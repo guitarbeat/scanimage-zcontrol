@@ -4,6 +4,9 @@ function test_zcontrol
 % This script tests the basic functionality of both Z control methods
 % (direct hardware and ScanImage API) to verify proper operation.
 
+% Add the src directory to the path
+addpath(fullfile(fileparts(mfilename('fullpath')), '..', 'src'));
+
 %% Test Direct Hardware Control
 fprintf('Testing ThorlabsZControl (Direct Hardware Control)...\n');
 
@@ -18,7 +21,20 @@ try
         % Get current position
         pos = z.getCurrentPosition();
         fprintf('✓ Current Z position: %.2f\n', pos);
-        
+
+        % Test setVelocity
+        fprintf('Testing setVelocity...\n');
+        try
+            successVel = z.setVelocity(z.velocity);
+            if successVel
+                fprintf('✓ setVelocity successful\n');
+            else
+                fprintf('✗ setVelocity returned false\n');
+            end
+        catch ME
+            fprintf('✗ setVelocity threw an error: %s\n', ME.message);
+        end
+
         % Test relative movement
         fprintf('Testing relative movement...\n');
         success = z.moveRelative(1.0);  % Move 1 µm up

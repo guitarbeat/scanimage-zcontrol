@@ -77,19 +77,12 @@ classdef SIZControl < handle
                     @() obj.getZPositionFromStackManager(),
                     @() obj.getZPositionFromFastZ()
                 };
-                
-                for i = 1:length(methods)
-                    try
-                        pos = methods{i}();
-                        if ~isempty(pos) && ~isnan(pos)
-                            return;
-                        end
-                    catch
-                        % Try next method
-                    end
+
+                [pos, success] = obj.tryMethods(methods);
+
+                if ~success
+                    obj.log('Could not determine Z position, returning 0', 'warning');
                 end
-                
-                obj.log('Could not determine Z position, returning 0', 'warning');
             catch ME
                 obj.log(['Error getting Z position: ' ME.message], 'error');
             end
@@ -138,20 +131,14 @@ classdef SIZControl < handle
                     @() obj.setZPositionViaStackManager(targetPosition),
                     @() obj.setZPositionViaFastZ(targetPosition)
                 };
-                
-                for i = 1:length(methods)
-                    try
-                        success = methods{i}();
-                        if success
-                            obj.log(sprintf('Moved to position %.2f', targetPosition));
-                            return;
-                        end
-                    catch
-                        % Try next method
-                    end
+
+                [~, success] = obj.tryMethods(methods);
+
+                if success
+                    obj.log(sprintf('Moved to position %.2f', targetPosition));
+                else
+                    obj.log('Failed to set Z position using any available method', 'error');
                 end
-                
-                obj.log('Failed to set Z position using any available method', 'error');
             catch ME
                 obj.log(['Error in absolute move: ' ME.message], 'error');
             end
@@ -346,7 +333,40 @@ classdef SIZControl < handle
                 % Failed to set position via FastZ
             end
         end
-        
+
+        function [result, success] = tryMethods(obj, methodCell)
+            %TRYMETHODS Attempt a series of methods until one succeeds
+            %   methodCell should be a cell array of function handles. The
+            %   functions may return a logical indicating success or a
+            %   numeric value. Success is determined based on the returned
+            %   value.
+
+            result = [];
+            success = false;
+
+            for i = 1:numel(methodCell)
+                try
+                    tmp = methodCell{i}();
+
+                    if islogical(tmp)
+                        success = tmp;
+                    else
+                        success = ~isempty(tmp) && ~isnan(tmp);
+                    end
+
+                    if success
+                        obj.log(sprintf('Method %d succeeded', i));
+                        result = tmp;
+                        return;
+                    end
+                catch ME
+                    obj.log(sprintf('Method %d failed: %s', i, ME.message), 'warning');
+                end
+            end
+
+            obj.log('All methods failed', 'warning');
+        end
+
         function log(obj, message, level)
             % Log a message using the status callback
             

@@ -16,7 +16,6 @@ ScanImage Z Control provides a user-friendly GUI and robust backend for controll
 
 This solution is particularly useful for microscopy setups where ScanImage's built-in Z control methods are unreliable or limited.
 
-![GUI Screenshot](docs/images/gui_screenshot.png)
 
 ## Repository Structure
 

@@ -258,7 +258,7 @@ classdef ThorlabsZControl < handle
             
             try
                 obj.log(sprintf('Setting velocity to: %.2f', velocity), 1);
-                obj.hC.SetVelParams(0, 0, acceleration, velocity);
+                obj.hC.SetVelParams(0, 0, obj.acceleration, velocity);
                 obj.velocity = velocity;
                 success = true;
             catch ME

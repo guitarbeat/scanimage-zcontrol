@@ -26,6 +26,20 @@ This hybrid Z control solution provides a user-friendly GUI for controlling Z po
    ```
 3. The GUI will appear with controls for Z movement
 
+### Running the Test Script
+
+After launching ScanImage and adding the `src` folder to your
+MATLAB path, you can verify communication with your hardware by
+running the provided test script:
+
+```matlab
+run(fullfile('tests','test_zcontrol.m'));
+```
+
+The script checks both direct Thorlabs control and the ScanImage API
+wrapper.  A connected Thorlabs Kinesis motor is required for these
+tests.
+
 ## GUI Features
 
 ### Manual Control

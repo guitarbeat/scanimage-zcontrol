@@ -75,6 +75,20 @@ scanimage-zcontrol/
    - Use the GUI to switch between direct hardware control and ScanImage API
    - Try both methods to determine which works best with your setup
 
+## Running Tests
+
+Basic tests are included to verify that the Z control interface can
+communicate with your hardware.  After adding the `src` directory to
+your MATLAB path, run the following command in MATLAB:
+
+```matlab
+run(fullfile('tests','test_zcontrol.m'));
+```
+
+These tests require a running ScanImage session and a connected
+Thorlabs Kinesis motor. They will exercise both the direct hardware
+control class and the ScanImage API wrapper.
+
 ## Documentation
 
 For detailed information, please refer to the following documents:

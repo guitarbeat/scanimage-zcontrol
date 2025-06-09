@@ -1,9 +1,9 @@
 classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
-    % SI_BrightnessZControl - Monitor brightness and control Z position
+    % SI_BrightnessZControl - Z-position control with brightness monitoring
     %
-    % This class extends SI_MotorGUI_ZControl to add brightness monitoring
-    % and automated Z-scanning capabilities. It provides a GUI interface
-    % for controlling Z position based on image brightness.
+    % Extends SI_MotorGUI_ZControl to add real-time brightness monitoring,
+    % automated Z-scanning, and focal point detection. Provides a modern GUI
+    % for parameter control, visualization, and Z limit management.
     %
     % Usage:
     %   control = SI_BrightnessZControl();
@@ -79,8 +79,9 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
     end
     
     methods
+        %% GUI Construction and Initialization
         function obj = SI_BrightnessZControl()
-            % Constructor - Initialize the brightness Z-control system
+            % Constructor - Initialize the brightness Z-control system and GUI
             
             % Initialize base class
             obj@SI_MotorGUI_ZControl();
@@ -153,6 +154,7 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
             obj.scanPauseTime = 0.5;  % Default pause between steps
         end
         
+        %% Monitoring and Z-Scan Control
         function startMonitoring(obj)
             % Start brightness monitoring
             if obj.isMonitoring

@@ -1,12 +1,12 @@
 function findZfocus()
-    % findZfocus - Main entry point for Z-focus finding with brightness monitoring
+    % findZfocus - Launch the Brightness Z-Control GUI for Z-focus finding
     %
     % This function launches the main GUI for finding optimal Z-focus using
-    % brightness monitoring. The GUI uses a modern, compact layout with:
-    %   - Slider for step size
-    %   - GridLayout for all controls
-    %   - ToggleButtons for monitoring and Z-scan
-    %   - Status label and compact usage guide
+    % brightness monitoring. The GUI provides:
+    %   - Step size and pause controls
+    %   - Z limit management
+    %   - Brightness metric selection
+    %   - Real-time plot and status
     %
     % Ensure ScanImage is running and hSI is in the base workspace.
     %
@@ -34,31 +34,21 @@ function findZfocus()
     end
 end
 
+%% --- Validation and Utility Functions ---
 function validateScanImageEnvironment()
     % Validate ScanImage environment and components
-    
-    % Check if ScanImage is running
+    % Checks for hSI, channel, and display readiness
     if ~evalin('base', 'exist(''hSI'', ''var'')')
         error('ScanImage must be running with hSI in the base workspace');
     end
-    
-    % Get ScanImage handle
     hSI = evalin('base', 'hSI');
-    
-    % Verify ScanImage components
     fprintf('Verifying ScanImage components...\n');
-    
-    % Check if acquisition is active
     if ~strcmp(hSI.acqState, 'idle')
         warning('ScanImage acquisition is not idle. Some features may not work properly.');
     end
-    
-    % Check if Channel 1 is active
     if isempty(hSI.hChannels.channelsActive) || ~ismember(1, hSI.hChannels.channelsActive)
         warning('Channel 1 is not active. Brightness monitoring may not work properly.');
     end
-    
-    % Check if display is properly configured
     if isempty(hSI.hDisplay) || isempty(hSI.hDisplay.lastAveragedFrame)
         warning('Display component may not be properly initialized.');
     end

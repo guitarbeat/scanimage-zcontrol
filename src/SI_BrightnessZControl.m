@@ -73,6 +73,9 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
         hTestDropDown   % Test function dropdown
         hZAboveEdit     % Z Above Focus edit field
         hZBelowEdit     % Z Below Focus edit field
+        hMinZEdit       % Min Z edit field
+        hMaxZEdit       % Max Z edit field
+        hMetricDropDown % Metric dropdown
     end
     
     methods
@@ -219,46 +222,48 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
             % Start Z-scanning
             try
                 % Get and validate parameters
-                [stepSize, zAbove, zBelow, pauseTime] = obj.getScanParameters();
-                
+                [stepSize, pauseTime] = obj.getScanParameters();
                 % Set scan parameters
-                obj.setScanParameters(stepSize, zAbove, zBelow, pauseTime);
-                
+                obj.setScanParameters(stepSize, pauseTime);
                 % Start scanning if not already scanning
                 if ~obj.isScanning
                     obj.initializeScan();
                 end
-                
             catch ME
                 error('Failed to start Z-scan: %s', ME.message);
             end
         end
         
-        function [stepSize, zAbove, zBelow, pauseTime] = getScanParameters(obj)
+        function [stepSize, pauseTime] = getScanParameters(obj)
             % Get and validate scan parameters from GUI
-            stepSize = str2double(get(obj.hStepSizeValue, 'String'));
-            zAbove = str2double(get(obj.hZAboveEdit, 'String'));
-            zBelow = str2double(get(obj.hZBelowEdit, 'String'));
-            pauseTime = str2double(get(obj.hPauseTimeEdit, 'String'));
-            if isnan(stepSize) || isnan(zAbove) || isnan(zBelow) || isnan(pauseTime)
+            stepSize = str2double(obj.hStepSizeValue.Text);
+            pauseTime = str2double(obj.hPauseTimeEdit.Value);
+            if isnan(stepSize) || isnan(pauseTime)
                 error('Invalid parameters. Please check input values.');
             end
         end
         
-        function setScanParameters(obj, stepSize, zAbove, zBelow, pauseTime)
-            % Set scan parameters
+        function setScanParameters(obj, stepSize, pauseTime)
+            % Set scan parameters (now ignores zAbove/zBelow, uses Z limits)
             obj.scanStepSize = stepSize;
             obj.initialStepSize = stepSize;
             obj.scanPauseTime = pauseTime;
-            obj.zAbove = zAbove;
-            obj.zBelow = zBelow;
         end
         
         function initializeScan(obj)
-            % Initialize and start scanning between zAbove and zBelow
+            % Initialize and start scanning between Z limits
             currentZ = obj.getZ();
-            obj.scanStartZ = currentZ + obj.zAbove;
-            obj.scanEndZ = currentZ + obj.zBelow;
+            % Get Z limits from motor controls
+            minZ = obj.getZLimit('min');
+            maxZ = obj.getZLimit('max');
+            if currentZ < minZ
+                obj.scanStartZ = minZ;
+            elseif currentZ > maxZ
+                obj.scanStartZ = maxZ;
+            else
+                obj.scanStartZ = currentZ;
+            end
+            obj.scanEndZ = maxZ;
             obj.scanCurrentZ = obj.scanStartZ;
             obj.scanDirection = sign(obj.scanEndZ - obj.scanStartZ);
             % Reset adaptive scan properties
@@ -274,6 +279,24 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
                 'TimerFcn', @(~,~) obj.scanStep());
             start(obj.scanTimer);
             obj.updateStatus(sprintf('Scanning from Z=%.2f to Z=%.2f', obj.scanStartZ, obj.scanEndZ));
+        end
+        
+        function val = getZLimit(obj, which)
+            % Get Z min or max limit from motor controls
+            if strcmpi(which, 'min')
+                % Assume min limit is the value set when pbMinLim was pressed
+                % (You may need to store this in your class if not available from GUI)
+                val = str2double(get(obj.findByTag('pbMinLim'), 'UserData'));
+                if isnan(val)
+                    val = -Inf;
+                end
+            else
+                % Assume max limit is the value set when pbMaxLim was pressed
+                val = str2double(get(obj.findByTag('pbMaxLim'), 'UserData'));
+                if isnan(val)
+                    val = Inf;
+                end
+            end
         end
         
         function stopZScan(obj)
@@ -335,19 +358,26 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
                 if isempty(frameData)
                     return;
                 end
-                
                 % Get current Z position
                 currentZ = obj.getZ();
-                
-                % Calculate brightness (mean intensity)
-                brightness = mean(frameData(:));
-                
+                % Calculate brightness using selected metric
+                metric = obj.hMetricDropDown.Value;
+                switch metric
+                    case 'Mean'
+                        brightness = mean(frameData(:));
+                    case 'Median'
+                        brightness = median(frameData(:));
+                    case 'Max'
+                        brightness = max(frameData(:));
+                    case '95th Percentile'
+                        brightness = prctile(frameData(:), 95);
+                    otherwise
+                        brightness = mean(frameData(:));
+                end
                 % Store data
                 obj.storeBrightnessData(brightness, currentZ);
-                
                 % Update plot
                 obj.updatePlot();
-                
             catch ME
                 warning('Error in brightness callback: %s', ME.message);
             end
@@ -415,10 +445,11 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
                 'CloseRequestFcn', @obj.closeFigure, ...
                 'Resize', 'on');
 
-            % --- Main Grid Layout ---
-            mainGrid = uigridlayout(obj.hFig, [5, 2]);
-            mainGrid.RowHeight = {'fit', 50, '1x', 30, 30};
-            mainGrid.ColumnWidth = {'1x', 220};
+            % Remove Dev Tools panel and related controls
+            % Expand plot area and adjust grid layout
+            mainGrid = uigridlayout(obj.hFig, [4, 2]);
+            mainGrid.RowHeight = {'fit', 50, '1x', 30};
+            mainGrid.ColumnWidth = {'2x', '1x'};
             mainGrid.Padding = [10 10 10 10];
             mainGrid.RowSpacing = 5;
             mainGrid.ColumnSpacing = 10;
@@ -450,22 +481,6 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
             obj.hStepSizeValue.Layout.Row = 1;
             obj.hStepSizeValue.Layout.Column = 3;
 
-            lbl = uilabel(paramGrid, 'Text', 'Z Above (µm):', 'Tooltip', 'Z position above the expected focal point (µm)');
-            lbl.Layout.Row = 1;
-            lbl.Layout.Column = 4;
-            obj.hZAboveEdit = uieditfield(paramGrid, 'text', ...
-                'Value', '50', 'Tooltip', 'Z position above the expected focal point (µm)');
-            obj.hZAboveEdit.Layout.Row = 1;
-            obj.hZAboveEdit.Layout.Column = 5;
-
-            lbl = uilabel(paramGrid, 'Text', 'Z Below (µm):', 'Tooltip', 'Z position below the expected focal point (µm)');
-            lbl.Layout.Row = 2;
-            lbl.Layout.Column = 4;
-            obj.hZBelowEdit = uieditfield(paramGrid, 'text', ...
-                'Value', '-50', 'Tooltip', 'Z position below the expected focal point (µm)');
-            obj.hZBelowEdit.Layout.Row = 2;
-            obj.hZBelowEdit.Layout.Column = 5;
-
             lbl = uilabel(paramGrid, 'Text', 'Pause (s):', 'Tooltip', 'Pause between Z steps (seconds)');
             lbl.Layout.Row = 2;
             lbl.Layout.Column = 1;
@@ -473,6 +488,41 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
                 'Value', num2str(obj.scanPauseTime), 'Tooltip', 'Pause between Z steps (seconds)');
             obj.hPauseTimeEdit.Layout.Row = 2;
             obj.hPauseTimeEdit.Layout.Column = 2;
+
+            % Min Z
+            lbl = uilabel(paramGrid, 'Text', 'Min Z:', 'Tooltip', 'Set minimum Z limit');
+            lbl.Layout.Row = 2;
+            lbl.Layout.Column = 3;
+            obj.hMinZEdit = uieditfield(paramGrid, 'numeric', 'Tooltip', 'Minimum Z limit');
+            obj.hMinZEdit.Layout.Row = 2;
+            obj.hMinZEdit.Layout.Column = 4;
+            btn = uibutton(paramGrid, 'Text', 'Set Min Z', 'Tooltip', 'Set minimum Z limit', ...
+                'ButtonPushedFcn', @(~,~) obj.setMinZLimit());
+            btn.Layout.Row = 2;
+            btn.Layout.Column = 5;
+
+            % Max Z
+            lbl = uilabel(paramGrid, 'Text', 'Max Z:', 'Tooltip', 'Set maximum Z limit');
+            lbl.Layout.Row = 3;
+            lbl.Layout.Column = 3;
+            obj.hMaxZEdit = uieditfield(paramGrid, 'numeric', 'Tooltip', 'Maximum Z limit');
+            obj.hMaxZEdit.Layout.Row = 3;
+            obj.hMaxZEdit.Layout.Column = 4;
+            btn = uibutton(paramGrid, 'Text', 'Set Max Z', 'Tooltip', 'Set maximum Z limit', ...
+                'ButtonPushedFcn', @(~,~) obj.setMaxZLimit());
+            btn.Layout.Row = 3;
+            btn.Layout.Column = 5;
+
+            % Brightness Metric
+            lbl = uilabel(paramGrid, 'Text', 'Brightness Metric:', 'Tooltip', 'Select brightness metric');
+            lbl.Layout.Row = 4;
+            lbl.Layout.Column = 1;
+            obj.hMetricDropDown = uidropdown(paramGrid, ...
+                'Items', {'Mean', 'Median', 'Max', '95th Percentile'}, ...
+                'Tooltip', 'Select brightness metric', ...
+                'Value', 'Mean');
+            obj.hMetricDropDown.Layout.Row = 4;
+            obj.hMetricDropDown.Layout.Column = 2;
 
             % --- Actions Panel (Row 2, Col 2) ---
             actionPanel = uipanel(mainGrid, 'Title', 'Actions', 'FontWeight', 'bold');
@@ -505,45 +555,18 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
             btn.Layout.Row = 1;
             btn.Layout.Column = 3;
 
-            % --- Dev Tools Panel (Row 5, Col 2, collapsible) ---
-            devPanel = uipanel(mainGrid, 'Title', 'Dev Tools', 'FontWeight', 'bold', 'Visible', 'off');
-            devPanel.Layout.Row = 5;
-            devPanel.Layout.Column = 2;
-            devGrid = uigridlayout(devPanel, [1, 2]);
-            devGrid.RowHeight = {'1x'};
-            devGrid.ColumnWidth = {'1x','1x'};
-
-            obj.hTestDropDown = uidropdown(devGrid, ...
-                'Items', {'Run All Tests','Test Z Movement','Test Monitoring','Test Z-Scan','Test Max Brightness'}, ...
-                'Tooltip', 'Select a test to run');
-            obj.hTestDropDown.Layout.Row = 1;
-            obj.hTestDropDown.Layout.Column = 1;
-
-            btn = uibutton(devGrid, 'Text', 'Run', ...
-                'ButtonPushedFcn', @(~,~) obj.runTestFromDropdown());
-            btn.Layout.Row = 1;
-            btn.Layout.Column = 2;
-
-            % Toggle Dev Tools button
-            btn = uibutton(mainGrid, 'Text', 'Dev Tools ▼', ...
-                'Tooltip', 'Show/hide developer tools', ...
-                'FontSize', 10, 'BackgroundColor', [0.95 0.95 1], ...
-                'ButtonPushedFcn', @(src,~) set(devPanel, 'Visible', toggleVisibility(devPanel.Visible)));
-            btn.Layout.Row = 5;
-            btn.Layout.Column = 1;
-
             % --- Help Button (bottom right) ---
             btn = uibutton(mainGrid, 'Text', 'Help', ...
                 'Tooltip', 'Show usage guide', ...
                 'FontSize', 10, ...
                 'ButtonPushedFcn', @(~,~) helpdlg([ ...
-                    '1. Set step size, Z above/below focus, and pause time.' newline ...
+                    '1. Set step size and pause time.' newline ...
                     '2. Use Monitor and Z-Scan to acquire data.' newline ...
                     '3. Move to Max to go to brightest Z.' newline ...
                     '4. Dev Tools: run quick tests.' ...
                 ], 'Usage Guide'));
-            btn.Layout.Row = 5;
-            btn.Layout.Column = 2;
+            btn.Layout.Row = 4;
+            btn.Layout.Column = 1;
         end
         
         function closeFigure(obj, ~, ~)
@@ -572,7 +595,7 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
         end
         
         function scanStep(obj)
-            % Execute one step of the Z scan between zAbove and zBelow
+            % Execute one step of the Z scan between Z limits
             if obj.isScanning
                 try
                     % Move to next position
@@ -614,8 +637,6 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
             if src.Value
                 % Get parameters from GUI
                 stepSize = round(obj.hStepSizeSlider.Value);
-                zAbove = str2double(get(obj.hZAboveEdit, 'String'));
-                zBelow = str2double(get(obj.hZBelowEdit, 'String'));
                 obj.scanStepSize = stepSize;
                 obj.initialStepSize = stepSize;
                 obj.scanPauseTime = obj.hPauseTimeEdit.Value;
@@ -709,6 +730,24 @@ classdef SI_BrightnessZControl < SI_MotorGUI_ZControl
             % Update step size label and set step size in ScanImage motor controls immediately
             obj.hStepSizeValue.Text = num2str(round(value));
             obj.setStepSize(round(value));
+        end
+        
+        function setMinZLimit(obj)
+            % Move to Min Z, press SetLim (min)
+            minZ = obj.hMinZEdit.Value;
+            obj.absoluteMove(minZ);
+            pause(0.2);
+            obj.pressSetLimMin();
+            obj.updateStatus(sprintf('Set Min Z limit to %.2f', minZ));
+        end
+        
+        function setMaxZLimit(obj)
+            % Move to Max Z, press SetLim (max)
+            maxZ = obj.hMaxZEdit.Value;
+            obj.absoluteMove(maxZ);
+            pause(0.2);
+            obj.pressSetLimMax();
+            obj.updateStatus(sprintf('Set Max Z limit to %.2f', maxZ));
         end
     end
 end

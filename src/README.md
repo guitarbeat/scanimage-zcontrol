@@ -20,23 +20,8 @@ Base class for Z-position control through ScanImage's Motor Controls GUI. Provid
 
 ## Development and Testing Files
 
-
-### `investigate_image_data.m`
-Utility script for exploring image data access in ScanImage. Used during development to:
-- Test different methods of accessing image data
-- Verify channel configuration
-- Debug data scope access
-
-### `investigate_scanimage_vars.m`
-Development tool for exploring ScanImage's internal variables and properties. Used to:
-- Map ScanImage's object hierarchy
-- Identify relevant properties and methods
-- Debug integration points
-
 ## Usage
 
-For normal usage, you only need to use `SI_BrightnessZControl.m`. The other files are either:
-1. Supporting classes (`SI_MotorGUI_ZControl.m`)
-2. Development tools (investigation scripts)
+For normal usage, you only need to use `SI_BrightnessZControl.m`. The GUI is now more compact, uses available space efficiently, and is focused on Z control and brightness monitoring only. All development tools have been removed from the main interface for clarity and usability.
 
 See the main README.md for usage instructions. 

@@ -71,7 +71,7 @@ function displaySuccessMessage()
     fprintf('1. Set step size (slider), scan range, and pause time.\n');
     fprintf('2. Toggle Monitor and Z-Scan as needed.\n');
     fprintf('3. Use "Move to Max" to go to brightest position.\n');
-    fprintf('4. The GUI is now more compact and dev tools are collapsible.\n');
+    fprintf('4. The GUI is now more compact.\n');
 end
 
 function handleError(ME)

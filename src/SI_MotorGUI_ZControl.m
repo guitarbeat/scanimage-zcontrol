@@ -1,9 +1,9 @@
 classdef SI_MotorGUI_ZControl < handle
-    % SI_MotorGUI_ZControl - Control Z via ScanImage Motor Controls GUI
+    % SI_MotorGUI_ZControl - Interface for Z-axis control via ScanImage Motor Controls GUI
     %
-    % This class provides a base interface for controlling Z-axis movement
-    % through ScanImage's Motor Controls GUI. It handles finding and
-    % interacting with the motor control elements.
+    % Provides programmatic access to Z-position, step size, and movement controls
+    % in the ScanImage Motor Controls GUI. Supports absolute/relative movement,
+    % step size adjustment, and Z limit setting.
     %
     % Usage:
     %   z = SI_MotorGUI_ZControl();
@@ -25,19 +25,18 @@ classdef SI_MotorGUI_ZControl < handle
     end
     
     methods
+        %% Initialization
         function obj = SI_MotorGUI_ZControl()
-            % Constructor - Initialize motor control handles
+            % Constructor - Find and validate all required motor control handles
             try
                 obj.motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
                 if isempty(obj.motorFig)
                     error('Motor Controls window not found. Please ensure ScanImage is running and the Motor Controls window is open.');
                 end
-                
                 obj.etZPos = findall(obj.motorFig, 'Tag', 'etZPos');
                 obj.Zstep = findall(obj.motorFig, 'Tag', 'Zstep');
                 obj.Zdec = findall(obj.motorFig, 'Tag', 'Zdec');
                 obj.Zinc = findall(obj.motorFig, 'Tag', 'Zinc');
-                
                 % Validate all handles were found
                 if any(cellfun(@isempty, {obj.etZPos, obj.Zstep, obj.Zdec, obj.Zinc}))
                     error('One or more motor control elements not found. Please verify ScanImage setup.');
@@ -60,8 +59,9 @@ classdef SI_MotorGUI_ZControl < handle
             end
         end
         
+        %% Z Position and Step Size
         function z = getZ(obj)
-            % Get current Z position
+            % Get current Z position from the GUI
             try
                 z = str2double(obj.etZPos.String);
                 if isnan(z)
@@ -82,6 +82,7 @@ classdef SI_MotorGUI_ZControl < handle
             end
         end
         
+        %% Z Movement
         function moveUp(obj)
             % Move Z position up by one step
             try
@@ -112,11 +113,9 @@ classdef SI_MotorGUI_ZControl < handle
             % Move by a relative distance (positive = up, negative = down)
             try
                 validateattributes(distance, {'numeric'}, {'finite', 'scalar'});
-                
                 step = abs(distance);
                 obj.setStepSize(step);
                 n = round(abs(distance) / step);
-                
                 if distance > 0
                     for i = 1:n
                         obj.moveUp();
@@ -141,6 +140,38 @@ classdef SI_MotorGUI_ZControl < handle
             catch ME
                 error('Failed to perform absolute move: %s', ME.message);
             end
+        end
+
+        %% Z Limit and Utility Methods
+        function setMaxZStep(obj, value)
+            % Set the Max Z-Step field (value can be numeric or 'Inf')
+            if isnumeric(value)
+                valueStr = num2str(value);
+            else
+                valueStr = value;
+            end
+            set(obj.findByTag('etMaxZStep'), 'String', valueStr);
+        end
+
+        function pressSetLimMax(obj)
+            % Press the SetLim button for max Z
+            btn = obj.findByTag('pbMaxLim');
+            if ~isempty(btn)
+                btn.Callback(btn, []);
+            end
+        end
+
+        function pressSetLimMin(obj)
+            % Press the SetLim button for min Z
+            btn = obj.findByTag('pbMinLim');
+            if ~isempty(btn)
+                btn.Callback(btn, []);
+            end
+        end
+
+        function h = findByTag(obj, tag)
+            % Utility to find a control by tag in the Motor Controls window
+            h = findall(obj.motorFig, 'Tag', tag);
         end
     end
 end 

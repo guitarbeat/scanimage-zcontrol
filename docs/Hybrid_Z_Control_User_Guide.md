@@ -1,116 +1,82 @@
-# Hybrid Z Control for ScanImage - User Guide
+# ScanImage Z Control - User Guide
 
 ## Overview
 
-This hybrid Z control solution provides a user-friendly GUI for controlling Z position in ScanImage, using both direct hardware control (via Thorlabs Kinesis ActiveX) and ScanImage API methods where available. The solution is specifically tailored for your setup with Thorlabs Kinesis motors.
+This solution provides robust, programmatic control of the Z position in ScanImage by directly interfacing with the ScanImage Motor Controls GUI. It is compatible with any ScanImage setup, including those using Thorlabs Kinesis motors, and avoids hardware conflicts by using the same GUI controls as the user.
 
 ## Files Included
 
-1. **launchHybridZControlGUI.m** - The main GUI launcher script
-2. **ThorlabsZControl.m** - Direct hardware control class for Thorlabs Kinesis motors
-3. **SIZControl.m** - ScanImage API wrapper class for Z control
+- **SI_MotorGUI_ZControl.m** — Main class for controlling Z via the ScanImage Motor Controls GUI
 
 ## Installation
 
-1. Copy all three files to a directory in your MATLAB path
-2. Ensure Thorlabs APT/Kinesis software is installed on your system
-   - The software version (32-bit/64-bit) must match your MATLAB version
-   - Default installation path: `C:\Program Files\Thorlabs\Kinesis`
+1. Copy `SI_MotorGUI_ZControl.m` to a directory in your MATLAB path (e.g., `src/`)
+2. Start ScanImage as usual and ensure the Motor Controls GUI is open
 
 ## Usage
 
-1. Start ScanImage as usual
-2. Run the following command in MATLAB:
+1. In MATLAB, create the controller:
    ```matlab
-   launchHybridZControlGUI
+   z = SI_MotorGUI_ZControl();
    ```
-3. The GUI will appear with controls for Z movement
+2. Read the current Z position:
+   ```matlab
+   z.getZ()
+   ```
+3. Set the step size (e.g., 5 µm):
+   ```matlab
+   z.setStepSize(5);
+   ```
+4. Move up or down by one step:
+   ```matlab
+   z.moveUp();
+   z.moveDown();
+   ```
+5. Move by a relative distance (e.g., +20 µm or -10 µm):
+   ```matlab
+   z.relativeMove(20);   % Up 20 µm
+   z.relativeMove(-10);  % Down 10 µm
+   ```
+6. Move to an absolute Z position (e.g., 12000 µm):
+   ```matlab
+   z.absoluteMove(12000);
+   ```
 
-### Running the Test Script
+## Features
 
-After launching ScanImage and adding the `src` folder to your
-MATLAB path, you can verify communication with your hardware by
-running the provided test script:
-
-```matlab
-run(fullfile('tests','test_zcontrol.m'));
-```
-
-The script checks both direct Thorlabs control and the ScanImage API
-wrapper.  A connected Thorlabs Kinesis motor is required for these
-tests.
-
-## GUI Features
-
-### Manual Control
-- **Move Up/Down**: Move Z position by the specified step size
-- **Step Size**: Adjust the distance for each step (in µm)
-- **Go to Z**: Move directly to a specific Z position
-- **Update Position**: Refresh the current Z position display
-
-### Automated Scanning
-- **Number of Steps**: How many steps to take during automated scanning
-- **Delay Between Steps**: Time to wait between steps (in seconds)
-- **Direction**: Choose to scan upward or downward
-- **Start Scan**: Begin automated Z scanning
-- **Stop**: Halt the current scan
-- **Return to Start**: Go back to the position where scanning began
-
-### Configuration
-- **Z Control Method**: Choose between direct hardware control and ScanImage API
-  - **Direct Hardware Control**: Uses Thorlabs ActiveX to control motors directly
-  - **ScanImage API**: Attempts to use ScanImage's built-in Z control methods
-- **Debug Level**: Adjust the verbosity of status messages
+- **No hardware conflicts**: Uses ScanImage's own GUI controls
+- **Robust**: Works with any ScanImage-supported motor
+- **Scriptable**: Automate Z movement, focus routines, or integrate into your own GUIs
 
 ## Troubleshooting
 
-### Connection Issues
-- If the GUI fails to connect to your Thorlabs motor:
-  1. Verify the motor is powered on and connected via USB
-  2. Check that Thorlabs Kinesis software can control the motor
-  3. Ensure the correct serial number is detected (shown in status messages)
-  4. Try restarting MATLAB and ScanImage
+- Ensure the Motor Controls GUI is open in ScanImage
+- If you get errors about missing controls, close and reopen the Motor Controls GUI
+- If Z does not move, check that ScanImage is not busy/acquiring
 
-### Movement Issues
-- If Z movement fails:
-  1. Try switching between Direct Hardware Control and ScanImage API
-  2. Check the status messages for specific error information
-  3. Verify motor limits are set correctly in your MDF file
-  4. Try smaller step sizes for more reliable movement
+## Advanced: Automated Z Scanning (Next Step)
 
-### ActiveX Errors
-- If you see ActiveX-related errors:
-  1. Ensure Thorlabs Kinesis software is installed correctly
-  2. Check that the MATLAB bitness (32/64-bit) matches the Kinesis installation
-  3. Try running MATLAB as administrator
+You can use the `relativeMove` and `absoluteMove` methods in a loop to perform automated Z scanning, e.g.:
 
-## Technical Details
-
-### Direct Hardware Control
-The `ThorlabsZControl` class connects directly to your Thorlabs Kinesis motor using ActiveX controls, bypassing ScanImage's motor control system. This approach is based on the method used in BakingTray, which successfully controls Thorlabs motors independently of ScanImage.
-
-### ScanImage API Control
-The `SIZControl` class attempts to use various methods in the ScanImage API to control Z position:
-1. First tries using `hSI.hMotors.moveXYZ`
-2. Falls back to `hSI.hStackManager.zPosition`
-3. Tries `hSI.hFastZ.positionTarget`
-4. Attempts to access the Z motor directly through `hMotorXYZ{3}`
-
-### Hybrid Approach
-The GUI allows you to switch between these methods, so you can use whichever works best with your specific hardware configuration.
+```matlab
+z = SI_MotorGUI_ZControl();
+startZ = z.getZ();
+step = 2; % µm
+nSteps = 20;
+for i = 1:nSteps
+    z.relativeMove(step);
+    pause(0.2); % adjust as needed
+    % Insert your image acquisition or focus metric code here
+end
+z.absoluteMove(startZ); % Return to start
+```
 
 ## Customization
-
-You can modify the following parameters in the code:
-- Default step size
-- Movement velocity and acceleration (in ThorlabsZControl.m)
-- Position limits (in ThorlabsZControl.m)
-- Debug verbosity levels
+- Change the default step size in your scripts
+- Integrate with image acquisition or autofocus routines
 
 ## Support
-
 If you encounter issues or need further customization, please provide:
-1. Specific error messages from the status window
+1. Specific error messages
 2. Your ScanImage version
-3. Your Thorlabs Kinesis software version
-4. Screenshots of any error dialogs
+3. Screenshots of the Motor Controls GUI

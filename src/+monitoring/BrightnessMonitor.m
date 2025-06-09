@@ -3,6 +3,7 @@ classdef BrightnessMonitor < handle
 
     properties (Access = public)
         activeChannel = 1 % Active channel for monitoring
+        isMonitoring = false % Monitoring state flag
     end
 
     properties (Access = private)
@@ -19,7 +20,7 @@ classdef BrightnessMonitor < handle
         
         % Monitoring state
         originalCallback % Original data scope callback
-        isMonitoring = false % Monitoring state flag
+        monitorTimer    % Timer for monitoring when callbacks aren't available
         
         % Display properties
         rollingAverageFactor = 1 % Rolling average factor for display
@@ -41,22 +42,40 @@ classdef BrightnessMonitor < handle
             end
             
             try
-                % Verify data scope is available
-                if isempty(obj.hSI.hScan2D) || isempty(obj.hSI.hScan2D.hDataScope)
-                    error('Data scope not available. Make sure ScanImage is properly initialized.');
-                end
-                
-                % Store original callback
-                obj.originalCallback = obj.hSI.hScan2D.hDataScope.callback;
-                
-                % Set up new callback
-                obj.hSI.hScan2D.hDataScope.callback = @obj.brightnessCallback;
-                
                 % Initialize data storage
                 obj.initializeDataStorage();
                 
                 % Set display settings for monitoring
                 obj.displaySettings.displayRollingAverageFactor = 1;
+                
+                % Try different methods to set up frame monitoring based on ScanImage version
+                if ~isempty(obj.hSI.hScan2D) && ~isempty(obj.hSI.hScan2D.hDataScope)
+                    try
+                        % First try the standard callback method
+                        if isprop(obj.hSI.hScan2D.hDataScope, 'callback')
+                            % Store original callback
+                            obj.originalCallback = obj.hSI.hScan2D.hDataScope.callback;
+                            % Set up new callback
+                            obj.hSI.hScan2D.hDataScope.callback = @obj.brightnessCallback;
+                        % Then try other known methods in different ScanImage versions
+                        elseif isprop(obj.hSI.hScan2D.hDataScope, 'functionHandle')
+                            obj.originalCallback = obj.hSI.hScan2D.hDataScope.functionHandle;
+                            obj.hSI.hScan2D.hDataScope.functionHandle = @obj.brightnessCallback;
+                        elseif isprop(obj.hSI.hScan2D, 'frameAcquiredFcn')
+                            obj.originalCallback = obj.hSI.hScan2D.frameAcquiredFcn;
+                            obj.hSI.hScan2D.frameAcquiredFcn = @obj.brightnessCallback;
+                        else
+                            % Create a timer as fallback if we can't hook into ScanImage directly
+                            obj.createMonitoringTimer();
+                        end
+                    catch
+                        % Fallback to timer-based monitoring
+                        obj.createMonitoringTimer();
+                    end
+                else
+                    % Fallback to timer-based monitoring
+                    obj.createMonitoringTimer();
+                end
                 
                 obj.isMonitoring = true;
                 obj.controller.updateStatus('Monitoring started');
@@ -73,10 +92,26 @@ classdef BrightnessMonitor < handle
             end
             
             try
-                % Verify data scope is available
+                % Check how we're monitoring and clean up appropriately
                 if ~isempty(obj.hSI.hScan2D) && ~isempty(obj.hSI.hScan2D.hDataScope)
-                    % Restore original callback
-                    obj.hSI.hScan2D.hDataScope.callback = obj.originalCallback;
+                    try
+                        % Try to restore original callback using various methods
+                        if isprop(obj.hSI.hScan2D.hDataScope, 'callback')
+                            obj.hSI.hScan2D.hDataScope.callback = obj.originalCallback;
+                        elseif isprop(obj.hSI.hScan2D.hDataScope, 'functionHandle')
+                            obj.hSI.hScan2D.hDataScope.functionHandle = obj.originalCallback;
+                        elseif isprop(obj.hSI.hScan2D, 'frameAcquiredFcn')
+                            obj.hSI.hScan2D.frameAcquiredFcn = obj.originalCallback;
+                        end
+                    catch
+                        % Ignore errors when trying to restore callbacks
+                    end
+                end
+                
+                % Stop any timer
+                if isfield(obj, 'monitorTimer') && ~isempty(obj.monitorTimer) && isvalid(obj.monitorTimer)
+                    stop(obj.monitorTimer);
+                    delete(obj.monitorTimer);
                 end
                 
                 % Restore display settings
@@ -120,6 +155,41 @@ classdef BrightnessMonitor < handle
                 obj.controller.updatePlot();
             catch ME
                 warning('Error in brightness callback: %s', ME.message);
+            end
+        end
+
+        function [brightness, currentZ] = getCurrentBrightness(obj)
+            % Get the current brightness and Z position
+            try
+                % Get current frame data
+                frameData = obj.hSI.hDisplay.lastAveragedFrame;
+                if isempty(frameData)
+                    brightness = NaN;
+                    currentZ = NaN;
+                    return;
+                end
+                
+                % Get current Z position
+                currentZ = obj.controller.getZ();
+                
+                % Calculate brightness using selected metric
+                metric = obj.controller.getBrightnessMetric();
+                switch metric
+                    case 'Mean'
+                        brightness = mean(frameData(:));
+                    case 'Median'
+                        brightness = median(frameData(:));
+                    case 'Max'
+                        brightness = max(frameData(:));
+                    case '95th Percentile'
+                        brightness = prctile(frameData(:), 95);
+                    otherwise
+                        brightness = mean(frameData(:));
+                end
+            catch ME
+                warning('Error getting current brightness: %s', ME.message);
+                brightness = NaN;
+                currentZ = NaN;
             end
         end
 
@@ -173,6 +243,21 @@ classdef BrightnessMonitor < handle
             obj.timeData = zeros(1, obj.maxPoints);
             obj.currentIndex = 1;
             obj.startTime = tic;
+        end
+
+        function createMonitoringTimer(obj)
+            % Create a timer for monitoring when direct callbacks aren't available
+            if isfield(obj, 'monitorTimer') && ~isempty(obj.monitorTimer) && isvalid(obj.monitorTimer)
+                stop(obj.monitorTimer);
+                delete(obj.monitorTimer);
+            end
+            
+            % Create a timer that calls brightnessCallback every 0.25 seconds
+            obj.monitorTimer = timer('ExecutionMode', 'fixedRate', ...
+                                    'Period', 0.25, ...
+                                    'TimerFcn', @(~,~) obj.brightnessCallback([], []), ...
+                                    'ErrorFcn', @(~,~) warning('Error in monitoring timer'));
+            start(obj.monitorTimer);
         end
 
         function storeBrightnessData(obj, brightness, currentZ)

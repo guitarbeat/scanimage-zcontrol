@@ -1,5 +1,5 @@
-classdef SI_BrightnessZControl < core.MotorGUI_ZControl
-    % SI_BrightnessZControl - Z-position control with brightness monitoring
+classdef BrightnessZController < core.MotorGUI_ZControl
+    % BrightnessZController - Z-position control with brightness monitoring
     %
     % This class acts as the main controller, coordinating the GUI,
     % brightness monitoring, and Z-scanning components.
@@ -23,64 +23,11 @@ classdef SI_BrightnessZControl < core.MotorGUI_ZControl
         hCSFocus         % Focus coordinate system handle
         hCSSample        % Sample coordinate system handle
         channelSettings  % Channel settings handle
-        
-        % Brightness monitoring properties
-        hFig            % Main figure handle
-        hAx             % Plot axes handle
-        brightnessData  % Brightness measurement data
-        zPositionData   % Z position data
-        timeData        % Time data
-        currentIndex    % Current data index
-        startTime       % Start time for monitoring
-        maxPoints = 1000 % Maximum number of data points
-        
-        % Monitoring state
-        originalCallback % Original data scope callback
-        isMonitoring = false % Monitoring state flag
-        
-        % Channel properties
-        activeChannel = 1 % Active channel for monitoring
-        
-        % Display properties
-        rollingAverageFactor = 1 % Rolling average factor for display
-        
-        % Z-scan properties
-        isScanning      % Scanning state flag
-        scanTimer       % Timer for scanning
-        scanStepSize    % Step size for scanning
-        scanRange       % Range for scanning
-        scanDirection   % Direction of scanning
-        scanStartZ      % Starting Z position
-        scanEndZ        % Ending Z position
-        scanCurrentZ    % Current Z position
-        
-        % Adaptive scan properties
-        minStepSize = 1      % Minimum step size
-        brightnessThreshold = 0.1  % Brightness change threshold
-        lastBrightness = 0   % Last measured brightness
-        consecutiveDecreases = 0  % Consecutive brightness decreases
-        maxConsecutiveDecreases = 3  % Maximum consecutive decreases
-        
-        % GUI elements
-        hStatusText     % Status text label
-        hStepSizeEdit   % Step size edit field
-        hRangeEdit      % Range edit field
-        hPauseTimeEdit  % Pause time edit field
-        hStepSizeSlider % Step size slider
-        hStepSizeValue  % Step size value label
-        hMonitorToggle  % Monitor toggle button
-        hZScanToggle    % Z-scan toggle button
-        hTestDropDown   % Test function dropdown
-        hZAboveEdit     % Z Above Focus edit field
-        hZBelowEdit     % Z Below Focus edit field
-        hMinZEdit       % Min Z edit field
-        hMaxZEdit       % Max Z edit field
-        hMetricDropDown % Metric dropdown
     end
     
     methods
         %% GUI Construction and Initialization
-        function obj = SI_BrightnessZControl()
+        function obj = BrightnessZController()
             % Constructor - Initialize the brightness Z-control system
             
             % Initialize base class
@@ -90,13 +37,13 @@ classdef SI_BrightnessZControl < core.MotorGUI_ZControl
                 % Get ScanImage handle
                 obj.hSI = evalin('base', 'hSI');
                 
-                % Initialize components
-                obj.initializeComponents();
-                
                 % Create components
                 obj.gui = gui.BrightnessZControlGUI(obj);
                 obj.monitor = monitoring.BrightnessMonitor(obj, obj.hSI);
                 obj.scanner = scan.ZScanner(obj);
+
+                % Initialize components
+                obj.initializeComponents();
 
                 % Create the GUI
                 obj.gui.create();
@@ -250,11 +197,3 @@ classdef SI_BrightnessZControl < core.MotorGUI_ZControl
         end
     end
 end
-
-function vis = toggleVisibility(current)
-    if strcmp(current, 'off')
-        vis = 'on';
-    else
-        vis = 'off';
-    end
-end 

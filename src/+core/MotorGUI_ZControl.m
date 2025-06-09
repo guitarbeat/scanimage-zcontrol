@@ -1,12 +1,12 @@
-classdef SI_MotorGUI_ZControl < handle
-    % SI_MotorGUI_ZControl - Interface for Z-axis control via ScanImage Motor Controls GUI
+classdef MotorGUI_ZControl < handle
+    % MotorGUI_ZControl - Interface for Z-axis control via ScanImage Motor Controls GUI
     %
     % Provides programmatic access to Z-position, step size, and movement controls
     % in the ScanImage Motor Controls GUI. Supports absolute/relative movement,
     % step size adjustment, and Z limit setting.
     %
     % Usage:
-    %   z = SI_MotorGUI_ZControl();
+    %   z = core.MotorGUI_ZControl();
     %   z.getZ();                    % Get current Z position
     %   z.setStepSize(5);            % Set step size to 5 units
     %   z.moveUp();                  % Move up one step
@@ -26,7 +26,7 @@ classdef SI_MotorGUI_ZControl < handle
     
     methods
         %% Initialization
-        function obj = SI_MotorGUI_ZControl()
+        function obj = MotorGUI_ZControl()
             % Constructor - Find and validate all required motor control handles
             try
                 obj.motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');

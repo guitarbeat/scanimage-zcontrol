@@ -1,6 +1,6 @@
 classdef UIEventHandlers < handle
     % UIEventHandlers - Helper class for handling UI events
-    % Used by BrightnessZControlGUIv3 to handle various UI interactions
+    % Used by FocusGUI to handle various UI interactions
     
     methods (Static)
         function updateStepSizeValueDisplay(stepSizeValue, value)

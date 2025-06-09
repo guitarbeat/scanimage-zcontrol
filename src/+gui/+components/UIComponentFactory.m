@@ -1,6 +1,6 @@
 classdef UIComponentFactory < handle
     % UIComponentFactory - Helper class for creating UI components
-    % Used by BrightnessZControlGUIv3 to create various UI elements
+    % Used by FocusGUI to create various UI elements
     
     methods (Static)
         function panel = createStyledPanel(parent, title, row, column)
@@ -76,7 +76,7 @@ classdef UIComponentFactory < handle
             instructText.Layout.Column = 1;
         end
         
-        function createScanParametersPanel(parent, paramPanel, controller, stepSizeSlider, stepSizeValue, pauseTimeEdit, metricDropDown, minZEdit, maxZEdit)
+        function [stepSizeSlider, stepSizeValue, pauseTimeEdit, metricDropDown, minZEdit, maxZEdit] = createScanParametersPanel(parent, paramPanel, controller)
             % Creates the scan parameters panel
             paramGrid = uigridlayout(paramPanel, [5, 4]);
             paramGrid.RowHeight = {'fit', 10, 'fit', 'fit', 'fit'};
@@ -100,7 +100,12 @@ classdef UIComponentFactory < handle
             sliderGrid.RowSpacing = 0;
             
             % Modern styled slider
-            stepSizeSlider.Parent = sliderGrid;
+            stepSizeSlider = uislider(sliderGrid, ...
+                'Limits', [1 50], ...
+                'Value', controller.initialStepSize, ...
+                'MajorTicks', [1 8 15 22 29 36 43 50], ...
+                'MinorTicks', [], ...
+                'Tooltip', 'Set the Z scan step size (µm)');
             stepSizeSlider.Layout.Row = 1;
             stepSizeSlider.Layout.Column = 1;
             
@@ -127,11 +132,11 @@ classdef UIComponentFactory < handle
             valueGrid = uigridlayout(valuePanel, [1, 1]);
             valueGrid.Padding = [0 0 0 0];
             
-            stepSizeValue.Parent = valueGrid;
-            stepSizeValue.Text = num2str(controller.initialStepSize);
-            stepSizeValue.HorizontalAlignment = 'center';
-            stepSizeValue.FontWeight = 'bold';
-            stepSizeValue.FontSize = 14;
+            stepSizeValue = uilabel(valueGrid, ...
+                'Text', num2str(controller.initialStepSize), ...
+                'HorizontalAlignment', 'center', ...
+                'FontWeight', 'bold', ...
+                'FontSize', 14);
             
             % Separator
             separatorPanel = uipanel(paramGrid, 'BorderType', 'line', 'BackgroundColor', paramPanel.BackgroundColor);
@@ -142,34 +147,24 @@ classdef UIComponentFactory < handle
             % Pause Time with better layout
             UIComponentFactory.createStyledLabel(paramGrid, 'Pause (s):', 3, 1, 'Pause between Z steps (seconds)');
             
-            pauseTimeEdit.Parent = paramGrid;
-            pauseTimeEdit.Value = controller.scanPauseTime;
-            pauseTimeEdit.ValueDisplayFormat = '%.1f';
-            pauseTimeEdit.Tooltip = 'Pause between Z steps (seconds)';
-            pauseTimeEdit.HorizontalAlignment = 'center';
-            pauseTimeEdit.FontSize = 12;
-            pauseTimeEdit.BackgroundColor = [1 1 1];
-            pauseTimeEdit.Layout.Row = 3;
-            pauseTimeEdit.Layout.Column = 2;
+            pauseTimeEdit = UIComponentFactory.createStyledEditField(paramGrid, 3, 2, controller.scanPauseTime, '%.1f', 'Pause between Z steps (seconds)');
             
             % Brightness Metric with better layout
             UIComponentFactory.createStyledLabel(paramGrid, 'Brightness Metric:', 3, 3, 'Select brightness metric');
             
-            metricDropDown.Parent = paramGrid;
+            metricDropDown = uidropdown(paramGrid, ...
+                'Items', {'Mean', 'Median', 'Max', '95th Percentile'}, ...
+                'Tooltip', 'Select brightness metric', ...
+                'FontSize', 12, ...
+                'BackgroundColor', [1 1 1], ...
+                'Value', 'Mean');
             metricDropDown.Layout.Row = 3;
             metricDropDown.Layout.Column = 4;
 
             % Min Z with better layout and visual connection
             UIComponentFactory.createStyledLabel(paramGrid, 'Min Z Position:', 4, 1, 'Set minimum Z limit (µm)');
             
-            minZEdit.Parent = paramGrid;
-            minZEdit.ValueDisplayFormat = '%.1f';
-            minZEdit.Tooltip = 'Minimum Z limit (µm)';
-            minZEdit.HorizontalAlignment = 'center';
-            minZEdit.FontSize = 12;
-            minZEdit.BackgroundColor = [1 1 1];
-            minZEdit.Layout.Row = 4;
-            minZEdit.Layout.Column = 2;
+            minZEdit = UIComponentFactory.createStyledEditField(paramGrid, 4, 2, [], '%.1f', 'Minimum Z limit (µm)');
             
             UIComponentFactory.createStyledButton(paramGrid, 'Set Min Z', 4, [3 4], @(~,~) controller.setMinZLimit(), ...
                 'Set current position as minimum Z limit', [0.9 0.9 1.0]);
@@ -177,20 +172,13 @@ classdef UIComponentFactory < handle
             % Max Z with better layout and visual connection
             UIComponentFactory.createStyledLabel(paramGrid, 'Max Z Position:', 5, 1, 'Set maximum Z limit (µm)');
             
-            maxZEdit.Parent = paramGrid;
-            maxZEdit.ValueDisplayFormat = '%.1f';
-            maxZEdit.Tooltip = 'Maximum Z limit (µm)';
-            maxZEdit.HorizontalAlignment = 'center';
-            maxZEdit.FontSize = 12;
-            maxZEdit.BackgroundColor = [1 1 1];
-            maxZEdit.Layout.Row = 5;
-            maxZEdit.Layout.Column = 2;
+            maxZEdit = UIComponentFactory.createStyledEditField(paramGrid, 5, 2, [], '%.1f', 'Maximum Z limit (µm)');
             
             UIComponentFactory.createStyledButton(paramGrid, 'Set Max Z', 5, [3 4], @(~,~) controller.setMaxZLimit(), ...
                 'Set current position as maximum Z limit', [0.9 0.9 1.0]);
         end
         
-        function createZControlPanel(parent, zControlPanel, controller, currentZLabel)
+        function currentZLabel = createZControlPanel(parent, zControlPanel, controller)
             % Creates the Z control panel with movement buttons
             zControlGrid = uigridlayout(zControlPanel, [3, 2]);
             zControlGrid.RowHeight = {'fit', '1x', 'fit'};
@@ -210,12 +198,9 @@ classdef UIComponentFactory < handle
             zPosValueGrid = uigridlayout(zPosPanel, [1, 1]);
             zPosValueGrid.Padding = [0 0 0 0];
             
-            currentZLabel.Parent = zPosValueGrid;
-            currentZLabel.Text = '0.0';
-            currentZLabel.HorizontalAlignment = 'center';
-            currentZLabel.FontWeight = 'bold';
-            currentZLabel.FontSize = 20;
-            currentZLabel.FontColor = [0.2 0.2 0.7];
+            currentZLabel = uilabel(zPosValueGrid, 'Text', '0.0', ...
+                'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'FontSize', 20, ...
+                'FontColor', [0.2 0.2 0.7]);
             
             % Z Movement Buttons with clear labels and modern styling
             upBtn = uibutton(zControlGrid, 'Text', '▲ Up', 'FontSize', 14, 'FontWeight', 'bold', ...
@@ -253,7 +238,7 @@ classdef UIComponentFactory < handle
             axes.FontSize = 11;
         end
         
-        function createActionPanel(parent, actionPanel, controller, monitorToggle, zScanToggle, focusButton, grabButton, abortButton)
+        function [monitorToggle, zScanToggle, focusButton, grabButton, abortButton] = createActionPanel(parent, actionPanel, controller)
             % Creates the action panel with control buttons
             actionGrid = uigridlayout(actionPanel, [1, 5]);
             actionGrid.RowHeight = {'fit'};
@@ -262,22 +247,18 @@ classdef UIComponentFactory < handle
             actionGrid.ColumnSpacing = 15;
 
             % Monitor toggle button
-            monitorToggle.Parent = actionGrid;
-            monitorToggle.Text = '👁️ Monitor Brightness';
-            monitorToggle.FontSize = 13;
-            monitorToggle.FontWeight = 'bold';
-            monitorToggle.Tooltip = 'Start/stop real-time brightness monitoring while you manually move Z stage';
-            monitorToggle.BackgroundColor = [0.85 0.95 0.85];
+            monitorToggle = uibutton(actionGrid, 'state', ...
+                'Text', '👁️ Monitor Brightness', 'FontSize', 13, 'FontWeight', 'bold', ...
+                'Tooltip', 'Start/stop real-time brightness monitoring while you manually move Z stage', ...
+                'BackgroundColor', [0.85 0.95 0.85]);
             monitorToggle.Layout.Row = 1;
             monitorToggle.Layout.Column = 1;
 
             % Z-scan toggle button
-            zScanToggle.Parent = actionGrid;
-            zScanToggle.Text = '🔍 Auto Z-Scan';
-            zScanToggle.FontSize = 13;
-            zScanToggle.FontWeight = 'bold';
-            zScanToggle.Tooltip = 'Start automatic Z scan to find focus - scans through Z range and records brightness';
-            zScanToggle.BackgroundColor = [0.7 0.85 1.0];
+            zScanToggle = uibutton(actionGrid, 'state', ...
+                'Text', '🔍 Auto Z-Scan', 'FontSize', 13, 'FontWeight', 'bold', ...
+                'Tooltip', 'Start automatic Z scan to find focus - scans through Z range and records brightness', ...
+                'BackgroundColor', [0.7 0.85 1.0]);
             zScanToggle.Layout.Row = 1;
             zScanToggle.Layout.Column = 2;
 
@@ -287,33 +268,20 @@ classdef UIComponentFactory < handle
                 'Move to the Z position with maximum brightness (best focus)', [1.0 0.85 0.85], 13);
 
             % Focus button
-            focusButton.Parent = actionGrid;
-            focusButton.Text = '🔄 Focus';
-            focusButton.FontSize = 13;
-            focusButton.FontWeight = 'bold';
-            focusButton.Tooltip = 'Start Focus mode in ScanImage';
-            focusButton.BackgroundColor = [0.85 0.95 0.95];
-            focusButton.Layout.Row = 1;
-            focusButton.Layout.Column = 4;
+            focusButton = UIComponentFactory.createStyledButton(actionGrid, '🔄 Focus', 1, 4, ...
+                @(~,~) controller.startSIFocus(), ...
+                'Start Focus mode in ScanImage', [0.85 0.95 0.95], 13);
 
             % Grab button
-            grabButton.Parent = actionGrid;
-            grabButton.Text = '📷 Grab';
-            grabButton.FontSize = 13;
-            grabButton.FontWeight = 'bold';
-            grabButton.Tooltip = 'Grab a single frame in ScanImage';
-            grabButton.BackgroundColor = [0.95 0.95 0.85];
-            grabButton.Layout.Row = 1;
-            grabButton.Layout.Column = 5;
+            grabButton = UIComponentFactory.createStyledButton(actionGrid, '📷 Grab', 1, 5, ...
+                @(~,~) controller.grabSIFrame(), ...
+                'Grab a single frame in ScanImage', [0.95 0.95 0.85], 13);
             
             % Abort button (hidden initially)
-            abortButton.Parent = actionGrid;
-            abortButton.Text = '⛔ ABORT';
-            abortButton.FontSize = 13;
-            abortButton.FontWeight = 'bold';
-            abortButton.Tooltip = 'Abort current operation';
-            abortButton.BackgroundColor = [0.95 0.6 0.6];
-            abortButton.Visible = 'off';
+            abortButton = uibutton(actionGrid, 'Text', '⛔ ABORT', 'FontSize', 13, 'FontWeight', 'bold', ...
+                'Tooltip', 'Abort current operation', ...
+                'BackgroundColor', [0.95 0.6 0.6], ...
+                'Visible', 'off');
             abortButton.Layout.Row = 1;
             abortButton.Layout.Column = [4 5];
         end

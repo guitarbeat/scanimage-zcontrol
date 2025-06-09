@@ -96,10 +96,10 @@ classdef BrightZ < core.MotorGUI_ZControl
                         % Try to use the newer v3 GUI as an alternative
                         fprintf('Trying v3 GUI...\n');
                         try
-                            obj.gui = gui.BrightnessZControlGUIv3(obj);
-                            fprintf('Using BrightnessZControlGUIv3.\n');
+                            obj.gui = gui.FocusGUI(obj);
+                            fprintf('Using FocusGUI.\n');
                         catch ME2
-                            fprintf('Failed to create GUI v3: %s\n', ME2.message);
+                            fprintf('Failed to create Focus GUI: %s\n', ME2.message);
                             
                             % Try to use the original GUI class as a last resort fallback
                             fprintf('Trying original GUI as fallback...\n');
@@ -294,7 +294,7 @@ classdef BrightZ < core.MotorGUI_ZControl
                 obj.updateStatus(sprintf('Moved Z up by %d to %.2f', stepSize, currentZ));
                 
                 % Update current Z position display in the v3 GUI
-                if isa(obj.gui, 'gui.BrightnessZControlGUIv3')
+                if isa(obj.gui, 'gui.FocusGUI')
                     obj.gui.updateCurrentZ(currentZ);
                 end
             catch ME
@@ -319,7 +319,7 @@ classdef BrightZ < core.MotorGUI_ZControl
                 obj.updateStatus(sprintf('Moved Z down by %d to %.2f', stepSize, currentZ));
                 
                 % Update current Z position display in the v3 GUI
-                if isa(obj.gui, 'gui.BrightnessZControlGUIv3')
+                if isa(obj.gui, 'gui.FocusGUI')
                     obj.gui.updateCurrentZ(currentZ);
                 end
             catch ME
@@ -487,7 +487,7 @@ classdef BrightZ < core.MotorGUI_ZControl
                 absoluteMove@core.MotorGUI_ZControl(obj, targetZ);
                 
                 % Update current Z position display in the v3 GUI
-                if isa(obj.gui, 'gui.BrightnessZControlGUIv3')
+                if isa(obj.gui, 'gui.FocusGUI')
                     obj.gui.updateCurrentZ(targetZ);
                 end
             catch ME
@@ -499,7 +499,7 @@ classdef BrightZ < core.MotorGUI_ZControl
             % Update the current Z position display in the GUI
             try
                 currentZ = obj.getZ();
-                if isa(obj.gui, 'gui.BrightnessZControlGUIv3')
+                if isa(obj.gui, 'gui.FocusGUI')
                     obj.gui.updateCurrentZ(currentZ);
                 end
             catch ME

@@ -4,10 +4,10 @@ This module contains the GUI components for the ScanImage Z-Control system.
 
 ## Refactored Structure
 
-The BrightnessZControlGUIv3 has been refactored into a more modular structure:
+The FocusGUI has been refactored into a modular structure:
 
 ### Main Classes
-- `BrightnessZControlGUIv3.m` - Main class that coordinates the GUI creation and manages callbacks
+- `FocusGUI.m` - Main class that coordinates the GUI creation and manages callbacks
 
 ### Components Module
 - `+components/UIComponentFactory.m` - Factory class for creating UI components with consistent styling
@@ -30,7 +30,7 @@ To use the refactored GUI:
 controller = YourControllerClass();
 
 % Create the GUI
-gui = gui.BrightnessZControlGUIv3(controller);
+gui = gui.FocusGUI(controller);
 
 % Initialize the GUI
 gui.create();

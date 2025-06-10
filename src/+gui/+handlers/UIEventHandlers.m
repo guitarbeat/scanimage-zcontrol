@@ -16,7 +16,7 @@ classdef UIEventHandlers < handle
         function toggleScanButtons(isScanActive, controller, focusButton, grabButton, abortButton, zScanToggle, stepSizeSlider, pauseTimeEdit, metricDropDown)
             % Toggle between scan control buttons and abort button
             if isScanActive
-                % Hide normal buttons, show abort
+                % Show abort button, hide focus/grab buttons
                 focusButton.Visible = 'off';
                 grabButton.Visible = 'off';
                 abortButton.Visible = 'on';
@@ -27,11 +27,6 @@ classdef UIEventHandlers < handle
                 metricType = metricDropDown.Value;
                 controller.toggleZScan(true, stepSize, pauseTime, metricType);
             else
-                % Show normal buttons, hide abort
-                focusButton.Visible = 'on';
-                grabButton.Visible = 'on';
-                abortButton.Visible = 'off';
-                
                 % Stop the scan
                 controller.toggleZScan(false);
             end
@@ -47,7 +42,7 @@ classdef UIEventHandlers < handle
             controller.abortAllOperations();
             
             % Update status
-            UIEventHandlers.updateStatus(statusText, 'Operation aborted by user');
+            gui.handlers.UIEventHandlers.updateStatus(statusText, 'Operation aborted by user');
         end
 
         function updatePlot(axes, zData, bData, activeChannel)
@@ -144,7 +139,11 @@ classdef UIEventHandlers < handle
         function updateStatusBarPosition(fig, statusBar)
             % Update status bar position when window is resized
             if ishandle(fig) && ishandle(statusBar)
-                statusBar.Position = [0, 0, fig.Position(3), 30];
+                % Set status bar to span the width of the figure at the bottom
+                statusBar.Position = [0, 0, fig.Position(3), 25];
+                
+                % Make sure it's at the front
+                uistack(statusBar, 'top');
             end
         end
     end

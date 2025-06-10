@@ -22,12 +22,15 @@ classdef FocusGUI < handle
         hFocusButton      % Focus button
         hGrabButton       % Grab button
         hAbortButton      % Abort button
+        hMoveToMaxButton  % Move to max brightness button
         hCurrentZLabel    % Current Z position label
         hStatusBar        % Status bar panel
     end
 
     properties (Access = private)
         controller        % Handle to the main controller
+        focusModeActive = false  % Track if focus mode is active
+        hasZData = false         % Track if we have Z position data
     end
 
     methods
@@ -37,9 +40,9 @@ classdef FocusGUI < handle
 
         function create(obj)
             % Create main figure with modern styling
-            fprintf('Creating modern Focus GUI...\n');
+            fprintf('Creating FocalSweep GUI...\n');
             obj.hFig = uifigure('Name', 'FocalSweep - Find optimal focus position', ...
-                'Position', [100 100 900 700], ...  % Make slightly taller for instruction panel
+                'Position', [100 100 900 600], ...  % Reduced height from 700 to 600
                 'Color', [0.95 0.95 0.98], ...
                 'CloseRequestFcn', @(~,~) obj.controller.closeFigure(), ...
                 'Resize', 'on');
@@ -49,43 +52,40 @@ classdef FocusGUI < handle
             if ~hasNewUIControls
                 fprintf('Warning: Running on an older MATLAB version. Some UI features may be limited.\n');
             end
-            
-            fprintf('Creating modern layout...\n');
 
-            % Create a modern grid layout with better spacing and organization
-            mainGrid = uigridlayout(obj.hFig, [4, 2]);  % Added an extra row for instructions
-            mainGrid.RowHeight = {'fit', 'fit', '1x', 'fit'};
-            mainGrid.ColumnWidth = {'1.2x', '1x'};
-            mainGrid.Padding = [15 15 15 15];
-            mainGrid.RowSpacing = 10;
-            mainGrid.ColumnSpacing = 15;
+            % Create a more compact grid layout
+            mainGrid = uigridlayout(obj.hFig, [3, 2]);  % Reduced from 4 to 3 rows by combining instruction with params
+            mainGrid.RowHeight = {'fit', '1x', '0.4x'};  % Use proportional units
+            mainGrid.ColumnWidth = {'1.2x', '1x'};  % Use proportional units
+            mainGrid.Padding = [10 10 10 10];  % Reduced padding
+            mainGrid.RowSpacing = 8;  % Reduced spacing
+            mainGrid.ColumnSpacing = 10;  % Reduced spacing
             
-            % --- Quick Start Instructions Panel (Row 1, Col 1:2) ---
-            instructPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, '💡 HOW TO FIND FOCUS - Quick Start Guide', 1, [1 2]);
-            instructGrid = uigridlayout(instructPanel, [1, 1]);
-            instructGrid.Padding = [10 10 10 10];
+            % --- Parameters Panel with Instructions (Row 1, Col 1-2) ---
+            paramContainer = uipanel(mainGrid, 'BorderType', 'none', 'BackgroundColor', [0.95 0.95 0.98]);
+            paramContainer.Layout.Row = 1;
+            paramContainer.Layout.Column = [1 2];
             
-            % Create instructions using component factory
-            gui.components.UIComponentFactory.createInstructionPanel(instructPanel, instructGrid);
-
-            % --- Scan Parameters Panel (Row 2, Col 1) ---
-            paramPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Scan Parameters', 2, 1);
+            paramGrid = uigridlayout(paramContainer, [1, 2]);
+            paramGrid.RowHeight = {'fit'};
+            paramGrid.ColumnWidth = {'1.2x', '1x'};
+            paramGrid.Padding = [0 0 0 0];
+            paramGrid.ColumnSpacing = 10;
             
-            % We'll create the components directly in the createScanParametersPanel method
+            % --- Scan Parameters Panel (Row 1, Col 1 of paramGrid) ---
+            paramPanel = gui.components.UIComponentFactory.createStyledPanel(paramGrid, 'Scan Parameters', 1, 1);
             
-            % --- Z Movement Controls Panel (Row 2, Col 2) ---
-            zControlPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Z Movement Controls', 2, 2);
+            % --- Z Movement Controls Panel (Row 1, Col 2 of paramGrid) ---
+            zControlPanel = gui.components.UIComponentFactory.createStyledPanel(paramGrid, 'Z Movement Controls', 1, 2);
             
-            % --- Plot Area (Row 3, Col 1:2) ---
-            plotPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Brightness vs. Z-Position', 3, [1 2]);
+            % --- Plot Area (Row 2, Col 1:2) ---
+            plotPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Brightness vs. Z-Position', 2, [1 2]);
             
             % Create plot area with component factory
             obj.hAx = gui.components.UIComponentFactory.createPlotPanel(plotPanel);
 
-            % --- Actions Panel (Row 4, Col 1:2) ---
-            actionPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Control Actions', 4, [1 2]);
-            
-            % We'll create the components in the specific panel creation methods
+            % --- Actions Panel (Row 3, Col 1:2) ---
+            actionPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Control Actions', 3, [1 2]);
             
             % Now create all panels and components
             [obj.hStepSizeSlider, obj.hStepSizeValue, obj.hPauseTimeEdit, obj.hMetricDropDown, obj.hMinZEdit, obj.hMaxZEdit] = ...
@@ -93,7 +93,7 @@ classdef FocusGUI < handle
                 
             obj.hCurrentZLabel = gui.components.UIComponentFactory.createZControlPanel(zControlPanel, zControlPanel, obj.controller);
             
-            [obj.hMonitorToggle, obj.hZScanToggle, obj.hFocusButton, obj.hGrabButton, obj.hAbortButton] = ...
+            [obj.hMonitorToggle, obj.hZScanToggle, obj.hFocusButton, obj.hGrabButton, obj.hAbortButton, obj.hMoveToMaxButton] = ...
                 gui.components.UIComponentFactory.createActionPanel(actionPanel, actionPanel, obj.controller);
                 
             % Set up event handlers
@@ -101,15 +101,81 @@ classdef FocusGUI < handle
             obj.hStepSizeSlider.ValueChangedFcn = @(src,event) obj.controller.updateStepSizeImmediate(event.Value);
             obj.hMonitorToggle.ValueChangedFcn = @(src,~) obj.controller.toggleMonitor(src.Value);
             obj.hZScanToggle.ValueChangedFcn = @(src,~) obj.toggleScanButtons(src.Value);
-            obj.hFocusButton.ButtonPushedFcn = @(~,~) obj.controller.startSIFocus();
+            
+            % The focus button callback needs to be set here because we're not using the factory's built-in callback
+            obj.hFocusButton.ButtonPushedFcn = @(~,~) obj.toggleFocusMode();
             obj.hGrabButton.ButtonPushedFcn = @(~,~) obj.controller.grabSIFrame();
             obj.hAbortButton.ButtonPushedFcn = @(~,~) obj.abortOperation();
+            
+            % Add min/max Z change callbacks to update Auto Z-Scan button state
+            obj.hMinZEdit.ValueChangedFcn = @(~,~) obj.updateButtonStates();
+            obj.hMaxZEdit.ValueChangedFcn = @(~,~) obj.updateButtonStates();
 
             % --- Status Bar ---
             [obj.hStatusText, obj.hStatusBar] = gui.components.UIComponentFactory.createStatusBar(obj.hFig);
             
             % Set up figure resize callback
+            obj.hFig.AutoResizeChildren = 'off';  % Disable auto resize before setting SizeChangedFcn
             obj.hFig.SizeChangedFcn = @(~,~) obj.updateStatusBarPosition();
+            
+            % Initialize button states
+            obj.updateButtonStates();
+        end
+        
+        function toggleFocusMode(obj)
+            % Toggle focus mode and update UI
+            obj.focusModeActive = ~obj.focusModeActive;
+            
+            if obj.focusModeActive
+                % Start focus mode in ScanImage
+                obj.controller.startSIFocus();
+                
+                % Show abort button instead of focus/grab buttons
+                obj.hFocusButton.Visible = 'off';
+                obj.hGrabButton.Visible = 'off';
+                obj.hAbortButton.Visible = 'on';
+                
+                % Update Z-scan button state
+                obj.updateButtonStates();
+                
+                % Start monitoring if not already active
+                if ~obj.hMonitorToggle.Value
+                    obj.hMonitorToggle.Value = true;
+                    obj.controller.toggleMonitor(true);
+                end
+            else
+                % Reset UI
+                obj.hFocusButton.Visible = 'on';
+                obj.hGrabButton.Visible = 'on';
+                obj.hAbortButton.Visible = 'off';
+                
+                % Update Z-scan button state
+                obj.updateButtonStates();
+            end
+        end
+        
+        function updateButtonStates(obj)
+            % Update enabled/disabled state of buttons based on conditions
+            
+            % Auto Z-Scan should be enabled only when:
+            % 1. Min and Max Z are set
+            % 2. Focus mode is active
+            minZValid = ~isempty(obj.hMinZEdit.Value) && ~isnan(obj.hMinZEdit.Value);
+            maxZValid = ~isempty(obj.hMaxZEdit.Value) && ~isnan(obj.hMaxZEdit.Value);
+            rangeValid = minZValid && maxZValid && (obj.hMaxZEdit.Value > obj.hMinZEdit.Value);
+            
+            if rangeValid && obj.focusModeActive
+                obj.hZScanToggle.Enable = 'on';
+            else
+                obj.hZScanToggle.Enable = 'off';
+            end
+            
+            % Move to Max Focus should be enabled only when we have Z data
+            if obj.hasZData
+                obj.hMoveToMaxButton.Enable = 'on';
+            else
+                obj.hMoveToMaxButton.Enable = 'off';
+            end
         end
         
         function updateStepSizeValueDisplay(obj, value)
@@ -127,11 +193,26 @@ classdef FocusGUI < handle
         function abortOperation(obj)
             % Handle abort button press
             gui.handlers.UIEventHandlers.abortOperation(obj.controller, obj.hZScanToggle, obj.hStatusText);
+            
+            % Reset focus mode
+            obj.focusModeActive = false;
+            obj.hFocusButton.Visible = 'on';
+            obj.hGrabButton.Visible = 'on';
+            obj.hAbortButton.Visible = 'off';
+            
+            % Update button states
+            obj.updateButtonStates();
         end
 
         function updatePlot(obj, zData, bData, activeChannel)
             % Update the brightness vs Z-position plot with visual markers
             gui.handlers.UIEventHandlers.updatePlot(obj.hAx, zData, bData, activeChannel);
+            
+            % Update hasZData flag based on data
+            obj.hasZData = ~isempty(zData) && length(zData) > 1;
+            
+            % Update Move to Max button state
+            obj.updateButtonStates();
         end
         
         function updateCurrentZ(obj, zValue)

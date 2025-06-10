@@ -34,12 +34,87 @@ classdef FocalSweep < core.MotorGUI_ZControl
         channelSettings  % Channel settings handle
     end
     
+    properties
+        % GUI and display handles
+        hFig            % Main figure handle
+        hAxes           % Main plot axes
+        hLine           % Plot line handle
+        hText           % Text label handle
+        
+        % State variables
+        isInitialized   % Flag for initialization state
+        isRunning       % Flag for running state
+        currentZ        % Current Z position
+        bestZ           % Best focus Z position
+        startZ          % Starting Z position
+        
+        % Focus calculation variables
+        focusHistory    % History of focus positions
+        focusMetrics    % Array of focus metric values
+        metricHistory   % History of metric calculations
+        metricNames     % Names of available metrics
+        metricFuncs     % Function handles for metrics
+        selectedMetric  % Currently selected metric
+        defaultMetric   % Default metric to use
+        metricData      % Raw metric data
+        zData           % Z positions for metric data
+        
+        % Control parameters
+        stepSize            % Z step size
+        rangeLow            % Lower range limit
+        rangeHigh           % Upper range limit
+        smoothingWindow     % Window size for smoothing
+        autoUpdateFrequency % Frequency of auto updates in seconds
+        lastAutoUpdateTime  % Timestamp of last auto update
+        
+        % Verbosity control
+        verbosity = 1       % Level of output messages (0=quiet, 1=normal, 2=debug)
+    end
+    
     methods
         %% GUI Construction and Initialization
-        function obj = FocalSweep()
-            % Constructor - Initialize the brightness Z-control system
+        function obj = FocalSweep(varargin)
+            % FocalSweep constructor
+            %
+            % Optional parameter/value pairs:
+            %   'verbosity' - Level of output messages (0=quiet, 1=normal, 2=debug)
             
-            % Initialize base class
+            % Parse inputs
+            p = inputParser;
+            p.addParameter('verbosity', 1, @isnumeric);
+            p.parse(varargin{:});
+            
+            % Initialize properties
+            obj.verbosity = p.Results.verbosity;
+            obj.isInitialized = false;
+            obj.isRunning = false;
+            obj.currentZ = 0;
+            obj.bestZ = [];
+            obj.startZ = [];
+            obj.focusHistory = [];
+            obj.focusMetrics = [];
+            obj.metricHistory = [];
+            obj.metricNames = {'Variance', 'StdDev', 'Sobel', 'Tenengrad', 'Laplacian', 'Entropy'};
+            obj.metricFuncs = {
+                @(x) var(double(x(:)))
+                @(x) std(double(x(:)))
+                @(x) sum(sum(edge(x, 'sobel')))
+                @(x) sum(sum(sqrt(imgradientxy(double(x)))))
+                @(x) sum(sum(abs(imgaussfilt(double(x), 2) - double(x))))
+                @(x) entropy(x)
+            };
+            obj.defaultMetric = 2;  % Use StdDev as default
+            obj.selectedMetric = obj.defaultMetric;
+            obj.metricData = zeros(0, length(obj.metricFuncs));
+            obj.zData = zeros(0, 1);
+            obj.stepSize = 1;
+            obj.rangeLow = -25;
+            obj.rangeHigh = 25;
+            obj.smoothingWindow = 3;
+            obj.autoUpdateFrequency = 1;
+            obj.lastAutoUpdateTime = 0;
+            
+            % Initialize base class first (must be before any object access)
             obj@core.MotorGUI_ZControl();
             
             try
@@ -47,13 +122,17 @@ classdef FocalSweep < core.MotorGUI_ZControl
                 obj.validateScanImageEnvironment();
                 
                 % Get ScanImage handle
-                fprintf('Getting ScanImage handle...\n');
+                if obj.verbosity > 0
+                    fprintf('Getting ScanImage handle...\n');
+                end
                 try
                     obj.hSI = evalin('base', 'hSI');
                     if ~isobject(obj.hSI)
                         error('hSI is not a valid object');
                     end
-                    fprintf('ScanImage handle acquired.\n');
+                    if obj.verbosity > 0
+                        fprintf('ScanImage handle acquired.\n');
+                    end
                 catch ME
                     fprintf('Error accessing ScanImage handle: %s\n', ME.message);
                     error('Failed to access ScanImage handle. Make sure ScanImage is running.');
@@ -61,48 +140,70 @@ classdef FocalSweep < core.MotorGUI_ZControl
                 
                 try
                     % Create monitoring and scanner components first
-                    fprintf('Creating monitoring component...\n');
+                    if obj.verbosity > 0
+                        fprintf('Creating monitoring component...\n');
+                    end
                     try
                         obj.monitor = monitoring.BrightnessMonitor(obj, obj.hSI);
-                        fprintf('Monitoring component created.\n');
+                        if obj.verbosity > 1
+                            fprintf('Monitoring component created.\n');
+                        end
                     catch ME
                         fprintf('Error creating monitor: %s\n', ME.message);
                         rethrow(ME);
                     end
                     
-                    fprintf('Creating scanner component...\n');
+                    if obj.verbosity > 0
+                        fprintf('Creating scanner component...\n');
+                    end
                     try
                         obj.scanner = scan.ZScanner(obj);
-                        fprintf('Scanner component created.\n');
+                        if obj.verbosity > 1
+                            fprintf('Scanner component created.\n');
+                        end
                     catch ME
                         fprintf('Error creating scanner: %s\n', ME.message);
                         rethrow(ME);
                     end
                     
                     % Initialize components before creating GUI
-                    fprintf('Initializing components...\n');
+                    if obj.verbosity > 0
+                        fprintf('Initializing components...\n');
+                    end
                     obj.initializeComponents();
-                    fprintf('Components initialized.\n');
+                    if obj.verbosity > 1
+                        fprintf('Components initialized.\n');
+                    end
                     
                     % Create GUI last to avoid incomplete initialization issues
-                    fprintf('Creating GUI...\n');
+                    if obj.verbosity > 0
+                        fprintf('Creating GUI...\n');
+                    end
                     try
                         % Create the modern FocusGUI interface
                         obj.gui = gui.FocusGUI(obj);
-                        fprintf('Using FocusGUI.\n');
+                        if obj.verbosity > 1
+                            fprintf('Using FocusGUI.\n');
+                        end
                     catch ME
                         fprintf('Failed to create GUI: %s\n', ME.message);
                         disp(getReport(ME));
                         rethrow(ME);
                     end
                     
-                    fprintf('Creating GUI interface...\n');
+                    if obj.verbosity > 1
+                        fprintf('Creating GUI interface...\n');
+                    end
                     obj.gui.create();
-                    fprintf('GUI created successfully.\n');
+                    if obj.verbosity > 0
+                        fprintf('GUI created successfully.\n');
+                    end
                     
                     % Initialize the current Z position display
                     obj.updateCurrentZDisplay();
-                    fprintf('Z position display initialized.\n');
+                    if obj.verbosity > 1
+                        fprintf('Z position display initialized.\n');
+                    end
                 catch ME
                     fprintf('Error during component initialization: %s\n', ME.message);
                     disp(getReport(ME));
@@ -389,6 +490,13 @@ classdef FocalSweep < core.MotorGUI_ZControl
                     return;
                 end
                 
+                % Show abort button if using the modern GUI
+                if isa(obj.gui, 'gui.FocusGUI')
+                    obj.gui.hFocusButton.Visible = 'off';
+                    obj.gui.hGrabButton.Visible = 'off';
+                    obj.gui.hAbortButton.Visible = 'on';
+                end
+                
                 % Stop Focus mode if it's running
                 if isfield(obj.hSI, 'acqState') && isfield(obj.hSI.acqState, 'acquiringFocus') && obj.hSI.acqState.acquiringFocus
                     obj.hSI.abort();
@@ -415,8 +523,22 @@ classdef FocalSweep < core.MotorGUI_ZControl
                 % Wait for grab to complete
                 pause(0.5);
                 obj.updateStatus('Frame acquired');
+                
+                % Restore buttons if using the modern GUI
+                if isa(obj.gui, 'gui.FocusGUI')
+                    obj.gui.hFocusButton.Visible = 'on';
+                    obj.gui.hGrabButton.Visible = 'on';
+                    obj.gui.hAbortButton.Visible = 'off';
+                end
             catch ME
                 obj.updateStatus(sprintf('Error grabbing frame: %s', ME.message));
+                
+                % Restore buttons if using the modern GUI
+                if isa(obj.gui, 'gui.FocusGUI')
+                    obj.gui.hFocusButton.Visible = 'on';
+                    obj.gui.hGrabButton.Visible = 'on';
+                    obj.gui.hAbortButton.Visible = 'off';
+                end
             end
         end
         
@@ -503,7 +625,9 @@ classdef FocalSweep < core.MotorGUI_ZControl
                 end
                 
                 if simMode
-                    fprintf('Running in SIMULATION MODE - no ScanImage connection.\n');
+                    if obj.verbosity > 0
+                        fprintf('Running in SIMULATION MODE - no ScanImage connection.\n');
+                    end
                     % Create a simulated hSI structure in base workspace
                     evalin('base', ['hSI = struct(' ...
                         '''acqState'', struct(''acqState'', ''idle''), ' ...
@@ -533,11 +657,13 @@ classdef FocalSweep < core.MotorGUI_ZControl
                     end
                 end
                 
-                if ~isIdle
-                    warning('ScanImage may not be idle. Proceed with caution.');
+                if ~isIdle && obj.verbosity > 0
+                    warning('ScanImage may not be idle. This is usually fine during startup.');
                 end
             catch ME
-                warning('Could not verify ScanImage state: %s', ME.message);
+                if obj.verbosity > 0
+                    warning('Could not verify ScanImage state: %s', ME.message);
+                end
             end
             
             % Check for active channels
@@ -545,26 +671,38 @@ classdef FocalSweep < core.MotorGUI_ZControl
                 if isfield(hSI, 'hChannels')
                     channelsActive = hSI.hChannels.channelsActive;
                     if isempty(channelsActive) || ~ismember(1, channelsActive)
-                        warning('Channel 1 not active.');
+                        if obj.verbosity > 0
+                            warning('Channel 1 not active. Will use first available channel.');
+                        end
                     end
                 else
-                    warning('Channel settings not accessible.');
+                    if obj.verbosity > 0
+                        warning('Channel settings not accessible. Will work with default settings.');
+                    end
                 end
             catch ME
-                warning('Could not verify channel settings: %s', ME.message);
+                if obj.verbosity > 0
+                    warning('Could not verify channel settings: %s', ME.message);
+                end
             end
             
             % Check display initialization
             try
                 if isfield(hSI, 'hDisplay')
                     if isempty(hSI.hDisplay) || ~isfield(hSI.hDisplay, 'lastAveragedFrame') || isempty(hSI.hDisplay.lastAveragedFrame)
-                        warning('Display not fully initialized.');
+                        if obj.verbosity > 0
+                            warning('Display not fully initialized. Will initialize when acquisition starts.');
+                        end
                     end
                 else
-                    warning('Display handle not accessible.');
+                    if obj.verbosity > 0
+                        warning('Display handle not accessible. Will work with limited functionality.');
+                    end
                 end
             catch ME
-                warning('Could not verify display initialization: %s', ME.message);
+                if obj.verbosity > 0
+                    warning('Could not verify display initialization: %s', ME.message);
+                end
             end
         end
 
@@ -590,19 +728,58 @@ classdef FocalSweep < core.MotorGUI_ZControl
     end
     
     methods (Static)
-        function zb = launch()
-            % Static method to create and launch FocalSweep
-            % Simplified entry point similar to findZfocus
-            try
-                fprintf('Initializing FocalSweep focus control...\n');
-                zb = FocalSweep();
-                fprintf('FocalSweep focus control ready.\n');
-            catch ME
-                fprintf('Error launching FocalSweep: %s\n', ME.message);
-                fprintf('For detailed error information, check below:\n');
-                disp(getReport(ME));
-                % Don't rethrow - it's cleaner for the user to just see the error message
-                zb = [];
+        function obj = launch(varargin)
+            % Launch FocalSweep as a singleton
+            %
+            % Optional parameter/value pairs:
+            %   'verbosity' - Level of output messages (0=quiet, 1=normal, 2=debug)
+            %   'forceNew'  - Force creation of a new instance
+            
+            % Parse inputs
+            p = inputParser;
+            p.addParameter('verbosity', 1, @isnumeric);
+            p.addParameter('forceNew', false, @islogical);
+            p.parse(varargin{:});
+            
+            verbosity = p.Results.verbosity;
+            forceNew = p.Results.forceNew;
+            
+            persistent instance;
+            
+            % Create a new instance or reuse existing
+            if isempty(instance) || ~isvalid(instance) || forceNew
+                if verbosity > 0
+                    fprintf('Initializing FocalSweep focus control...\n');
+                end
+                obj = FocalSweep();
+                obj.verbosity = verbosity;
+                
+                % Check ScanImage environment
+                obj.validateScanImageEnvironment();
+                
+                % Create the GUI
+                if verbosity > 0
+                    fprintf('Creating FocalSweep GUI...\n');
+                end
+                obj.createGUI();
+                
+                % Store as singleton
+                instance = obj;
+                
+                if verbosity > 0
+                    fprintf('FocalSweep focus control ready.\n');
+                end
+            else
+                % Return existing instance
+                obj = instance;
+                obj.verbosity = verbosity;  % Update verbosity setting
+                
+                if verbosity > 0
+                    fprintf('Using existing FocalSweep instance.\n');
+                end
+                
+                % Bring window to front
+                figure(obj.hFig);
             end
         end
     end

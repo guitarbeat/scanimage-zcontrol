@@ -1,6 +1,59 @@
 # ScanImage Z-Control
 
-A MATLAB-based tool for controlling Z-axis focus in ScanImage microscopy applications.
+A tool for automated Z-focus finding in microscopy applications using ScanImage.
+
+## Overview
+
+This software provides Z-focus control for microscopes running ScanImage, with automated focus finding based on image brightness. The system includes:
+
+- Real-time brightness monitoring
+- Automated Z-scanning
+- Focus optimization
+- Interactive GUI
+
+## Recent Simplifications (MVP Version)
+
+The software has been simplified to a Minimum Viable Product (MVP) version to address stability issues. The following changes were made:
+
+1. **Removed channelSettings dependency** - The code no longer requires access to ScanImage's channel settings, which was causing errors.
+2. **Made display settings optional** - The software now gracefully handles missing display settings.
+3. **Added error resilience** - Added try-catch blocks around critical components to prevent crashes.
+4. **Improved GUI robustness** - The UI creation is now wrapped in try-catch to handle initialization failures.
+5. **Better status reporting** - Status updates now work even if UI components aren't fully initialized.
+
+## Requirements
+
+- MATLAB R2018b or later
+- ScanImage 2020 or later
+- Access to ScanImage motor controls
+
+## Usage
+
+```matlab
+% Launch the Z-control tool
+fsweep
+
+% Launch with debug messages
+fsweep('verbosity', 2)
+
+% Close the tool
+fsweep('close')
+
+% Display version information
+fsweep('version')
+```
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Make sure ScanImage is running with `hSI` in the base workspace
+2. Check if your ScanImage version is compatible
+3. Verify that motor controls are accessible
+
+## License
+
+See LICENSE file for details.
 
 ## Structure
 
@@ -51,12 +104,6 @@ zController = fsweep();
 % Close any existing instances
 fsweep('close')
 ```
-
-## Requirements
-
-- MATLAB (tested with R2019b or newer)
-- ScanImage (must be running with `hSI` in base workspace)
-- Access to Motor Controls in ScanImage
 
 ## Development
 

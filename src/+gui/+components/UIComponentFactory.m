@@ -235,8 +235,12 @@ classdef UIComponentFactory < handle
             components.pauseTimeEdit = gui.components.UIComponentFactory.createPauseTimeControl(paramGrid, controller);
             components.metricDropDown = gui.components.UIComponentFactory.createMetricControl(paramGrid);
             
-            [components.minZEdit, components.maxZEdit] = ...
-                gui.components.UIComponentFactory.createZLimitControls(paramGrid, controller);
+            % Use RangeSlider for Z limits instead of separate controls
+            components.zRangeSlider = gui.components.UIComponentFactory.createZRangeSlider(paramGrid, controller);
+            
+            % Keep minZEdit and maxZEdit properties for backward compatibility
+            components.minZEdit = components.zRangeSlider.MinValueField;
+            components.maxZEdit = components.zRangeSlider.MaxValueField;
         end
         
         function currentZLabel = createZControlPanel(parent, zControlPanel, controller)
@@ -432,29 +436,174 @@ classdef UIComponentFactory < handle
             metricDropDown.Layout.Column = 4;
         end
         
-        function [minZEdit, maxZEdit] = createZLimitControls(paramGrid, controller)
-            % Creates Z limit controls
-            % Min Z
-            gui.components.UIComponentFactory.createStyledLabel(paramGrid, 'Min Z Position (µm):', 4, 1, ...
-                Tooltip="Set minimum Z limit (µm)");
-            minZEdit = gui.components.UIComponentFactory.createStyledEditField(paramGrid, 4, 2, ...
-                Value=0, Format="%.1f", Tooltip="Minimum Z limit (µm)");
-            gui.components.UIComponentFactory.createStyledButton(paramGrid, 'Set Min Z', 4, [3 4], ...
-                @(~,~) controller.setMinZLimit(), ...
+        function rangeSliderComponents = createZRangeSlider(paramGrid, controller)
+            % Creates Z limit controls using a RangeSlider
+            %
+            % This uses the App Designer RangeSlider component for more intuitive
+            % control of Z scan range limits.
+            
+            % Container panel for range slider components
+            rangePanel = uipanel(paramGrid, 'BorderType', 'none', 'BackgroundColor', paramGrid.Parent.BackgroundColor);
+            rangePanel.Layout.Row = [4 5];
+            rangePanel.Layout.Column = [1 4];
+            
+            % Create grid layout for range slider components
+            rangeGrid = uigridlayout(rangePanel, [3, 4]);
+            rangeGrid.RowHeight = {'fit', '1x', 'fit'};
+            rangeGrid.ColumnWidth = {'fit', '1x', 'fit', '1x'};
+            rangeGrid.Padding = [5 5 5 5];
+            rangeGrid.RowSpacing = 8;
+            rangeGrid.ColumnSpacing = 10;
+            
+            % Z Range label
+            gui.components.UIComponentFactory.createStyledLabel(rangeGrid, 'Z Scan Range (µm):', 1, [1 4], ...
+                Tooltip="Set the range for Z scanning", ...
+                HorizontalAlignment="center", ...
+                FontSize=gui.components.UIComponentFactory.FONTS.DefaultSize+1);
+            
+            % Create the range slider
+            % Get current Z limits from controller if available
+            try
+                minZ = controller.getZLimit('min');
+                maxZ = controller.getZLimit('max');
+                
+                % Use reasonable defaults if limits are infinite
+                if isinf(minZ) || isnan(minZ)
+                    minZ = -100;
+                end
+                if isinf(maxZ) || isnan(maxZ)
+                    maxZ = 100;
+                end
+            catch
+                % Default values if controller doesn't have limits
+                minZ = -100;
+                maxZ = 100;
+            end
+            
+            % Create the range slider
+            sliderRange = [minZ, maxZ];
+            rangeSlider = uislider(rangeGrid, 'range', ...
+                'Limits', sliderRange, ...
+                'Value', [0, 50], ...
+                'MajorTicks', linspace(sliderRange(1), sliderRange(2), 5), ...
+                'MinorTicks', [], ...
+                'Tooltip', 'Set the minimum and maximum Z positions for scanning', ...
+                'ValueChangedFcn', @(src,event) onRangeSliderChanged(src, event, controller));
+            rangeSlider.Layout.Row = 2;
+            rangeSlider.Layout.Column = [1 4];
+            
+            % Create value display fields
+            gui.components.UIComponentFactory.createStyledLabel(rangeGrid, 'Min Z:', 3, 1, ...
+                Tooltip="Minimum Z position for scanning");
+            minValueField = gui.components.UIComponentFactory.createStyledEditField(rangeGrid, 3, 2, ...
+                Value=rangeSlider.Value(1), Format="%.1f", ...
+                Tooltip="Minimum Z position for scanning");
+            
+            gui.components.UIComponentFactory.createStyledLabel(rangeGrid, 'Max Z:', 3, 3, ...
+                Tooltip="Maximum Z position for scanning");
+            maxValueField = gui.components.UIComponentFactory.createStyledEditField(rangeGrid, 3, 4, ...
+                Value=rangeSlider.Value(2), Format="%.1f", ...
+                Tooltip="Maximum Z position for scanning");
+            
+            % Set up callbacks for value fields
+            minValueField.ValueChangedFcn = @(src,~) updateRangeSliderLow(src, rangeSlider, controller);
+            maxValueField.ValueChangedFcn = @(src,~) updateRangeSliderHigh(src, rangeSlider, controller);
+            
+            % Create set limit buttons (removed Width property as it's not supported)
+            setMinBtn = gui.components.UIComponentFactory.createStyledButton(rangeGrid, 'Set Min', 1, 1, ...
+                @(~,~) setCurrentAsMin(controller, rangeSlider, minValueField), ...
                 Tooltip="Set current position as minimum Z limit", ...
                 BackgroundColor=[0.9 0.9 1.0], ...
                 HorizontalAlignment="center");
             
-            % Max Z
-            gui.components.UIComponentFactory.createStyledLabel(paramGrid, 'Max Z Position (µm):', 5, 1, ...
-                Tooltip="Set maximum Z limit (µm)");
-            maxZEdit = gui.components.UIComponentFactory.createStyledEditField(paramGrid, 5, 2, ...
-                Value=100, Format="%.1f", Tooltip="Maximum Z limit (µm)");
-            gui.components.UIComponentFactory.createStyledButton(paramGrid, 'Set Max Z', 5, [3 4], ...
-                @(~,~) controller.setMaxZLimit(), ...
+            setMaxBtn = gui.components.UIComponentFactory.createStyledButton(rangeGrid, 'Set Max', 1, 3, ...
+                @(~,~) setCurrentAsMax(controller, rangeSlider, maxValueField), ...
                 Tooltip="Set current position as maximum Z limit", ...
                 BackgroundColor=[0.9 0.9 1.0], ...
                 HorizontalAlignment="center");
+            
+            % Package all components into a struct for return
+            rangeSliderComponents = struct(...
+                'RangeSlider', rangeSlider, ...
+                'MinValueField', minValueField, ...
+                'MaxValueField', maxValueField, ...
+                'SetMinButton', setMinBtn, ...
+                'SetMaxButton', setMaxBtn);
+            
+            % Nested callback functions
+            function onRangeSliderChanged(src, event, controller)
+                % Update edit fields when slider changes
+                try
+                    minValueField.Value = src.Value(1);
+                    maxValueField.Value = src.Value(2);
+                catch
+                    % Ignore errors during update
+                end
+            end
+            
+            function updateRangeSliderLow(src, slider, controller)
+                % Update slider when min edit field changes
+                try
+                    newMin = src.Value;
+                    currentMax = slider.Value(2);
+                    
+                    % Ensure min < max
+                    if newMin >= currentMax
+                        newMin = currentMax - 1;
+                        src.Value = newMin;
+                    end
+                    
+                    slider.Value = [newMin, currentMax];
+                catch
+                    % Ignore errors during update
+                end
+            end
+            
+            function updateRangeSliderHigh(src, slider, controller)
+                % Update slider when max edit field changes
+                try
+                    currentMin = slider.Value(1);
+                    newMax = src.Value;
+                    
+                    % Ensure max > min
+                    if newMax <= currentMin
+                        newMax = currentMin + 1;
+                        src.Value = newMax;
+                    end
+                    
+                    slider.Value = [currentMin, newMax];
+                catch
+                    % Ignore errors during update
+                end
+            end
+            
+            function setCurrentAsMin(controller, slider, valueField)
+                % Set current Z position as minimum
+                try
+                    currentZ = controller.getZ();
+                    valueField.Value = currentZ;
+                    updateRangeSliderLow(valueField, slider, controller);
+                    
+                    % Call controller to set limit in ScanImage
+                    controller.setMinZLimit(currentZ);
+                catch ME
+                    warning('Error setting minimum Z limit: %s', ME.message);
+                end
+            end
+            
+            function setCurrentAsMax(controller, slider, valueField)
+                % Set current Z position as maximum
+                try
+                    currentZ = controller.getZ();
+                    valueField.Value = currentZ;
+                    updateRangeSliderHigh(valueField, slider, controller);
+                    
+                    % Call controller to set limit in ScanImage
+                    controller.setMaxZLimit(currentZ);
+                catch ME
+                    warning('Error setting maximum Z limit: %s', ME.message);
+                end
+            end
         end
         
         function currentZLabel = createZPositionDisplay(zControlGrid)
@@ -509,19 +658,21 @@ classdef UIComponentFactory < handle
         end
         
         function [monitorToggle, zScanToggle, moveToMaxButton] = createScanControls(actionGrid, actionPanel, controller)
-            % Creates main scanning control buttons
+            % Creates main scanning control buttons - simplified version
             scanControlsPanel = uipanel(actionGrid, ...
                 'BorderType', 'none', ...
                 'BackgroundColor', actionPanel.BackgroundColor);
             scanControlsPanel.Layout.Row = 1;
             scanControlsPanel.Layout.Column = [1 3];
             
+            % Create simple grid for control buttons
             scanGrid = uigridlayout(scanControlsPanel, [1, 3]);
             scanGrid.RowHeight = {'1x'};
             scanGrid.ColumnWidth = {'1x', '1x', '1x'};
             scanGrid.Padding = [0 0 0 0];
             scanGrid.ColumnSpacing = 15;
             
+            % Monitor toggle
             monitorToggle = uibutton(scanGrid, 'state', ...
                 'Text', '👁️ Monitor Brightness', ...
                 'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
@@ -532,6 +683,7 @@ classdef UIComponentFactory < handle
             monitorToggle.Layout.Row = 1;
             monitorToggle.Layout.Column = 1;
             
+            % Z-Scan toggle
             zScanToggle = uibutton(scanGrid, 'state', ...
                 'Text', '🔍 Auto Z-Scan', ...
                 'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
@@ -543,6 +695,7 @@ classdef UIComponentFactory < handle
             zScanToggle.Layout.Row = 1;
             zScanToggle.Layout.Column = 2;
             
+            % Move to max button
             moveToMaxButton = gui.components.UIComponentFactory.createStyledButton(scanGrid, 'Move to Max Focus', 1, 3, ...
                 @(~,~) controller.moveToMaxBrightness(), ...
                 Tooltip="Move to the Z position with maximum brightness (best focus)", ...
@@ -553,7 +706,7 @@ classdef UIComponentFactory < handle
         end
         
         function [focusButton, grabButton, abortButton] = createScanImageControls(actionGrid, controller)
-            % Creates ScanImage control buttons
+            % Creates ScanImage control buttons - simplified version
             siControlsPanel = uipanel(actionGrid, ...
                 'BorderType', 'line', ...
                 'BackgroundColor', [0.93 0.93 0.95]);
@@ -572,21 +725,28 @@ classdef UIComponentFactory < handle
                 'FontWeight', 'bold', ...
                 'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize);
             
-            focusButton = gui.components.UIComponentFactory.createStyledButton(siGrid, 'Focus Mode', 2, 1, ...
-                @(~,~) controller.startSIFocus(), ...
-                Tooltip="Start Focus mode in ScanImage (continuous scanning)", ...
-                BackgroundColor=gui.components.UIComponentFactory.COLORS.ActionButton, ...
-                FontSize=gui.components.UIComponentFactory.FONTS.LargeSize, ...
-                Icon="🔄", ...
-                HorizontalAlignment="center");
+            % Focus Button - using state button
+            focusButton = uibutton(siGrid, 'state', ...
+                'Text', '🔄 Focus Mode', ...
+                'ValueChangedFcn', [], ... % Will be set by FocusGUI
+                'BackgroundColor', gui.components.UIComponentFactory.COLORS.ActionButton, ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'Tooltip', 'Start Focus mode in ScanImage (continuous scanning)', ...
+                'HorizontalAlignment', 'center');
+            focusButton.Layout.Row = 2;
+            focusButton.Layout.Column = 1;
             
-            grabButton = gui.components.UIComponentFactory.createStyledButton(siGrid, 'Grab Frame', 3, 1, ...
-                @(~,~) controller.grabSIFrame(), ...
-                Tooltip="Grab a single frame in ScanImage (snapshot)", ...
-                BackgroundColor=[0.95 0.95 0.85], ...
-                FontSize=gui.components.UIComponentFactory.FONTS.LargeSize, ...
-                Icon="📷", ...
-                HorizontalAlignment="center");
+            % Grab Button - using state button
+            grabButton = uibutton(siGrid, 'state', ...
+                'Text', '📷 Grab Frame', ...
+                'Value', false, ... % Initial state is off
+                'ValueChangedFcn', [], ... % Will be set by FocusGUI
+                'BackgroundColor', [0.95 0.95 0.85], ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'Tooltip', 'Grab a single frame in ScanImage (snapshot)', ...
+                'HorizontalAlignment', 'center');
+            grabButton.Layout.Row = 3;
+            grabButton.Layout.Column = 1;
             
             abortButton = gui.components.UIComponentFactory.createStyledButton(siGrid, 'ABORT', [2 3], 1, ...
                 @(~,~) controller.abortAllOperations(), ...

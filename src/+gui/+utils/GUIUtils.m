@@ -175,8 +175,7 @@ classdef GUIUtils
                 figPos = figureHandle.Position;
                 statusBar.Position = [0, 0, figPos(3), height];
                 
-                % Bring to front
-                uistack(statusBar, 'top');
+                % Note: Removed uistack call as it's not supported in uifigure
                 
             catch ME
                 gui.utils.GUIUtils.logError('updateStatusBarLayout', ME);

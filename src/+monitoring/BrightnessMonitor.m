@@ -26,14 +26,42 @@ classdef BrightnessMonitor < handle
         
         % Metrics management
         metrics         % Structure with metric configurations
+        
+        % Simulation mode
+        simulationMode = false % Flag for simulation mode
     end
 
     methods
         function obj = BrightnessMonitor(controller, hSI)
             obj.controller = controller;
             obj.hSI = hSI;
-            obj.displaySettings = obj.hSI.hDisplay;
-            obj.rollingAverageFactor = obj.displaySettings.displayRollingAverageFactor;
+            
+            % Check if we're in simulation mode
+            try
+                obj.simulationMode = evalin('base', 'exist(''SIM_MODE'', ''var'') && SIM_MODE == true');
+            catch
+                obj.simulationMode = false;
+            end
+            
+            % Handle display settings gracefully
+            try
+                if isfield(obj.hSI, 'hDisplay') && ~isempty(obj.hSI.hDisplay)
+                    obj.displaySettings = obj.hSI.hDisplay;
+                    if isfield(obj.displaySettings, 'displayRollingAverageFactor')
+                        obj.rollingAverageFactor = obj.displaySettings.displayRollingAverageFactor;
+                    else
+                        obj.rollingAverageFactor = 1;
+                    end
+                else
+                    % Create empty display settings if not available
+                    obj.displaySettings = struct('displayRollingAverageFactor', 1);
+                    obj.rollingAverageFactor = 1;
+                end
+            catch
+                % Create empty display settings if not available
+                obj.displaySettings = struct('displayRollingAverageFactor', 1);
+                obj.rollingAverageFactor = 1;
+            end
             
             % Initialize metrics first so we can set the default metric
             obj.initializeMetrics();
@@ -55,37 +83,16 @@ classdef BrightnessMonitor < handle
                 % Reset data storage
                 obj.initializeDataStorage();
                 
-                % Set display settings for monitoring
-                obj.displaySettings.displayRollingAverageFactor = 1;
-                
-                % Try different methods to set up frame monitoring based on ScanImage version
-                if ~isempty(obj.hSI.hScan2D) && ~isempty(obj.hSI.hScan2D.hDataScope)
-                    try
-                        % First try the standard callback method
-                        if isprop(obj.hSI.hScan2D.hDataScope, 'callback')
-                            % Store original callback
-                            obj.originalCallback = obj.hSI.hScan2D.hDataScope.callback;
-                            % Set up new callback
-                            obj.hSI.hScan2D.hDataScope.callback = @obj.brightnessCallback;
-                        % Then try other known methods in different ScanImage versions
-                        elseif isprop(obj.hSI.hScan2D.hDataScope, 'functionHandle')
-                            obj.originalCallback = obj.hSI.hScan2D.hDataScope.functionHandle;
-                            obj.hSI.hScan2D.hDataScope.functionHandle = @obj.brightnessCallback;
-                        elseif isprop(obj.hSI.hScan2D, 'frameAcquiredFcn')
-                            obj.originalCallback = obj.hSI.hScan2D.frameAcquiredFcn;
-                            obj.hSI.hScan2D.frameAcquiredFcn = @obj.brightnessCallback;
-                        else
-                            % Create a timer as fallback
-                            obj.createMonitoringTimer();
-                        end
-                    catch
-                        % Fallback to timer-based monitoring
-                        obj.createMonitoringTimer();
-                    end
-                else
-                    % Fallback to timer-based monitoring
-                    obj.createMonitoringTimer();
+                % Set display settings for monitoring (if available)
+                try
+                    obj.displaySettings.displayRollingAverageFactor = 1;
+                catch
+                    % Ignore errors in setting display properties
                 end
+                
+                % Create a timer instead of trying to hook into ScanImage callbacks
+                % This is more reliable across different ScanImage versions
+                obj.createMonitoringTimer();
                 
                 obj.isMonitoring = true;
                 obj.controller.updateStatus('Monitoring started');
@@ -102,27 +109,15 @@ classdef BrightnessMonitor < handle
             end
             
             try
-                % Check how we're monitoring and clean up appropriately
-                if ~isempty(obj.hSI.hScan2D) && ~isempty(obj.hSI.hScan2D.hDataScope)
-                    try
-                        % Try to restore original callback using various methods
-                        if isprop(obj.hSI.hScan2D.hDataScope, 'callback')
-                            obj.hSI.hScan2D.hDataScope.callback = obj.originalCallback;
-                        elseif isprop(obj.hSI.hScan2D.hDataScope, 'functionHandle')
-                            obj.hSI.hScan2D.hDataScope.functionHandle = obj.originalCallback;
-                        elseif isprop(obj.hSI.hScan2D, 'frameAcquiredFcn')
-                            obj.hSI.hScan2D.frameAcquiredFcn = obj.originalCallback;
-                        end
-                    catch
-                        % Ignore errors when trying to restore callbacks
-                    end
-                end
-                
                 % Stop any timer
                 obj.stopMonitoringTimer();
                 
-                % Restore display settings
-                obj.displaySettings.displayRollingAverageFactor = obj.rollingAverageFactor;
+                % Restore display settings if possible
+                try
+                    obj.displaySettings.displayRollingAverageFactor = obj.rollingAverageFactor;
+                catch
+                    % Ignore errors when restoring display settings
+                end
                 
                 obj.isMonitoring = false;
                 obj.controller.updateStatus('Monitoring stopped');
@@ -135,8 +130,23 @@ classdef BrightnessMonitor < handle
         function brightnessCallback(obj, ~, ~)
             % Callback function for brightness monitoring
             try
-                % Get current frame data
-                frameData = obj.hSI.hDisplay.lastAveragedFrame;
+                % Get current frame data safely
+                frameData = [];
+                try
+                    if isfield(obj.hSI, 'hDisplay') && ~isempty(obj.hSI.hDisplay) && ...
+                       isfield(obj.hSI.hDisplay, 'lastAveragedFrame') && ~isempty(obj.hSI.hDisplay.lastAveragedFrame)
+                        frameData = obj.hSI.hDisplay.lastAveragedFrame;
+                    elseif obj.simulationMode
+                        % Generate random data in simulation mode
+                        frameData = rand(512);
+                    end
+                catch
+                    % If we can't get frame data, generate random data
+                    if obj.simulationMode
+                        frameData = rand(512);
+                    end
+                end
+                
                 if isempty(frameData)
                     return;
                 end
@@ -155,7 +165,22 @@ classdef BrightnessMonitor < handle
             % Get the current brightness and Z position
             try
                 % Get current frame data
-                frameData = obj.hSI.hDisplay.lastAveragedFrame;
+                frameData = [];
+                try
+                    if isfield(obj.hSI, 'hDisplay') && ~isempty(obj.hSI.hDisplay) && ...
+                       isfield(obj.hSI.hDisplay, 'lastAveragedFrame') && ~isempty(obj.hSI.hDisplay.lastAveragedFrame)
+                        frameData = obj.hSI.hDisplay.lastAveragedFrame;
+                    elseif obj.simulationMode
+                        % Generate random data in simulation mode
+                        frameData = rand(512);
+                    end
+                catch
+                    % If we can't get frame data, generate random data
+                    if obj.simulationMode
+                        frameData = rand(512);
+                    end
+                end
+                
                 if isempty(frameData)
                     brightness = NaN;
                     currentZ = NaN;

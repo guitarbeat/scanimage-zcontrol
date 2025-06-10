@@ -31,7 +31,10 @@ classdef FocalSweep < core.MotorGUI_ZControl
         % ScanImage handles
         hCSFocus         % Focus coordinate system handle
         hCSSample        % Sample coordinate system handle
-        channelSettings  % Channel settings handle
+        channelSettings = []  % Channel settings handle (optional in MVP)
+        
+        % Closing flag to prevent duplicate destruction
+        isClosing = false % Flag to prevent recursive closing
     end
     
     properties
@@ -366,11 +369,41 @@ classdef FocalSweep < core.MotorGUI_ZControl
 
         function closeFigure(obj)
             % Handle figure close request - delegate to GUI
-            if core.CoreUtils.isGuiValid(obj)
-                obj.gui.closeFigure();
-            else
-                warning('GUI not available for closing');
+            % Only proceed if not already closing to prevent recursion
+            if obj.isClosing
+                return;
             end
+            
+            obj.isClosing = true;
+            
+            try
+                % Stop monitoring and scanning before closing
+                if isfield(obj, 'monitor') && ~isempty(obj.monitor) && isvalid(obj.monitor)
+                    try
+                        obj.monitor.toggleMonitor(false);
+                    catch
+                        % Ignore errors during shutdown
+                    end
+                end
+                
+                if isfield(obj, 'scanner') && ~isempty(obj.scanner) && isvalid(obj.scanner)
+                    try
+                        obj.scanner.toggleZScan(false);
+                    catch
+                        % Ignore errors during shutdown
+                    end
+                end
+                
+                if core.CoreUtils.isGuiValid(obj)
+                    obj.gui.closeFigure();
+                else
+                    warning('GUI not available for closing');
+                end
+            catch ME
+                warning('Error during close: %s', ME.message);
+            end
+            
+            obj.isClosing = false;
         end
 
         % Override absoluteMove to update current Z display
@@ -430,6 +463,13 @@ classdef FocalSweep < core.MotorGUI_ZControl
         %% Destructor
         function delete(obj)
             % Destructor to clean up resources when the object is destroyed
+            % Only proceed if not already closing to prevent recursion
+            if obj.isClosing
+                return;
+            end
+            
+            obj.isClosing = true;
+            
             try
                 if obj.verbosity > 0
                     fprintf('Cleaning up FocalSweep resources...\n');
@@ -484,6 +524,8 @@ classdef FocalSweep < core.MotorGUI_ZControl
             catch ME
                 warning('Error during FocalSweep cleanup: %s', ME.message);
             end
+            
+            obj.isClosing = false;
         end
     end
 end 

@@ -31,6 +31,41 @@ This document describes the refactoring of the GUI module components to improve 
    - Standardized parameter handling
    - Improved validity checking for UI components
 
+## App Designer Component Integration
+
+The following App Designer components have been integrated into the application to improve the user interface:
+
+1. **RangeSlider**
+   - **Location**: Z-scan range limit controls
+   - **Benefits**: 
+     - Visual representation of scanning range
+     - More intuitive user interaction
+     - Single component replaces multiple separate controls
+   - **Implementation**: `createZRangeSlider` in UIComponentFactory
+
+2. **StateButton**
+   - **Location**: Focus and Grab controls
+   - **Benefits**:
+     - Clear visual state feedback
+     - Built-in state management
+     - Improved user experience
+   - **Implementation**: Updated `createScanImageControls` in UIComponentFactory
+
+3. **ButtonGroup**
+   - **Location**: Scanning and ScanImage control panels
+   - **Benefits**:
+     - Visual organization of related controls
+     - Consistent styling and grouping
+     - Improved user interface structure
+   - **Implementation**: Updated `createScanControls` and `createScanImageControls`
+
+4. **Toggle Buttons**
+   - **Location**: Monitor and Z-Scan controls
+   - **Benefits**:
+     - Clear on/off state indication
+     - Consistent appearance with other controls
+   - **Implementation**: Inside `createScanControls` function
+
 ## Affected Components
 
 - **Added new components**:
@@ -39,6 +74,7 @@ This document describes the refactoring of the GUI module components to improve 
 - **Refactored existing components**:
   - `gui.handlers.UIEventHandlers`: Uses GUIUtils for common operations
   - `gui.FocusGUI`: Improved component handling with GUIUtils
+  - `gui.components.UIComponentFactory`: Enhanced with App Designer components
 
 ## Design Patterns Used
 

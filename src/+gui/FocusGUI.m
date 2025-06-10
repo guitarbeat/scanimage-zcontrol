@@ -42,7 +42,7 @@ classdef FocusGUI < handle
             % Create main figure with modern styling
             fprintf('Creating FocalSweep GUI...\n');
             obj.hFig = uifigure('Name', 'FocalSweep - Find optimal focus position', ...
-                'Position', [100 100 900 600], ...  % Reduced height from 700 to 600
+                'Position', [100 100 900 700], ...
                 'Color', [0.95 0.95 0.98], ...
                 'CloseRequestFcn', @(~,~) obj.controller.closeFigure(), ...
                 'Resize', 'on');
@@ -54,17 +54,17 @@ classdef FocusGUI < handle
             end
 
             % Create a more compact grid layout
-            mainGrid = uigridlayout(obj.hFig, [3, 2]);  % Reduced from 4 to 3 rows by combining instruction with params
-            mainGrid.RowHeight = {'fit', '1x', '0.4x'};  % Use proportional units
-            mainGrid.ColumnWidth = {'1.2x', '1x'};  % Use proportional units
-            mainGrid.Padding = [10 10 10 10];  % Reduced padding
-            mainGrid.RowSpacing = 8;  % Reduced spacing
-            mainGrid.ColumnSpacing = 10;  % Reduced spacing
+            mainGrid = uigridlayout(obj.hFig, [3, 2]);
+            mainGrid.RowHeight = {'fit', '1x', 'fit'};
+            mainGrid.ColumnWidth = {'1x', '1.5x'};
+            mainGrid.Padding = [15 15 15 15];
+            mainGrid.RowSpacing = 12;
+            mainGrid.ColumnSpacing = 15;
             
-            % --- Parameters Panel with Instructions (Row 1, Col 1-2) ---
+            % --- Parameters Panel with Instructions (Row 1, Col 1) ---
             paramContainer = uipanel(mainGrid, 'BorderType', 'none', 'BackgroundColor', [0.95 0.95 0.98]);
             paramContainer.Layout.Row = 1;
-            paramContainer.Layout.Column = [1 2];
+            paramContainer.Layout.Column = 1;
             
             paramGrid = uigridlayout(paramContainer, [1, 2]);
             paramGrid.RowHeight = {'fit'};
@@ -78,24 +78,34 @@ classdef FocusGUI < handle
             % --- Z Movement Controls Panel (Row 1, Col 2 of paramGrid) ---
             zControlPanel = gui.components.UIComponentFactory.createStyledPanel(paramGrid, 'Z Movement Controls', 1, 2);
             
-            % --- Plot Area (Row 2, Col 1:2) ---
-            plotPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Brightness vs. Z-Position', 2, [1 2]);
+            % --- Plot Area (Col 2, Row 1:3) ---
+            plotPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Brightness vs. Z-Position', [1 3], 2);
             
             % Create plot area with component factory
             obj.hAx = gui.components.UIComponentFactory.createPlotPanel(plotPanel);
 
-            % --- Actions Panel (Row 3, Col 1:2) ---
-            actionPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Control Actions', 3, [1 2]);
+            % --- Actions Panel (Row 3, Col 1) ---
+            actionPanel = gui.components.UIComponentFactory.createStyledPanel(mainGrid, 'Control Actions', 3, 1);
             
             % Now create all panels and components
-            [obj.hStepSizeSlider, obj.hStepSizeValue, obj.hPauseTimeEdit, obj.hMetricDropDown, obj.hMinZEdit, obj.hMaxZEdit] = ...
-                gui.components.UIComponentFactory.createScanParametersPanel(paramPanel, paramPanel, obj.controller);
+            components = gui.components.UIComponentFactory.createScanParametersPanel(paramPanel, paramPanel, obj.controller);
+            obj.hStepSizeSlider = components.stepSizeSlider;
+            obj.hStepSizeValue = components.stepSizeValue; 
+            obj.hPauseTimeEdit = components.pauseTimeEdit;
+            obj.hMetricDropDown = components.metricDropDown;
+            obj.hMinZEdit = components.minZEdit;
+            obj.hMaxZEdit = components.maxZEdit;
                 
             obj.hCurrentZLabel = gui.components.UIComponentFactory.createZControlPanel(zControlPanel, zControlPanel, obj.controller);
             
-            [obj.hMonitorToggle, obj.hZScanToggle, obj.hFocusButton, obj.hGrabButton, obj.hAbortButton, obj.hMoveToMaxButton] = ...
-                gui.components.UIComponentFactory.createActionPanel(actionPanel, actionPanel, obj.controller);
-                
+            buttons = gui.components.UIComponentFactory.createActionPanel(actionPanel, actionPanel, obj.controller);
+            obj.hMonitorToggle = buttons.monitorToggle;
+            obj.hZScanToggle = buttons.zScanToggle;
+            obj.hMoveToMaxButton = buttons.moveToMaxButton;
+            obj.hFocusButton = buttons.focusButton;
+            obj.hGrabButton = buttons.grabButton;
+            obj.hAbortButton = buttons.abortButton;
+            
             % Set up event handlers
             obj.hStepSizeSlider.ValueChangingFcn = @(src,event) obj.updateStepSizeValueDisplay(event.Value);
             obj.hStepSizeSlider.ValueChangedFcn = @(src,event) obj.controller.updateStepSizeImmediate(event.Value);
@@ -180,19 +190,45 @@ classdef FocusGUI < handle
         
         function updateStepSizeValueDisplay(obj, value)
             % Update step size value display immediately during slider movement
-            gui.handlers.UIEventHandlers.updateStepSizeValueDisplay(obj.hStepSizeValue, value);
+            gui.handlers.UIEventHandlers.updateStepSizeDisplay(obj.hStepSizeValue, value);
         end
 
         function toggleScanButtons(obj, isScanActive)
             % Toggle between scan control buttons and abort button
-            gui.handlers.UIEventHandlers.toggleScanButtons(isScanActive, obj.controller, ...
-                obj.hFocusButton, obj.hGrabButton, obj.hAbortButton, obj.hZScanToggle, ...
-                obj.hStepSizeSlider, obj.hPauseTimeEdit, obj.hMetricDropDown);
+            uiComponents = struct(...
+                'FocusButton', obj.hFocusButton, ...
+                'GrabButton', obj.hGrabButton, ...
+                'AbortButton', obj.hAbortButton, ...
+                'ZScanToggle', obj.hZScanToggle, ...
+                'StepSizeSlider', obj.hStepSizeSlider, ...
+                'PauseTimeEdit', obj.hPauseTimeEdit, ...
+                'MetricDropDown', obj.hMetricDropDown);
+                
+            if isScanActive
+                % Start Z-scan
+                scanParams = struct();
+                gui.handlers.UIEventHandlers.handleScanToggle(true, ...
+                    Controller=obj.controller, ...
+                    UI=uiComponents, ...
+                    ScanParams=scanParams);
+            else
+                % Stop Z-scan
+                gui.handlers.UIEventHandlers.handleScanToggle(false, ...
+                    Controller=obj.controller, ...
+                    UI=uiComponents);
+            end
         end
         
         function abortOperation(obj)
             % Handle abort button press
-            gui.handlers.UIEventHandlers.abortOperation(obj.controller, obj.hZScanToggle, obj.hStatusText);
+            uiComponents = struct(...
+                'ZScanToggle', obj.hZScanToggle, ...
+                'StatusText', obj.hStatusText);
+                
+            gui.handlers.UIEventHandlers.handleAbortOperation(...
+                Controller=obj.controller, ...
+                UI=uiComponents, ...
+                Message="Operation aborted by user");
             
             % Reset focus mode
             obj.focusModeActive = false;
@@ -206,7 +242,15 @@ classdef FocusGUI < handle
 
         function updatePlot(obj, zData, bData, activeChannel)
             % Update the brightness vs Z-position plot with visual markers
-            gui.handlers.UIEventHandlers.updatePlot(obj.hAx, zData, bData, activeChannel);
+            plotData = struct(...
+                'zData', zData, ...
+                'bData', bData, ...
+                'activeChannel', activeChannel);
+                
+            gui.handlers.UIEventHandlers.updateBrightnessPlot(obj.hAx, plotData, ...
+                ActiveChannel=activeChannel, ...
+                ShowLegend=true, ...
+                ShowMarkers=true);
             
             % Update hasZData flag based on data
             obj.hasZData = ~isempty(zData) && length(zData) > 1;
@@ -217,22 +261,26 @@ classdef FocusGUI < handle
         
         function updateCurrentZ(obj, zValue)
             % Update current Z position display
-            gui.handlers.UIEventHandlers.updateCurrentZ(obj.hCurrentZLabel, zValue);
+            gui.handlers.UIEventHandlers.updateCurrentZDisplay(obj.hCurrentZLabel, zValue, ...
+                Format="%.1f", ...
+                ColorThreshold=500);
         end
 
         function updateStatus(obj, message)
             % Update status text
-            gui.handlers.UIEventHandlers.updateStatus(obj.hStatusText, message);
+            gui.handlers.UIEventHandlers.updateStatusDisplay(obj.hStatusText, message, ...
+                AddTimestamp=false, ...
+                Severity="info");
         end
         
         function updateStatusBarPosition(obj)
             % Update status bar position when window is resized
-            gui.handlers.UIEventHandlers.updateStatusBarPosition(obj.hFig, obj.hStatusBar);
+            gui.handlers.UIEventHandlers.updateStatusBarLayout(obj.hFig, obj.hStatusBar);
         end
         
         function showHelp(obj)
             % Display help dialog with usage instructions
-            gui.handlers.UIEventHandlers.showHelp();
+            gui.handlers.UIEventHandlers.showHelpDialog();
         end
 
         function delete(obj)

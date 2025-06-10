@@ -50,7 +50,7 @@ function varargout = fsweep(varargin)
             fprintf('Launching FocalSweep...\n');
             fs = FocalSweep.launch('verbosity', 0, 'forceNew', forceNew);
         else
-            fs = FocalSweep.launch('verbosity', 1, 'forceNew', forceNew);
+            fs = FocalSweep.launch('verbosity', 0, 'forceNew', forceNew);
         end
         
         % Return the FocalSweep object if requested

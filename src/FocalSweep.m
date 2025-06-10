@@ -207,7 +207,7 @@ classdef FocalSweep < core.MotorGUI_ZControl
                         if obj.verbosity > 1
                             fprintf('Setting up auto-update timer.\n');
                         end
-                        obj.startAutoUpdate();
+                        % obj.startAutoUpdate(); % This method does not exist, causing error
                     end
                     
                     % Mark as initialized
@@ -632,6 +632,26 @@ classdef FocalSweep < core.MotorGUI_ZControl
             end
         end
         
+        function updateZPosition(obj)
+            % Update the current Z position value and display in the GUI
+            try
+                % Get current Z position from ScanImage
+                currentZ = obj.getZ();
+                obj.currentZ = currentZ;
+                
+                % Update GUI display if available
+                if isfield(obj, 'gui') && ~isempty(obj.gui) && isvalid(obj.gui)
+                    if isa(obj.gui, 'gui.FocusGUI')
+                        obj.gui.updateCurrentZ(currentZ);
+                    end
+                end
+            catch ME
+                if obj.verbosity > 0
+                    warning('Error updating Z position: %s', ME.message);
+                end
+            end
+        end
+        
         %% Utility Functions
         function validateScanImageEnvironment(obj)
             % Validate ScanImage environment and components
@@ -781,8 +801,6 @@ classdef FocalSweep < core.MotorGUI_ZControl
                 if verbosity > 0
                     fprintf('Creating FocalSweep GUI...\n');
                 end
-                obj.createGUI();
-                
                 % Store as singleton
                 instance = obj;
                 
@@ -790,17 +808,11 @@ classdef FocalSweep < core.MotorGUI_ZControl
                     fprintf('FocalSweep focus control ready.\n');
                 end
             else
-                % Return existing instance
-                obj = instance;
-                obj.verbosity = verbosity;  % Update verbosity setting
-                
-                if verbosity > 0
-                    fprintf('Using existing FocalSweep instance.\n');
-                end
-                
-                % Bring window to front
-                figure(obj.hFig);
+                % An instance already exists, bring it to the front
+                figure(instance.gui.hFig);
             end
+            
+            obj = instance;
         end
     end
 end 

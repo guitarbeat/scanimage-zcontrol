@@ -31,6 +31,9 @@ classdef FocusGUI < handle
         controller        % Handle to the main controller
         focusModeActive = false  % Track if focus mode is active
         hasZData = false         % Track if we have Z position data
+        previousZValue = 0       % Previous Z value for movement indicator
+        tooltipsEnabled = true   % Flag to enable/disable tooltips
+        helpButton               % Help button in the status bar
     end
 
     methods
@@ -41,8 +44,8 @@ classdef FocusGUI < handle
         function create(obj)
             % Create main figure with modern styling
             fprintf('Creating FocalSweep GUI...\n');
-            obj.hFig = uifigure('Name', 'FocalSweep - Find optimal focus position', ...
-                'Position', [100 100 900 700], ...
+            obj.hFig = uifigure('Name', 'FocalSweep - Automated Z-Focus Finder', ...
+                'Position', [100 100 950 700], ...
                 'Color', [0.95 0.95 0.98], ...
                 'CloseRequestFcn', @(~,~) obj.controller.closeFigure(), ...
                 'Resize', 'on');
@@ -73,7 +76,7 @@ classdef FocusGUI < handle
             paramGrid.ColumnSpacing = 10;
             
             % --- Scan Parameters Panel (Row 1, Col 1 of paramGrid) ---
-            paramPanel = gui.components.UIComponentFactory.createStyledPanel(paramGrid, 'Scan Parameters', 1, 1);
+            paramPanel = gui.components.UIComponentFactory.createStyledPanel(paramGrid, 'Z-Scan Parameters', 1, 1);
             
             % --- Z Movement Controls Panel (Row 1, Col 2 of paramGrid) ---
             zControlPanel = gui.components.UIComponentFactory.createStyledPanel(paramGrid, 'Z Movement Controls', 1, 2);
@@ -109,13 +112,14 @@ classdef FocusGUI < handle
             % Set up event handlers
             obj.hStepSizeSlider.ValueChangingFcn = @(src,event) obj.updateStepSizeValueDisplay(event.Value);
             obj.hStepSizeSlider.ValueChangedFcn = @(src,event) obj.controller.updateStepSizeImmediate(event.Value);
-            obj.hMonitorToggle.ValueChangedFcn = @(src,~) obj.controller.toggleMonitor(src.Value);
+            obj.hMonitorToggle.ValueChangedFcn = @(src,~) obj.monitorToggleChanged(src.Value);
             obj.hZScanToggle.ValueChangedFcn = @(src,~) obj.toggleScanButtons(src.Value);
             
             % The focus button callback needs to be set here because we're not using the factory's built-in callback
             obj.hFocusButton.ButtonPushedFcn = @(~,~) obj.toggleFocusMode();
             obj.hGrabButton.ButtonPushedFcn = @(~,~) obj.controller.grabSIFrame();
             obj.hAbortButton.ButtonPushedFcn = @(~,~) obj.abortOperation();
+            obj.hMoveToMaxButton.ButtonPushedFcn = @(~,~) obj.moveToMaxBrightness();
             
             % Add min/max Z change callbacks to update Auto Z-Scan button state
             obj.hMinZEdit.ValueChangedFcn = @(~,~) obj.updateButtonStates();
@@ -124,11 +128,41 @@ classdef FocusGUI < handle
             % --- Status Bar ---
             [obj.hStatusText, obj.hStatusBar] = gui.components.UIComponentFactory.createStatusBar(obj.hFig);
             
+            % Add Help button to status bar
+            obj.helpButton = uibutton(obj.hStatusBar, ...
+                'Text', '❓ Help', ...
+                'Position', [obj.hFig.Position(3)-70, 2, 60, 20], ...
+                'BackgroundColor', [0.9 0.9 0.95], ...
+                'FontSize', 10, ...
+                'ButtonPushedFcn', @(~,~) obj.showHelp());
+            
             % Set up figure resize callback
             obj.hFig.AutoResizeChildren = 'off';  % Disable auto resize before setting SizeChangedFcn
             obj.hFig.SizeChangedFcn = @(~,~) obj.updateStatusBarPosition();
             
             % Initialize button states
+            obj.updateButtonStates();
+            
+            % Show initial status message
+            obj.updateStatus('Ready - Set Z parameters and press "Monitor Brightness" to start');
+        end
+        
+        function monitorToggleChanged(obj, isActive)
+            % Handle monitor toggle state change with visual feedback
+            obj.controller.toggleMonitor(isActive);
+            
+            % Visual feedback for button state
+            gui.handlers.UIEventHandlers.setButtonVisualState(obj.hMonitorToggle, isActive);
+            
+            if isActive
+                obj.updateStatus('Monitoring active - brightness will update in real-time');
+                obj.hZScanToggle.Enable = 'on';
+            else
+                obj.updateStatus('Monitoring stopped');
+                obj.hZScanToggle.Enable = 'off';
+            end
+            
+            % Update button states
             obj.updateButtonStates();
         end
         
@@ -145,13 +179,16 @@ classdef FocusGUI < handle
                 obj.hGrabButton.Visible = 'off';
                 obj.hAbortButton.Visible = 'on';
                 
+                % Visual feedback
+                obj.updateStatus('Focus mode active - ScanImage is continuously acquiring', Severity="success");
+                
                 % Update Z-scan button state
                 obj.updateButtonStates();
                 
                 % Start monitoring if not already active
                 if ~obj.hMonitorToggle.Value
                     obj.hMonitorToggle.Value = true;
-                    obj.controller.toggleMonitor(true);
+                    obj.monitorToggleChanged(true);
                 end
             else
                 % Reset UI
@@ -159,9 +196,18 @@ classdef FocusGUI < handle
                 obj.hGrabButton.Visible = 'on';
                 obj.hAbortButton.Visible = 'off';
                 
+                % Update status
+                obj.updateStatus('Focus mode stopped');
+                
                 % Update Z-scan button state
                 obj.updateButtonStates();
             end
+        end
+        
+        function moveToMaxBrightness(obj)
+            % Move to max brightness with visual feedback
+            obj.updateStatus('Moving to position of maximum brightness...', Severity="info");
+            obj.controller.moveToMaxBrightness();
         end
         
         function updateButtonStates(obj)
@@ -169,22 +215,34 @@ classdef FocusGUI < handle
             
             % Auto Z-Scan should be enabled only when:
             % 1. Min and Max Z are set
-            % 2. Focus mode is active
+            % 2. Focus mode is active or monitoring is active
             minZValid = ~isempty(obj.hMinZEdit.Value) && ~isnan(obj.hMinZEdit.Value);
             maxZValid = ~isempty(obj.hMaxZEdit.Value) && ~isnan(obj.hMaxZEdit.Value);
             rangeValid = minZValid && maxZValid && (obj.hMaxZEdit.Value > obj.hMinZEdit.Value);
             
-            if rangeValid && obj.focusModeActive
+            if rangeValid && (obj.focusModeActive || obj.hMonitorToggle.Value)
                 obj.hZScanToggle.Enable = 'on';
+                obj.hZScanToggle.Tooltip = 'Start automatic Z scan to find focus';
             else
                 obj.hZScanToggle.Enable = 'off';
+                
+                % Set explanatory tooltip based on the reason it's disabled
+                if ~rangeValid
+                    obj.hZScanToggle.Tooltip = 'Set valid Min and Max Z positions first';
+                elseif ~obj.focusModeActive && ~obj.hMonitorToggle.Value
+                    obj.hZScanToggle.Tooltip = 'Start Focus mode or Monitor first';
+                else
+                    obj.hZScanToggle.Tooltip = 'Auto Z-Scan disabled';
+                end
             end
             
             % Move to Max Focus should be enabled only when we have Z data
             if obj.hasZData
                 obj.hMoveToMaxButton.Enable = 'on';
+                obj.hMoveToMaxButton.Tooltip = 'Move to the Z position with maximum brightness (best focus)';
             else
                 obj.hMoveToMaxButton.Enable = 'off';
+                obj.hMoveToMaxButton.Tooltip = 'Perform a Z-Scan first to find maximum brightness';
             end
         end
         
@@ -202,7 +260,8 @@ classdef FocusGUI < handle
                 'ZScanToggle', obj.hZScanToggle, ...
                 'StepSizeSlider', obj.hStepSizeSlider, ...
                 'PauseTimeEdit', obj.hPauseTimeEdit, ...
-                'MetricDropDown', obj.hMetricDropDown);
+                'MetricDropDown', obj.hMetricDropDown, ...
+                'StatusText', obj.hStatusText);
                 
             if isScanActive
                 % Start Z-scan
@@ -211,11 +270,17 @@ classdef FocusGUI < handle
                     Controller=obj.controller, ...
                     UI=uiComponents, ...
                     ScanParams=scanParams);
+                    
+                % Visual feedback for button state
+                gui.handlers.UIEventHandlers.setButtonVisualState(obj.hZScanToggle, true);
             else
                 % Stop Z-scan
                 gui.handlers.UIEventHandlers.handleScanToggle(false, ...
                     Controller=obj.controller, ...
                     UI=uiComponents);
+                    
+                % Visual feedback for button state
+                gui.handlers.UIEventHandlers.setButtonVisualState(obj.hZScanToggle, false);
             end
         end
         
@@ -223,12 +288,13 @@ classdef FocusGUI < handle
             % Handle abort button press
             uiComponents = struct(...
                 'ZScanToggle', obj.hZScanToggle, ...
+                'MonitorToggle', obj.hMonitorToggle, ...
                 'StatusText', obj.hStatusText);
                 
             gui.handlers.UIEventHandlers.handleAbortOperation(...
                 Controller=obj.controller, ...
                 UI=uiComponents, ...
-                Message="Operation aborted by user");
+                Message="OPERATION ABORTED");
             
             % Reset focus mode
             obj.focusModeActive = false;
@@ -246,11 +312,20 @@ classdef FocusGUI < handle
                 'zData', zData, ...
                 'bData', bData, ...
                 'activeChannel', activeChannel);
+            
+            % Get current Z position to overlay on plot    
+            currentZ = [];
+            try
+                currentZ = obj.controller.getZ();
+            catch
+                % If we can't get current Z, just don't show the marker
+            end
                 
             gui.handlers.UIEventHandlers.updateBrightnessPlot(obj.hAx, plotData, ...
                 ActiveChannel=activeChannel, ...
                 ShowLegend=true, ...
-                ShowMarkers=true);
+                ShowMarkers=true, ...
+                CurrentZ=currentZ);
             
             % Update hasZData flag based on data
             obj.hasZData = ~isempty(zData) && length(zData) > 1;
@@ -260,22 +335,38 @@ classdef FocusGUI < handle
         end
         
         function updateCurrentZ(obj, zValue)
-            % Update current Z position display
+            % Update current Z position display with movement indicator
+            prevZ = obj.previousZValue;
+            obj.previousZValue = zValue;
+            
             gui.handlers.UIEventHandlers.updateCurrentZDisplay(obj.hCurrentZLabel, zValue, ...
                 Format="%.1f", ...
-                ColorThreshold=500);
+                ColorThreshold=500, ...
+                ShowMovementIndicator=true, ...
+                PreviousValue=prevZ);
         end
 
-        function updateStatus(obj, message)
-            % Update status text
+        function updateStatus(obj, message, varargin)
+            % Update status text with optional severity
+            p = inputParser;
+            p.addOptional('Severity', 'info', @ischar);
+            p.addOptional('FlashMessage', false, @islogical);
+            p.parse(varargin{:});
+            
             gui.handlers.UIEventHandlers.updateStatusDisplay(obj.hStatusText, message, ...
                 AddTimestamp=false, ...
-                Severity="info");
+                Severity=p.Results.Severity, ...
+                FlashMessage=p.Results.FlashMessage);
         end
         
         function updateStatusBarPosition(obj)
             % Update status bar position when window is resized
             gui.handlers.UIEventHandlers.updateStatusBarLayout(obj.hFig, obj.hStatusBar);
+            
+            % Also update help button position
+            if isfield(obj, 'helpButton') && ~isempty(obj.helpButton) && isvalid(obj.helpButton)
+                obj.helpButton.Position = [obj.hFig.Position(3)-70, 2, 60, 20];
+            end
         end
         
         function showHelp(obj)

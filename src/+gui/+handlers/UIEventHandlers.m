@@ -5,10 +5,11 @@ classdef UIEventHandlers < handle
     properties (Constant, Access = private)
         % Visual styling constants
         PLOT_STYLES = struct(...
-            'ScanTrace', struct('Color', [0.2 0.4 0.8], 'LineWidth', 2, 'Marker', '.', 'MarkerSize', 12), ...
+            'ScanTrace', struct('Color', [0.2 0.4 0.8], 'LineWidth', 2.5, 'Marker', '.', 'MarkerSize', 14), ...
             'StartMarker', struct('Color', [0.2 0.7 0.3], 'Marker', 'o', 'MarkerSize', 10, 'LineWidth', 2), ...
             'EndMarker', struct('Color', [0.7 0.2 0.7], 'Marker', 'o', 'MarkerSize', 10, 'LineWidth', 2), ...
-            'MaxMarker', struct('Color', [0.8 0.2 0.2], 'Marker', 'p', 'MarkerSize', 14, 'LineWidth', 2) ...
+            'MaxMarker', struct('Color', [0.8 0.2 0.2], 'Marker', 'p', 'MarkerSize', 16, 'LineWidth', 2.5), ...
+            'CurrentMarker', struct('Color', [0.2 0.6 0.9], 'Marker', 'x', 'MarkerSize', 14, 'LineWidth', 2) ...
         );
         
         PLOT_CONFIG = struct(...
@@ -17,12 +18,18 @@ classdef UIEventHandlers < handle
             'FontSize', 11, ...
             'TitleFontSize', 13, ...
             'LegendFontSize', 10, ...
-            'AxisMargin', 0.05 ...
+            'AxisMargin', 0.08 ...  % Increased margin for better visualization
         );
         
         STATUS_CONFIG = struct(...
             'StatusBarHeight', 25, ...
             'UpdateInterval', 0.1 ...
+        );
+        
+        % Button state visual indicators
+        BUTTON_STATES = struct(...
+            'Active', struct('FontWeight', 'bold', 'BorderWidth', 2), ...
+            'Inactive', struct('FontWeight', 'normal', 'BorderWidth', 1) ...
         );
     end
     
@@ -35,6 +42,7 @@ classdef UIEventHandlers < handle
                 value double {mustBePositive, mustBeFinite}
                 options.Format string = "%.0f"
                 options.EnableDrawnow logical = true
+                options.HighlightChange logical = true
             end
             
             success = false;
@@ -43,8 +51,23 @@ classdef UIEventHandlers < handle
                     return;
                 end
                 
+                % Store previous value for highlighting changes
+                if options.HighlightChange && isfield(stepSizeValue, 'Text')
+                    prevValue = str2double(stepSizeValue.Text);
+                else
+                    prevValue = value;
+                end
+                
                 formattedValue = sprintf(options.Format, round(value));
                 stepSizeValue.Text = formattedValue;
+                
+                % Highlight if value changed significantly
+                if options.HighlightChange && abs(prevValue - value) > 1
+                    originalColor = stepSizeValue.FontColor;
+                    stepSizeValue.FontColor = [0.8 0.2 0.2]; % Highlight in red
+                    pause(0.2);
+                    stepSizeValue.FontColor = originalColor;
+                end
                 
                 if options.EnableDrawnow
                     drawnow limitrate;
@@ -64,6 +87,8 @@ classdef UIEventHandlers < handle
                 options.Format string = "%.1f"
                 options.EnableDrawnow logical = true
                 options.ColorThreshold double = []
+                options.ShowMovementIndicator logical = false
+                options.PreviousValue double = []
             end
             
             success = false;
@@ -72,15 +97,26 @@ classdef UIEventHandlers < handle
                     return;
                 end
                 
+                % Format the value
                 formattedValue = sprintf(options.Format, zValue);
+                
+                % Add movement indicator arrow if requested
+                if options.ShowMovementIndicator && ~isempty(options.PreviousValue)
+                    if zValue > options.PreviousValue
+                        formattedValue = [formattedValue ' ▼']; % Down arrow (Z increases)
+                    elseif zValue < options.PreviousValue
+                        formattedValue = [formattedValue ' ▲']; % Up arrow (Z decreases)
+                    end
+                end
+                
                 currentZLabel.Text = formattedValue;
                 
-                % Optional color coding based on threshold
+                % Color coding based on threshold
                 if ~isempty(options.ColorThreshold)
                     if abs(zValue) > options.ColorThreshold
                         currentZLabel.FontColor = [0.8 0.2 0.2]; % Red for extreme values
                     else
-                        currentZLabel.FontColor = [0.2 0.2 0.7]; % Blue for normal values
+                        currentZLabel.FontColor = [0.2 0.4 0.8]; % Blue for normal values
                     end
                 end
                 
@@ -102,6 +138,7 @@ classdef UIEventHandlers < handle
                 options.AddTimestamp logical = false
                 options.Severity string {mustBeMember(options.Severity, ["info", "warning", "error", "success"])} = "info"
                 options.EnableDrawnow logical = true
+                options.FlashMessage logical = false
             end
             
             success = false;
@@ -118,10 +155,33 @@ classdef UIEventHandlers < handle
                     displayMessage = message;
                 end
                 
+                % Add severity indicator icon
+                switch options.Severity
+                    case "error"
+                        displayMessage = ['⛔ ' displayMessage];
+                    case "warning"
+                        displayMessage = ['⚠️ ' displayMessage];
+                    case "success"
+                        displayMessage = ['✅ ' displayMessage];
+                    case "info"
+                        displayMessage = ['ℹ️ ' displayMessage];
+                end
+                
                 statusText.Text = displayMessage;
                 
                 % Set color based on severity
                 statusText.FontColor = UIEventHandlers.getSeverityColor(options.Severity);
+                
+                % Flash message for attention if requested
+                if options.FlashMessage
+                    originalColor = statusText.FontColor;
+                    for i = 1:2
+                        statusText.FontColor = [0.9 0.1 0.1];  % Bright red
+                        pause(0.1);
+                        statusText.FontColor = originalColor;
+                        pause(0.1);
+                    end
+                end
                 
                 if options.EnableDrawnow
                     drawnow limitrate;
@@ -154,7 +214,7 @@ classdef UIEventHandlers < handle
             catch ME
                 UIEventHandlers.logError('handleScanToggle', ME);
                 UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
-                    "Error during scan toggle operation", Severity="error");
+                    "Error during scan toggle operation", Severity="error", FlashMessage=true);
             end
         end
         
@@ -184,7 +244,8 @@ classdef UIEventHandlers < handle
                 
                 % Update status
                 if isfield(params.UI, 'StatusText')
-                    UIEventHandlers.updateStatusDisplay(params.UI.StatusText, params.Message, Severity="warning");
+                    UIEventHandlers.updateStatusDisplay(params.UI.StatusText, params.Message, ...
+                        Severity="warning", FlashMessage=true);
                 end
                 
                 success = true;
@@ -205,6 +266,8 @@ classdef UIEventHandlers < handle
                 options.ShowMarkers logical = true
                 options.ShowAnnotations logical = true
                 options.AutoScale logical = true
+                options.CurrentZ double = []
+                options.ShowGrid logical = true
             end
             
             success = false;
@@ -228,11 +291,16 @@ classdef UIEventHandlers < handle
                 % Add markers if requested
                 if options.ShowMarkers
                     UIEventHandlers.addPlotMarkers(axes, plotData);
+                    
+                    % Add current Z position marker if provided
+                    if ~isempty(options.CurrentZ)
+                        UIEventHandlers.addCurrentZMarker(axes, options.CurrentZ, plotData);
+                    end
                 end
                 
                 % Add annotations if requested
                 if options.ShowAnnotations
-                    UIEventHandlers.addPlotAnnotations(axes, plotData);
+                    UIEventHandlers.addPlotAnnotations(axes, plotData, options.CurrentZ);
                 end
                 
                 % Configure axes appearance
@@ -240,7 +308,7 @@ classdef UIEventHandlers < handle
                 
                 % Auto-scale if requested
                 if options.AutoScale
-                    UIEventHandlers.autoScalePlot(axes, plotData);
+                    UIEventHandlers.autoScalePlot(axes, plotData, options.CurrentZ);
                 end
                 
                 hold(axes, 'off');
@@ -260,6 +328,7 @@ classdef UIEventHandlers < handle
                 state string {mustBeMember(state, ["enable", "disable", "show", "hide"])}
                 options.ComponentFilter string = ""
                 options.ExcludeComponents string = ""
+                options.VisualFeedback logical = true
             end
             
             success = false;
@@ -279,7 +348,11 @@ classdef UIEventHandlers < handle
                 for i = 1:length(componentNames)
                     component = uiComponents.(componentNames{i});
                     if UIEventHandlers.isValidUIComponent(component)
-                        UIEventHandlers.setComponentState(component, state);
+                        if options.VisualFeedback
+                            UIEventHandlers.setComponentStateWithVisualFeedback(component, state);
+                        else
+                            UIEventHandlers.setComponentState(component, state);
+                        end
                     end
                 end
                 
@@ -320,6 +393,39 @@ classdef UIEventHandlers < handle
                 
             catch ME
                 UIEventHandlers.logError('updateStatusBarLayout', ME);
+            end
+        end
+        
+        %% Button State Visual Feedback
+        function success = setButtonVisualState(button, isActive)
+            % Sets visual appearance of button based on active/inactive state
+            arguments
+                button
+                isActive logical
+            end
+            
+            success = false;
+            try
+                if ~UIEventHandlers.isValidUIComponent(button)
+                    return;
+                end
+                
+                if isActive
+                    button.FontWeight = UIEventHandlers.BUTTON_STATES.Active.FontWeight;
+                    if isprop(button, 'BorderWidth')
+                        button.BorderWidth = UIEventHandlers.BUTTON_STATES.Active.BorderWidth;
+                    end
+                else
+                    button.FontWeight = UIEventHandlers.BUTTON_STATES.Inactive.FontWeight;
+                    if isprop(button, 'BorderWidth')
+                        button.BorderWidth = UIEventHandlers.BUTTON_STATES.Inactive.BorderWidth;
+                    end
+                end
+                
+                success = true;
+                
+            catch ME
+                UIEventHandlers.logError('setButtonVisualState', ME);
             end
         end
         
@@ -375,6 +481,13 @@ classdef UIEventHandlers < handle
                 % Extract and validate scan parameters
                 scanParams = UIEventHandlers.extractScanParameters(params);
                 
+                % Visual feedback that scan is starting
+                if isfield(params.UI, 'StatusText')
+                    UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
+                        sprintf("Starting Z-Scan with step size %d μm", scanParams.stepSize), ...
+                        Severity="info");
+                end
+                
                 % Start the scan through controller
                 if ismethod(params.Controller, 'toggleZScan')
                     params.Controller.toggleZScan(true, scanParams.stepSize, ...
@@ -394,9 +507,23 @@ classdef UIEventHandlers < handle
                 % Restore normal button visibility
                 UIEventHandlers.toggleScanButtons(params.UI, false);
                 
+                % Visual feedback that scan is stopping
+                if isfield(params.UI, 'StatusText')
+                    UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
+                        "Stopping Z-Scan...", Severity="info");
+                end
+                
                 % Stop the scan through controller
                 if ismethod(params.Controller, 'toggleZScan')
                     params.Controller.toggleZScan(false);
+                    
+                    % Confirmation that scan stopped
+                    if isfield(params.UI, 'StatusText')
+                        UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
+                            "Z-Scan stopped. Use 'Move to Max Focus' to go to best position.", ...
+                            Severity="success");
+                    end
+                    
                     success = true;
                 end
                 
@@ -444,6 +571,17 @@ classdef UIEventHandlers < handle
                 if isfield(ui, 'AbortButton') && UIEventHandlers.isValidUIComponent(ui.AbortButton)
                     ui.AbortButton.Visible = 'on';
                 end
+                
+                % Disable settings controls during scan
+                if isfield(ui, 'StepSizeSlider') && UIEventHandlers.isValidUIComponent(ui.StepSizeSlider)
+                    ui.StepSizeSlider.Enable = 'off';
+                end
+                if isfield(ui, 'PauseTimeEdit') && UIEventHandlers.isValidUIComponent(ui.PauseTimeEdit)
+                    ui.PauseTimeEdit.Enable = 'off';
+                end
+                if isfield(ui, 'MetricDropDown') && UIEventHandlers.isValidUIComponent(ui.MetricDropDown)
+                    ui.MetricDropDown.Enable = 'off';
+                end
             else
                 % Show normal buttons, hide abort
                 if isfield(ui, 'FocusButton') && UIEventHandlers.isValidUIComponent(ui.FocusButton)
@@ -454,6 +592,17 @@ classdef UIEventHandlers < handle
                 end
                 if isfield(ui, 'AbortButton') && UIEventHandlers.isValidUIComponent(ui.AbortButton)
                     ui.AbortButton.Visible = 'off';
+                end
+                
+                % Re-enable settings controls after scan
+                if isfield(ui, 'StepSizeSlider') && UIEventHandlers.isValidUIComponent(ui.StepSizeSlider)
+                    ui.StepSizeSlider.Enable = 'on';
+                end
+                if isfield(ui, 'PauseTimeEdit') && UIEventHandlers.isValidUIComponent(ui.PauseTimeEdit)
+                    ui.PauseTimeEdit.Enable = 'on';
+                end
+                if isfield(ui, 'MetricDropDown') && UIEventHandlers.isValidUIComponent(ui.MetricDropDown)
+                    ui.MetricDropDown.Enable = 'on';
                 end
             end
         end
@@ -467,7 +616,7 @@ classdef UIEventHandlers < handle
                 'LineWidth', style.LineWidth, ...
                 'Marker', style.Marker, ...
                 'MarkerSize', style.MarkerSize, ...
-                'DisplayName', 'Scan Trace');
+                'DisplayName', 'Brightness Scan');
         end
         
         function addPlotMarkers(axes, plotData)
@@ -506,23 +655,74 @@ classdef UIEventHandlers < handle
                 'MarkerSize', maxStyle.MarkerSize, ...
                 'LineWidth', maxStyle.LineWidth, ...
                 'LineStyle', 'none', ...
-                'DisplayName', 'Brightest Point');
+                'DisplayName', 'Optimal Focus');
         end
         
-        function addPlotAnnotations(axes, plotData)
+        function addCurrentZMarker(axes, currentZ, plotData)
+            % Adds marker for current Z position if within plot range
+            if isempty(plotData.zData) || isempty(plotData.bData)
+                return;
+            end
+            
+            % Only add marker if current Z is within the range of data
+            minZ = min(plotData.zData);
+            maxZ = max(plotData.zData);
+            
+            if currentZ >= minZ && currentZ <= maxZ
+                % Interpolate brightness at current Z
+                currentB = interp1(plotData.zData, plotData.bData, currentZ, 'linear');
+                
+                if ~isnan(currentB)
+                    % Plot current Z marker
+                    currentStyle = UIEventHandlers.PLOT_STYLES.CurrentMarker;
+                    plot(axes, currentZ, currentB, ...
+                        'Color', currentStyle.Color, ...
+                        'Marker', currentStyle.Marker, ...
+                        'MarkerSize', currentStyle.MarkerSize, ...
+                        'LineWidth', currentStyle.LineWidth, ...
+                        'LineStyle', 'none', ...
+                        'DisplayName', 'Current Position');
+                end
+            end
+        end
+        
+        function addPlotAnnotations(axes, plotData, currentZ)
             % Adds text annotations to plot
             if isempty(plotData.bData)
                 return;
             end
             
+            % Add annotation for maximum brightness
             [maxB, maxIdx] = max(plotData.bData);
             maxZ = plotData.zData(maxIdx);
             
-            text(axes, maxZ, maxB, sprintf('  Max: %.2f', maxB), ...
+            text(axes, maxZ, maxB, sprintf('  Max: %.1f @ Z=%.1f', maxB, maxZ), ...
                 'Color', UIEventHandlers.PLOT_STYLES.MaxMarker.Color, ...
                 'FontWeight', 'bold', ...
                 'VerticalAlignment', 'bottom', ...
+                'HorizontalAlignment', 'left', ...
                 'FontSize', UIEventHandlers.PLOT_CONFIG.FontSize);
+            
+            % Add annotation for current Z if provided
+            if ~isempty(currentZ)
+                % Only add annotation if current Z is within the range of data
+                minZ = min(plotData.zData);
+                maxZ = max(plotData.zData);
+                
+                if currentZ >= minZ && currentZ <= maxZ
+                    % Interpolate brightness at current Z
+                    currentB = interp1(plotData.zData, plotData.bData, currentZ, 'linear');
+                    
+                    if ~isnan(currentB)
+                        text(axes, currentZ, currentB, sprintf('  Current: Z=%.1f', currentZ), ...
+                            'Color', UIEventHandlers.PLOT_STYLES.CurrentMarker.Color, ...
+                            'FontWeight', 'bold', ...
+                            'VerticalAlignment', 'top', ...
+                            'HorizontalAlignment', 'left', ...
+                            'FontSize', UIEventHandlers.PLOT_CONFIG.FontSize);
+                    end
+                end
+            end
         end
         
         function configurePlotAppearance(axes, plotData, options)
@@ -542,20 +742,24 @@ classdef UIEventHandlers < handle
                 'FontSize', config.TitleFontSize);
             
             % Grid and box
-            grid(axes, 'on');
+            if options.ShowGrid
+                grid(axes, 'on');
+            else
+                grid(axes, 'off');
+            end
             box(axes, 'on');
             axes.GridAlpha = config.GridAlpha;
             axes.LineWidth = config.LineWidth;
             axes.FontSize = config.FontSize;
             
             % Legend
-            if options.ShowLegend
+            if options.ShowLegend && ~isempty(plotData.zData)
                 legend(axes, 'show', 'Location', 'best', ...
                     'FontSize', config.LegendFontSize, 'Box', 'on');
             end
         end
         
-        function autoScalePlot(axes, plotData)
+        function autoScalePlot(axes, plotData, currentZ)
             % Auto-scales plot axes with margin
             if isempty(plotData.zData) || isempty(plotData.bData)
                 return;
@@ -563,11 +767,20 @@ classdef UIEventHandlers < handle
             
             margin = UIEventHandlers.PLOT_CONFIG.AxisMargin;
             
+            % Determine Z range, potentially including current Z position
+            minZ = min(plotData.zData);
+            maxZ = max(plotData.zData);
+            
+            if ~isempty(currentZ) && (currentZ < minZ || currentZ > maxZ)
+                % Include current Z in range if it's outside the data range
+                minZ = min(minZ, currentZ);
+                maxZ = max(maxZ, currentZ);
+            end
+            
             % X-axis scaling
-            xRange = max(plotData.zData) - min(plotData.zData);
-            if xRange > 0
-                axes.XLim = [min(plotData.zData) - margin*xRange, ...
-                            max(plotData.zData) + margin*xRange];
+            zRange = maxZ - minZ;
+            if zRange > 0
+                axes.XLim = [minZ - margin*zRange, maxZ + margin*zRange];
             end
             
             % Y-axis scaling
@@ -575,6 +788,9 @@ classdef UIEventHandlers < handle
             if yRange > 0
                 axes.YLim = [max(0, min(plotData.bData) - margin*yRange), ...
                             max(plotData.bData) + margin*yRange];
+            else
+                % If there's no range, create one around the value
+                axes.YLim = [max(0, min(plotData.bData)*0.9), min(plotData.bData)*1.1];
             end
         end
         
@@ -609,6 +825,30 @@ classdef UIEventHandlers < handle
             end
         end
         
+        function setComponentStateWithVisualFeedback(component, state)
+            % Sets component state with visual feedback
+            originalBgColor = [];
+            if isprop(component, 'BackgroundColor')
+                originalBgColor = component.BackgroundColor;
+            end
+            
+            % Apply state change
+            UIEventHandlers.setComponentState(component, state);
+            
+            % Visual feedback for enable/disable
+            if strcmp(state, 'enable') && ~isempty(originalBgColor)
+                % Flash green for enable
+                component.BackgroundColor = [0.8 1.0 0.8];
+                pause(0.1);
+                component.BackgroundColor = originalBgColor;
+            elseif strcmp(state, 'disable') && ~isempty(originalBgColor)
+                % Flash red for disable
+                component.BackgroundColor = [1.0 0.8 0.8];
+                pause(0.1);
+                component.BackgroundColor = originalBgColor;
+            end
+        end
+        
         function content = buildHelpContent()
             % Builds help dialog content
             content = [ ...
@@ -621,13 +861,23 @@ classdef UIEventHandlers < handle
                 '   a. Press "Monitor Brightness" to start tracking brightness' newline ...
                 '   b. Use Up/Down buttons to move the Z stage while watching brightness' newline ...
                 '   c. The plot will show brightness changes in real-time' newline newline ...
-                '4. CONTROLS:' newline ...
-                '   • Red markers show the brightest point found' newline ...
-                '   • Green/purple markers show scan start/end points' newline ...
-                '   • Press "Abort" to stop any operation immediately' newline newline ...
-                '5. TIPS:' newline ...
-                '   • Use smaller step sizes (8-15μm) for more precise scanning' newline ...
-                '   • Increase pause time if the system needs more settling time' newline ...
+                '4. PLOT MARKERS:' newline ...
+                '   • Red diamond (◆): Optimal focus position (highest brightness)' newline ...
+                '   • Green circle (○): Scan start position' newline ...
+                '   • Purple circle (○): Scan end position' newline ...
+                '   • Blue X (×): Current Z position' newline newline ...
+                '5. CONTROLS:' newline ...
+                '   • "Monitor Brightness": Tracks image brightness without moving' newline ...
+                '   • "Auto Z-Scan": Automatically scans through Z positions' newline ...
+                '   • "Move to Max Focus": Moves to the position of maximum brightness' newline ...
+                '   • "Focus Mode": Starts continuous scanning in ScanImage' newline ...
+                '   • "Grab Frame": Takes a single image in ScanImage' newline ...
+                '   • "ABORT": Stops all operations immediately' newline newline ...
+                '6. TIPS:' newline ...
+                '   • Use 8-15μm step sizes for more precise focus finding' newline ...
+                '   • Larger step sizes (20-30μm) are good for initial rough scans' newline ...
+                '   • Increase pause time if images appear noisy or inconsistent' newline ...
+                '   • The "Current Z Position" display shows movement direction (▲/▼)' newline ...
             ];
         end
         
@@ -635,6 +885,7 @@ classdef UIEventHandlers < handle
             % Logs errors with context information
             warning('UIEventHandlers:%s:Error', functionName, ...
                 'Error in %s: %s', functionName, ME.message);
+            disp(['Stack trace: ' getReport(ME, 'basic')]);
         end
     end
 end

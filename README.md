@@ -38,6 +38,11 @@ addpath('src');
 ```matlab
 control = FocalSweep();
 ```
+   
+   Alternatively, use the quick launcher function:
+```matlab
+control = fsweep();
+```
 
 3. The GUI will appear with the following components:
    - Brightness vs Z-position plot
@@ -96,18 +101,38 @@ control.relativeMove(-10); % Move down 10 units
 control.absoluteMove(12000);
 ```
 
-## File Structure
+## Code Structure
 
-```
-scanimage-zcontrol/
-├── src/
-│   ├── FocalSweep.m       # Main control class
-│   └── fsweep.m           # Quick launcher function
-├── docs/
-│   └── ...                # Documentation files
-├── LICENSE
-└── README.md
-```
+### Main Components
+
+#### `FocalSweep.m`
+The main class that combines Z-position control with brightness monitoring, providing:
+- Real-time brightness monitoring
+- Automated Z-scanning with adaptive step sizing
+- Interactive GUI for control and visualization
+- Automatic focal point detection
+
+#### `fsweep.m`
+Quick launcher function that creates and returns a FocalSweep object instance.
+
+### GUI Module
+
+The GUI system is built with a modular structure:
+
+#### Main Classes
+- `FocusGUI.m` - Main class that coordinates the GUI creation and manages callbacks
+
+#### Components Module
+- `UIComponentFactory.m` - Factory class for creating UI components with consistent styling
+
+#### Handlers Module
+- `UIEventHandlers.m` - Event handler class for handling UI events and updates
+
+### Design Patterns Used
+
+1. **Factory Pattern** - The UIComponentFactory class creates UI components with consistent styling
+2. **Facade Pattern** - The main GUI class provides a simplified interface to the complex UI subsystem
+3. **Observer Pattern** - The event handlers respond to UI events and update the UI accordingly
 
 ## Troubleshooting
 

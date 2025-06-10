@@ -1,122 +1,139 @@
 function varargout = fsweep(varargin)
-    % FSWEEP - Quick launcher for the FocalSweep focus finding tool
+    % FSWEEP - Focal Sweep Tool for ScanImage
     %
-    % This function provides a simple way to launch the FocalSweep
-    % focus finding tool for microscopy applications.
+    % DESCRIPTION:
+    %   Launch or close the Focal Sweep tool for ScanImage, which provides Z-focus
+    %   finding based on image brightness optimization.
     %
-    % Usage:
-    %   fsweep           % Launch the FocalSweep tool
-    %   fs = fsweep      % Launch and return the FocalSweep object
-    %   fsweep('quiet')  % Launch with minimal output and no warnings
-    %   fsweep('force')  % Force creation of a new instance
+    % SYNTAX:
+    %   fsweep                    % Launch with default settings
+    %   fsweep('param', value)    % Launch with custom parameters
+    %   fsweep('close')           % Close any existing instances
+    %   fsweep('version')         % Display version information
+    %   fs = fsweep(...)          % Return the FocalSweep instance
     %
-    % Simulation Mode:
-    %   To run in simulation mode without ScanImage:
-    %   >> SIM_MODE = true;
-    %   >> fsweep
+    % PARAMETERS:
+    %   'verbosity' - Level of output messages (0=quiet, 1=normal, 2=debug)
+    %                 Default: 1
+    %   'forceNew'  - Force creation of a new instance (true/false)
+    %                 Default: false
+    %   'close'     - Close any existing instances (no value needed)
+    %   'version'   - Display version information (no value needed)
     %
-    % See also: FocalSweep, fsweep_close
+    % RETURNS:
+    %   fs - Handle to the FocalSweep object (optional)
+    %
+    % EXAMPLES:
+    %   fsweep                       % Launch with default settings
+    %   fsweep('verbosity', 2)       % Launch with debug messages
+    %   fs = fsweep('forceNew', true) % Force new instance and get handle
+    %   fsweep('close')              % Close any existing instances
+    %   fsweep('version')            % Display version information
+    %
+    % REQUIREMENTS:
+    %   - ScanImage must be running with 'hSI' in base workspace
+    %   - Access to Motor Controls in ScanImage
+    %
+    % See also:
+    %   core.FocalSweep, core.FocalSweepFactory
+    
+    % Copyright (C) 2023-2025
+    % Version 1.1.0
+    
+    % Version information
+    FSWEEP_VERSION = '1.1.0';
+    FSWEEP_DATE = 'May 2025';
     
     try
-        % Parse options
-        quiet = false;
-        forceNew = false;
-        
-        % Process input arguments
-        for i = 1:nargin
-            if ischar(varargin{i})
-                switch lower(varargin{i})
-                    case 'quiet'
-                        quiet = true;
-                    case 'force'
-                        forceNew = true;
+        % Check if the 'close' command is provided
+        if nargin > 0 && ischar(varargin{1})
+            if strcmpi(varargin{1}, 'close')
+                % Close any existing instances
+                closeInstances();
+                
+                % Return empty if output requested
+                if nargout > 0
+                    varargout{1} = [];
                 end
+                return;
+            elseif strcmpi(varargin{1}, 'version')
+                % Display version information
+                fprintf('FocalSweep Z-Control version %s (%s)\n', FSWEEP_VERSION, FSWEEP_DATE);
+                fprintf('Copyright (C) 2023-2025\n');
+                
+                % Return version if output requested
+                if nargout > 0
+                    varargout{1} = FSWEEP_VERSION;
+                end
+                return;
             end
         end
         
-        % Turn off warnings if quiet mode
-        if quiet
-            warnState = warning('off', 'all');
-        end
-        
-        % Ensure FocalSweep.m is in the path
-        thisFile = mfilename('fullpath');
-        [basePath, ~, ~] = fileparts(thisFile);
-        addpath(basePath);
-        
-        % Launch FocalSweep using the static launch method
-        if quiet
-            % Only print essential messages
-            fprintf('Launching FocalSweep...\n');
-            fs = FocalSweep.launch('verbosity', 0, 'forceNew', forceNew);
+        % Use direct instance creation if no factory exists
+        if ~exist('core.FocalSweepFactory', 'class')
+            fprintf('FocalSweepFactory not found. Creating instance directly.\n');
+            
+            % Parse parameters
+            p = inputParser;
+            p.addParameter('verbosity', 1, @isnumeric);
+            p.addParameter('forceNew', false, @islogical);
+            p.parse(varargin{:});
+            
+            % Create a new instance directly
+            fs = core.FocalSweep('verbosity', p.Results.verbosity);
         else
-            fs = FocalSweep.launch('verbosity', 0, 'forceNew', forceNew);
+            % Use the factory to create or get an instance
+            fs = core.FocalSweepFactory.launch(varargin{:});
         end
         
-        % Return the FocalSweep object if requested
+        % Return the FocalSweep handle if requested
         if nargout > 0
             varargout{1} = fs;
         end
-        
-        % Restore warnings if quiet mode
-        if quiet
-            warning(warnState);
-        end
     catch ME
-        % Check if the error is related to a previous instance
-        if contains(ME.message, 'superclass constructor') || ...
-           contains(ME.message, 'property access')
-            fprintf('Error detected that may be due to a previous instance.\n');
-            fprintf('Attempting to clean up and restart...\n');
-            
-            % Try to close any open instances
-            try
-                % Create the cleanup function if it doesn't exist
-                if ~exist('fsweep_close', 'file')
-                    fsweep_close_path = fullfile(basePath, 'fsweep_close.m');
-                    if ~exist(fsweep_close_path, 'file')
-                        fprintf('Creating cleanup utility...\n');
-                        fid = fopen(fsweep_close_path, 'w');
-                        if fid > 0
-                            fprintf(fid, 'function fsweep_close()\n');
-                            fprintf(fid, '    %% Force close FocalSweep instances\n');
-                            fprintf(fid, '    figs = findall(0, ''Type'', ''figure'');\n');
-                            fprintf(fid, '    for i = 1:length(figs)\n');
-                            fprintf(fid, '        if contains(get(figs(i), ''Name''), ''FocalSweep'')\n');
-                            fprintf(fid, '            close(figs(i));\n');
-                            fprintf(fid, '        end\n');
-                            fprintf(fid, '    end\n');
-                            fprintf(fid, '    clear FocalSweep.launch\n');
-                            fprintf(fid, 'end\n');
-                            fclose(fid);
-                        end
-                    end
-                end
-                
-                % Run the cleanup
-                fsweep_close();
-                
-                % Try to clear classes
-                fprintf('Resetting class definitions...\n');
-                clear classes;
-                
-                % Retry once with force flag
-                fprintf('Retrying launch...\n');
-                if nargout > 0
-                    varargout{1} = fsweep('force');
-                else
-                    fsweep('force');
-                end
-                return;
-            catch ME2
-                fprintf('Recovery attempt failed: %s\n', ME2.message);
-            end
-        end
+        % Handle any errors
+        fprintf('Error with FocalSweep: %s\n', ME.message);
+        disp(getReport(ME));
         
-        % If we get here, the error wasn't handled or recovery failed
-        fprintf('Error in fsweep launcher: %s\n', ME.message);
+        % Return empty if output requested
         if nargout > 0
             varargout{1} = [];
         end
+        
+        % Rethrow to let calling code handle it
+        rethrow(ME);
+    end
+end
+
+%% Helper function to close instances
+function closeInstances()
+    try
+        % Find all figures with FocalSweep in the name
+        figs = findall(0, 'Type', 'figure');
+        closedCount = 0;
+        
+        for i = 1:length(figs)
+            if contains(get(figs(i), 'Name'), 'FocalSweep')
+                close(figs(i));
+                closedCount = closedCount + 1;
+            end
+        end
+        
+        % Reset the persistent instance variables if factory exists
+        if exist('core.FocalSweepFactory', 'class')
+            try
+                clear core.FocalSweepFactory.launch
+            catch
+                % Ignore errors when clearing factory
+            end
+        end
+        
+        if closedCount > 0
+            fprintf('FocalSweep: %d instance(s) closed.\n', closedCount);
+        else
+            fprintf('FocalSweep: No active instances found.\n');
+        end
+    catch ME
+        fprintf('Error closing FocalSweep: %s\n', ME.message);
     end
 end 

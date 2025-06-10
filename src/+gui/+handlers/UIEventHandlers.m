@@ -1,6 +1,7 @@
 classdef UIEventHandlers < handle
     % UIEventHandlers - Modern event handling system for FocusGUI
     % Provides robust, type-safe event handling with comprehensive error management
+    % Uses gui.utils.GUIUtils for common operations
     
     properties (Constant, Access = private)
         % Visual styling constants
@@ -47,7 +48,7 @@ classdef UIEventHandlers < handle
             
             success = false;
             try
-                if ~gui.handlers.UIEventHandlers.isValidUIComponent(stepSizeValue)
+                if ~gui.utils.GUIUtils.isValidUIComponent(stepSizeValue)
                     return;
                 end
                 
@@ -75,7 +76,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('updateStepSizeDisplay', ME);
+                gui.utils.GUIUtils.logError('updateStepSizeDisplay', ME);
             end
         end
         
@@ -93,7 +94,7 @@ classdef UIEventHandlers < handle
             
             success = false;
             try
-                if ~UIEventHandlers.isValidUIComponent(currentZLabel)
+                if ~gui.utils.GUIUtils.isValidUIComponent(currentZLabel)
                     return;
                 end
                 
@@ -126,7 +127,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('updateCurrentZDisplay', ME);
+                gui.utils.GUIUtils.logError('updateCurrentZDisplay', ME);
             end
         end
         
@@ -141,55 +142,17 @@ classdef UIEventHandlers < handle
                 options.FlashMessage logical = false
             end
             
-            success = false;
+            % Delegate to GUIUtils
             try
-                if ~gui.handlers.UIEventHandlers.isValidUIComponent(statusText)
-                    return;
-                end
-                
-                % Format message with optional timestamp
-                if options.AddTimestamp
-                    timestamp = string(datetime('now', 'Format', 'HH:mm:ss'));
-                    displayMessage = sprintf('[%s] %s', timestamp, message);
-                else
-                    displayMessage = message;
-                end
-                
-                % Add severity indicator icon
-                switch options.Severity
-                    case "error"
-                        displayMessage = ['⛔ ' displayMessage];
-                    case "warning"
-                        displayMessage = ['⚠️ ' displayMessage];
-                    case "success"
-                        displayMessage = ['✅ ' displayMessage];
-                    case "info"
-                        displayMessage = ['ℹ️ ' displayMessage];
-                end
-                
-                statusText.Text = displayMessage;
-                
-                % Set color based on severity
-                statusText.FontColor = gui.handlers.UIEventHandlers.getSeverityColor(options.Severity);
-                
-                % Flash message for attention if requested
-                if options.FlashMessage
-                    originalColor = statusText.FontColor;
-                    for i = 1:2
-                        statusText.FontColor = [0.9 0.1 0.1];  % Bright red
-                        pause(0.1);
-                        statusText.FontColor = originalColor;
-                        pause(0.1);
-                    end
-                end
-                
-                if options.EnableDrawnow
-                    drawnow limitrate;
-                end
+                gui.utils.GUIUtils.updateStatus(statusText, message, ...
+                    'AddTimestamp', options.AddTimestamp, ...
+                    'Severity', options.Severity, ...
+                    'EnableDrawnow', options.EnableDrawnow, ...
+                    'FlashMessage', options.FlashMessage);
                 success = true;
-                
             catch ME
-                gui.handlers.UIEventHandlers.logError('updateStatusDisplay', ME);
+                gui.utils.GUIUtils.logError('updateStatusDisplay', ME);
+                success = false;
             end
         end
         
@@ -212,7 +175,7 @@ classdef UIEventHandlers < handle
                 end
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('handleScanToggle', ME);
+                gui.utils.GUIUtils.logError('handleScanToggle', ME);
                 gui.handlers.UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
                     "Error during scan toggle operation", Severity="error", FlashMessage=true);
             end
@@ -229,11 +192,11 @@ classdef UIEventHandlers < handle
             success = false;
             try
                 % Reset UI state
-                if isfield(params.UI, 'ZScanToggle') && UIEventHandlers.isValidUIComponent(params.UI.ZScanToggle)
+                if isfield(params.UI, 'ZScanToggle') && gui.utils.GUIUtils.isValidUIComponent(params.UI.ZScanToggle)
                     params.UI.ZScanToggle.Value = false;
                 end
                 
-                if isfield(params.UI, 'MonitorToggle') && UIEventHandlers.isValidUIComponent(params.UI.MonitorToggle)
+                if isfield(params.UI, 'MonitorToggle') && gui.utils.GUIUtils.isValidUIComponent(params.UI.MonitorToggle)
                     params.UI.MonitorToggle.Value = false;
                 end
                 
@@ -251,7 +214,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('handleAbortOperation', ME);
+                gui.utils.GUIUtils.logError('handleAbortOperation', ME);
             end
         end
         
@@ -272,12 +235,12 @@ classdef UIEventHandlers < handle
             
             success = false;
             try
-                if ~UIEventHandlers.isValidUIComponent(axes)
+                if ~gui.utils.GUIUtils.isValidUIComponent(axes)
                     return;
                 end
                 
                 % Validate plot data
-                if ~UIEventHandlers.isValidPlotData(plotData)
+                if ~gui.handlers.UIEventHandlers.isValidPlotData(plotData)
                     return;
                 end
                 
@@ -286,29 +249,29 @@ classdef UIEventHandlers < handle
                 hold(axes, 'on');
                 
                 % Plot main trace
-                UIEventHandlers.plotScanTrace(axes, plotData);
+                gui.handlers.UIEventHandlers.plotScanTrace(axes, plotData);
                 
                 % Add markers if requested
                 if options.ShowMarkers
-                    UIEventHandlers.addPlotMarkers(axes, plotData);
+                    gui.handlers.UIEventHandlers.addPlotMarkers(axes, plotData);
                     
                     % Add current Z position marker if provided
                     if ~isempty(options.CurrentZ)
-                        UIEventHandlers.addCurrentZMarker(axes, options.CurrentZ, plotData);
+                        gui.handlers.UIEventHandlers.addCurrentZMarker(axes, options.CurrentZ, plotData);
                     end
                 end
                 
                 % Add annotations if requested
                 if options.ShowAnnotations
-                    UIEventHandlers.addPlotAnnotations(axes, plotData, options.CurrentZ);
+                    gui.handlers.UIEventHandlers.addPlotAnnotations(axes, plotData, options.CurrentZ);
                 end
                 
                 % Configure axes appearance
-                UIEventHandlers.configurePlotAppearance(axes, plotData, options);
+                gui.handlers.UIEventHandlers.configurePlotAppearance(axes, plotData, options);
                 
                 % Auto-scale if requested
                 if options.AutoScale
-                    UIEventHandlers.autoScalePlot(axes, plotData, options.CurrentZ);
+                    gui.handlers.UIEventHandlers.autoScalePlot(axes, plotData, options.CurrentZ);
                 end
                 
                 hold(axes, 'off');
@@ -316,7 +279,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('updateBrightnessPlot', ME);
+                gui.utils.GUIUtils.logError('updateBrightnessPlot', ME);
             end
         end
         
@@ -347,11 +310,11 @@ classdef UIEventHandlers < handle
                 % Apply state changes
                 for i = 1:length(componentNames)
                     component = uiComponents.(componentNames{i});
-                    if UIEventHandlers.isValidUIComponent(component)
+                    if gui.utils.GUIUtils.isValidUIComponent(component)
                         if options.VisualFeedback
-                            UIEventHandlers.setComponentStateWithVisualFeedback(component, state);
+                            gui.handlers.UIEventHandlers.setComponentStateWithVisualFeedback(component, state);
                         else
-                            UIEventHandlers.setComponentState(component, state);
+                            gui.handlers.UIEventHandlers.setComponentState(component, state);
                         end
                     end
                 end
@@ -359,7 +322,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('toggleUIState', ME);
+                gui.utils.GUIUtils.logError('toggleUIState', ME);
             end
         end
         
@@ -373,26 +336,13 @@ classdef UIEventHandlers < handle
                 options.BringToFront logical = true
             end
             
-            success = false;
+            % Delegate to GUIUtils
             try
-                if ~UIEventHandlers.isValidUIComponent(figureHandle) || ...
-                   ~UIEventHandlers.isValidUIComponent(statusBar)
-                    return;
-                end
-                
-                % Update position
-                figPos = figureHandle.Position;
-                statusBar.Position = [0, 0, figPos(3), options.Height];
-                
-                % Bring to front if requested
-                if options.BringToFront
-                    uistack(statusBar, 'top');
-                end
-                
+                gui.utils.GUIUtils.updateStatusBarLayout(figureHandle, statusBar, options.Height);
                 success = true;
-                
             catch ME
-                gui.handlers.UIEventHandlers.logError('updateStatusBarLayout', ME);
+                gui.utils.GUIUtils.logError('updateStatusBarLayout', ME);
+                success = false;
             end
         end
         
@@ -406,26 +356,26 @@ classdef UIEventHandlers < handle
             
             success = false;
             try
-                if ~UIEventHandlers.isValidUIComponent(button)
+                if ~gui.utils.GUIUtils.isValidUIComponent(button)
                     return;
                 end
                 
                 if isActive
-                    button.FontWeight = UIEventHandlers.BUTTON_STATES.Active.FontWeight;
+                    button.FontWeight = gui.handlers.UIEventHandlers.BUTTON_STATES.Active.FontWeight;
                     if isprop(button, 'BorderWidth')
-                        button.BorderWidth = UIEventHandlers.BUTTON_STATES.Active.BorderWidth;
+                        button.BorderWidth = gui.handlers.UIEventHandlers.BUTTON_STATES.Active.BorderWidth;
                     end
                 else
-                    button.FontWeight = UIEventHandlers.BUTTON_STATES.Inactive.FontWeight;
+                    button.FontWeight = gui.handlers.UIEventHandlers.BUTTON_STATES.Inactive.FontWeight;
                     if isprop(button, 'BorderWidth')
-                        button.BorderWidth = UIEventHandlers.BUTTON_STATES.Inactive.BorderWidth;
+                        button.BorderWidth = gui.handlers.UIEventHandlers.BUTTON_STATES.Inactive.BorderWidth;
                     end
                 end
                 
                 success = true;
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('setButtonVisualState', ME);
+                gui.utils.GUIUtils.logError('setButtonVisualState', ME);
             end
         end
         
@@ -441,32 +391,19 @@ classdef UIEventHandlers < handle
                 if options.CustomContent ~= ""
                     content = options.CustomContent;
                 else
-                    content = UIEventHandlers.buildHelpContent();
+                    content = gui.handlers.UIEventHandlers.buildHelpContent();
                 end
                 
                 helpdlg(content, options.DialogTitle);
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('showHelpDialog', ME);
+                gui.utils.GUIUtils.logError('showHelpDialog', ME);
             end
         end
     end
     
     methods (Static)
-        %% Error Handling
-        function logError(functionName, ME)
-            % Logs errors with context information
-            warning('UIEventHandlers:%s:Error', functionName, ...
-                'Error in %s: %s', functionName, ME.message);
-            disp(['Stack trace: ' getReport(ME, 'basic')]);
-        end
-        
         %% Validation Methods
-        function isValid = isValidUIComponent(component)
-            % Validates UI component handle
-            isValid = ~isempty(component) && isvalid(component) && ishandle(component);
-        end
-        
         function isValid = isValidPlotData(plotData)
             % Validates plot data structure
             isValid = isstruct(plotData) && ...
@@ -479,22 +416,6 @@ classdef UIEventHandlers < handle
         end
         
         %% Utility Methods
-        function color = getSeverityColor(severity)
-            % Returns color based on message severity
-            switch severity
-                case "info"
-                    color = [0.3 0.3 0.3];
-                case "success"
-                    color = [0.2 0.7 0.3];
-                case "warning"
-                    color = [0.9 0.6 0.1];
-                case "error"
-                    color = [0.8 0.2 0.2];
-                otherwise
-                    color = [0.3 0.3 0.3];
-            end
-        end
-        
         function setComponentState(component, state)
             % Sets component state (enable/disable, show/hide)
             switch state
@@ -569,46 +490,46 @@ classdef UIEventHandlers < handle
             % Toggles scan button visibility
             if isScanActive
                 % Show abort, hide others
-                if isfield(ui, 'FocusButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.FocusButton)
+                if isfield(ui, 'FocusButton') && gui.utils.GUIUtils.isValidUIComponent(ui.FocusButton)
                     ui.FocusButton.Visible = 'off';
                 end
-                if isfield(ui, 'GrabButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.GrabButton)
+                if isfield(ui, 'GrabButton') && gui.utils.GUIUtils.isValidUIComponent(ui.GrabButton)
                     ui.GrabButton.Visible = 'off';
                 end
-                if isfield(ui, 'AbortButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.AbortButton)
+                if isfield(ui, 'AbortButton') && gui.utils.GUIUtils.isValidUIComponent(ui.AbortButton)
                     ui.AbortButton.Visible = 'on';
                 end
                 
                 % Disable settings controls during scan
-                if isfield(ui, 'StepSizeSlider') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.StepSizeSlider)
+                if isfield(ui, 'StepSizeSlider') && gui.utils.GUIUtils.isValidUIComponent(ui.StepSizeSlider)
                     ui.StepSizeSlider.Enable = 'off';
                 end
-                if isfield(ui, 'PauseTimeEdit') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.PauseTimeEdit)
+                if isfield(ui, 'PauseTimeEdit') && gui.utils.GUIUtils.isValidUIComponent(ui.PauseTimeEdit)
                     ui.PauseTimeEdit.Enable = 'off';
                 end
-                if isfield(ui, 'MetricDropDown') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.MetricDropDown)
+                if isfield(ui, 'MetricDropDown') && gui.utils.GUIUtils.isValidUIComponent(ui.MetricDropDown)
                     ui.MetricDropDown.Enable = 'off';
                 end
             else
                 % Show normal buttons, hide abort
-                if isfield(ui, 'FocusButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.FocusButton)
+                if isfield(ui, 'FocusButton') && gui.utils.GUIUtils.isValidUIComponent(ui.FocusButton)
                     ui.FocusButton.Visible = 'on';
                 end
-                if isfield(ui, 'GrabButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.GrabButton)
+                if isfield(ui, 'GrabButton') && gui.utils.GUIUtils.isValidUIComponent(ui.GrabButton)
                     ui.GrabButton.Visible = 'on';
                 end
-                if isfield(ui, 'AbortButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.AbortButton)
+                if isfield(ui, 'AbortButton') && gui.utils.GUIUtils.isValidUIComponent(ui.AbortButton)
                     ui.AbortButton.Visible = 'off';
                 end
                 
                 % Re-enable settings controls after scan
-                if isfield(ui, 'StepSizeSlider') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.StepSizeSlider)
+                if isfield(ui, 'StepSizeSlider') && gui.utils.GUIUtils.isValidUIComponent(ui.StepSizeSlider)
                     ui.StepSizeSlider.Enable = 'on';
                 end
-                if isfield(ui, 'PauseTimeEdit') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.PauseTimeEdit)
+                if isfield(ui, 'PauseTimeEdit') && gui.utils.GUIUtils.isValidUIComponent(ui.PauseTimeEdit)
                     ui.PauseTimeEdit.Enable = 'on';
                 end
-                if isfield(ui, 'MetricDropDown') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.MetricDropDown)
+                if isfield(ui, 'MetricDropDown') && gui.utils.GUIUtils.isValidUIComponent(ui.MetricDropDown)
                     ui.MetricDropDown.Enable = 'on';
                 end
             end
@@ -622,7 +543,7 @@ classdef UIEventHandlers < handle
             success = false;
             try
                 % Show abort button, hide others
-                UIEventHandlers.toggleScanButtons(params.UI, true);
+                gui.handlers.UIEventHandlers.toggleScanButtons(params.UI, true);
                 
                 % Extract and validate scan parameters
                 scanParams = gui.handlers.UIEventHandlers.extractScanParameters(params);
@@ -642,7 +563,7 @@ classdef UIEventHandlers < handle
                 end
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('startScanOperation', ME);
+                gui.utils.GUIUtils.logError('startScanOperation', ME);
             end
         end
         
@@ -651,7 +572,7 @@ classdef UIEventHandlers < handle
             success = false;
             try
                 % Restore normal button visibility
-                UIEventHandlers.toggleScanButtons(params.UI, false);
+                gui.handlers.UIEventHandlers.toggleScanButtons(params.UI, false);
                 
                 % Visual feedback that scan is stopping
                 if isfield(params.UI, 'StatusText')
@@ -674,7 +595,7 @@ classdef UIEventHandlers < handle
                 end
                 
             catch ME
-                gui.handlers.UIEventHandlers.logError('stopScanOperation', ME);
+                gui.utils.GUIUtils.logError('stopScanOperation', ME);
             end
         end
         
@@ -710,7 +631,7 @@ classdef UIEventHandlers < handle
         %% Plotting Helpers
         function plotScanTrace(axes, plotData)
             % Plots the main scan trace
-            style = UIEventHandlers.PLOT_STYLES.ScanTrace;
+            style = gui.handlers.UIEventHandlers.PLOT_STYLES.ScanTrace;
             plot(axes, plotData.zData, plotData.bData, ...
                 'Color', style.Color, ...
                 'LineWidth', style.LineWidth, ...
@@ -726,7 +647,7 @@ classdef UIEventHandlers < handle
             end
             
             % Start marker
-            startStyle = UIEventHandlers.PLOT_STYLES.StartMarker;
+            startStyle = gui.handlers.UIEventHandlers.PLOT_STYLES.StartMarker;
             plot(axes, plotData.zData(1), plotData.bData(1), ...
                 'Color', startStyle.Color, ...
                 'Marker', startStyle.Marker, ...
@@ -736,7 +657,7 @@ classdef UIEventHandlers < handle
                 'DisplayName', 'Scan Start');
             
             % End marker
-            endStyle = UIEventHandlers.PLOT_STYLES.EndMarker;
+            endStyle = gui.handlers.UIEventHandlers.PLOT_STYLES.EndMarker;
             plot(axes, plotData.zData(end), plotData.bData(end), ...
                 'Color', endStyle.Color, ...
                 'Marker', endStyle.Marker, ...
@@ -748,7 +669,7 @@ classdef UIEventHandlers < handle
             % Maximum marker
             [maxB, maxIdx] = max(plotData.bData);
             maxZ = plotData.zData(maxIdx);
-            maxStyle = UIEventHandlers.PLOT_STYLES.MaxMarker;
+            maxStyle = gui.handlers.UIEventHandlers.PLOT_STYLES.MaxMarker;
             plot(axes, maxZ, maxB, ...
                 'Color', maxStyle.Color, ...
                 'Marker', maxStyle.Marker, ...
@@ -774,7 +695,7 @@ classdef UIEventHandlers < handle
                 
                 if ~isnan(currentB)
                     % Plot current Z marker
-                    currentStyle = UIEventHandlers.PLOT_STYLES.CurrentMarker;
+                    currentStyle = gui.handlers.UIEventHandlers.PLOT_STYLES.CurrentMarker;
                     plot(axes, currentZ, currentB, ...
                         'Color', currentStyle.Color, ...
                         'Marker', currentStyle.Marker, ...
@@ -797,11 +718,11 @@ classdef UIEventHandlers < handle
             maxZ = plotData.zData(maxIdx);
             
             text(axes, maxZ, maxB, sprintf('  Max: %.1f @ Z=%.1f', maxB, maxZ), ...
-                'Color', UIEventHandlers.PLOT_STYLES.MaxMarker.Color, ...
+                'Color', gui.handlers.UIEventHandlers.PLOT_STYLES.MaxMarker.Color, ...
                 'FontWeight', 'bold', ...
                 'VerticalAlignment', 'bottom', ...
                 'HorizontalAlignment', 'left', ...
-                'FontSize', UIEventHandlers.PLOT_CONFIG.FontSize);
+                'FontSize', gui.handlers.UIEventHandlers.PLOT_CONFIG.FontSize);
             
             % Add annotation for current Z if provided
             if ~isempty(currentZ)
@@ -815,11 +736,11 @@ classdef UIEventHandlers < handle
                     
                     if ~isnan(currentB)
                         text(axes, currentZ, currentB, sprintf('  Current: Z=%.1f', currentZ), ...
-                            'Color', UIEventHandlers.PLOT_STYLES.CurrentMarker.Color, ...
+                            'Color', gui.handlers.UIEventHandlers.PLOT_STYLES.CurrentMarker.Color, ...
                             'FontWeight', 'bold', ...
                             'VerticalAlignment', 'top', ...
                             'HorizontalAlignment', 'left', ...
-                            'FontSize', UIEventHandlers.PLOT_CONFIG.FontSize);
+                            'FontSize', gui.handlers.UIEventHandlers.PLOT_CONFIG.FontSize);
                     end
                 end
             end
@@ -827,7 +748,7 @@ classdef UIEventHandlers < handle
         
         function configurePlotAppearance(axes, plotData, options)
             % Configures plot appearance and styling
-            config = UIEventHandlers.PLOT_CONFIG;
+            config = gui.handlers.UIEventHandlers.PLOT_CONFIG;
             
             % Title
             channelText = '';
@@ -865,7 +786,7 @@ classdef UIEventHandlers < handle
                 return;
             end
             
-            margin = UIEventHandlers.PLOT_CONFIG.AxisMargin;
+            margin = gui.handlers.UIEventHandlers.PLOT_CONFIG.AxisMargin;
             
             % Determine Z range, potentially including current Z position
             minZ = min(plotData.zData);

@@ -5,6 +5,7 @@ classdef FocusGUI < handle
     % This class has been refactored to use helper classes:
     % - gui.components.UIComponentFactory: For creating UI components
     % - gui.handlers.UIEventHandlers: For handling UI events
+    % - gui.utils.GUIUtils: For common utility functions
 
     properties (Access = public)
         % GUI Handles
@@ -34,6 +35,7 @@ classdef FocusGUI < handle
         previousZValue = 0       % Previous Z value for movement indicator
         tooltipsEnabled = true   % Flag to enable/disable tooltips
         helpButton               % Help button in the status bar
+        verbosity = 1            % Verbosity level (inherited from controller)
     end
 
     methods
@@ -47,7 +49,7 @@ classdef FocusGUI < handle
             obj.hFig = uifigure('Name', 'FocalSweep - Automated Z-Focus Finder', ...
                 'Position', [100 100 950 700], ...
                 'Color', [0.95 0.95 0.98], ...
-                'CloseRequestFcn', @(~,~) obj.controller.closeFigure(), ...
+                'CloseRequestFcn', @(~,~) obj.closeFigure(), ...
                 'Resize', 'on');
             
             % Check if we're running in a compatible MATLAB version
@@ -172,12 +174,12 @@ classdef FocusGUI < handle
             
             if obj.focusModeActive
                 % Start focus mode in ScanImage
-                obj.controller.startSIFocus();
+                obj.startSIFocus();
                 
                 % Show abort button instead of focus/grab buttons
-                obj.hFocusButton.Visible = 'off';
-                obj.hGrabButton.Visible = 'off';
-                obj.hAbortButton.Visible = 'on';
+                gui.utils.GUIUtils.setVisibility(obj.hFocusButton, false);
+                gui.utils.GUIUtils.setVisibility(obj.hGrabButton, false);
+                gui.utils.GUIUtils.setVisibility(obj.hAbortButton, true);
                 
                 % Visual feedback
                 obj.updateStatus('Focus mode active - ScanImage is continuously acquiring', Severity="success");
@@ -192,9 +194,9 @@ classdef FocusGUI < handle
                 end
             else
                 % Reset UI
-                obj.hFocusButton.Visible = 'on';
-                obj.hGrabButton.Visible = 'on';
-                obj.hAbortButton.Visible = 'off';
+                gui.utils.GUIUtils.setVisibility(obj.hFocusButton, true);
+                gui.utils.GUIUtils.setVisibility(obj.hGrabButton, true);
+                gui.utils.GUIUtils.setVisibility(obj.hAbortButton, false);
                 
                 % Update status
                 obj.updateStatus('Focus mode stopped');
@@ -221,10 +223,10 @@ classdef FocusGUI < handle
             rangeValid = minZValid && maxZValid && (obj.hMaxZEdit.Value > obj.hMinZEdit.Value);
             
             if rangeValid && (obj.focusModeActive || obj.hMonitorToggle.Value)
-                obj.hZScanToggle.Enable = 'on';
+                gui.utils.GUIUtils.toggleComponentState(obj.hZScanToggle, true);
                 obj.hZScanToggle.Tooltip = 'Start automatic Z scan to find focus';
             else
-                obj.hZScanToggle.Enable = 'off';
+                gui.utils.GUIUtils.toggleComponentState(obj.hZScanToggle, false);
                 
                 % Set explanatory tooltip based on the reason it's disabled
                 if ~rangeValid
@@ -238,10 +240,10 @@ classdef FocusGUI < handle
             
             % Move to Max Focus should be enabled only when we have Z data
             if obj.hasZData
-                obj.hMoveToMaxButton.Enable = 'on';
+                gui.utils.GUIUtils.toggleComponentState(obj.hMoveToMaxButton, true);
                 obj.hMoveToMaxButton.Tooltip = 'Move to the Z position with maximum brightness (best focus)';
             else
-                obj.hMoveToMaxButton.Enable = 'off';
+                gui.utils.GUIUtils.toggleComponentState(obj.hMoveToMaxButton, false);
                 obj.hMoveToMaxButton.Tooltip = 'Perform a Z-Scan first to find maximum brightness';
             end
         end
@@ -298,9 +300,9 @@ classdef FocusGUI < handle
             
             % Reset focus mode
             obj.focusModeActive = false;
-            obj.hFocusButton.Visible = 'on';
-            obj.hGrabButton.Visible = 'on';
-            obj.hAbortButton.Visible = 'off';
+            gui.utils.GUIUtils.setVisibility(obj.hFocusButton, true);
+            gui.utils.GUIUtils.setVisibility(obj.hGrabButton, true);
+            gui.utils.GUIUtils.setVisibility(obj.hAbortButton, false);
             
             % Update button states
             obj.updateButtonStates();
@@ -353,18 +355,18 @@ classdef FocusGUI < handle
             p.addOptional('FlashMessage', false, @islogical);
             p.parse(varargin{:});
             
-            gui.handlers.UIEventHandlers.updateStatusDisplay(obj.hStatusText, message, ...
-                AddTimestamp=false, ...
-                Severity=p.Results.Severity, ...
-                FlashMessage=p.Results.FlashMessage);
+            gui.utils.GUIUtils.updateStatus(obj.hStatusText, message, ...
+                'AddTimestamp', false, ...
+                'Severity', p.Results.Severity, ...
+                'FlashMessage', p.Results.FlashMessage);
         end
         
         function updateStatusBarPosition(obj)
             % Update status bar position when window is resized
-            gui.handlers.UIEventHandlers.updateStatusBarLayout(obj.hFig, obj.hStatusBar);
+            gui.utils.GUIUtils.updateStatusBarLayout(obj.hFig, obj.hStatusBar);
             
             % Also update help button position
-            if isfield(obj, 'helpButton') && ~isempty(obj.helpButton) && isvalid(obj.helpButton)
+            if gui.utils.GUIUtils.isValidUIComponent(obj.helpButton)
                 obj.helpButton.Position = [obj.hFig.Position(3)-70, 2, 60, 20];
             end
         end
@@ -378,6 +380,198 @@ classdef FocusGUI < handle
             % Destructor to clean up figure
             if ishandle(obj.hFig)
                 delete(obj.hFig);
+            end
+        end
+
+        function updateZPosition(obj)
+            % Update the current Z position value and display in the GUI
+            try
+                % Get current Z position from controller
+                currentZ = obj.controller.getZ();
+                
+                % Update GUI display
+                try
+                    obj.updateCurrentZ(currentZ);
+                catch ME
+                    if obj.verbosity > 1
+                        warning('Error updating Z display: %s', ME.message);
+                    end
+                end
+            catch ME
+                if obj.verbosity > 0
+                    warning('Error updating Z position: %s', ME.message);
+                end
+            end
+        end
+
+        function updateCurrentZDisplay(obj)
+            % Update the current Z position display in the GUI
+            try
+                currentZ = obj.controller.getZ();
+                obj.updateCurrentZ(currentZ);
+            catch ME
+                warning('Error updating Z position display: %s', ME.message);
+            end
+        end
+
+        function startSIFocus(obj)
+            % Start Focus mode in ScanImage
+            try
+                % Make sure ScanImage is available
+                hSI = obj.controller.hSI;
+                if isempty(hSI) || ~isvalid(hSI)
+                    obj.updateStatus('ScanImage handle not available. Cannot start Focus mode.');
+                    return;
+                end
+                
+                % Check if startFocus method exists (compatibility check)
+                if ~ismethod(hSI, 'startFocus')
+                    % Try alternative method
+                    if isfield(hSI, 'hDisplay') && ismethod(hSI.hDisplay, 'startFocus')
+                        hSI.hDisplay.startFocus();
+                    elseif isfield(hSI, 'startLoop')
+                        hSI.startLoop();
+                    else
+                        obj.updateStatus('Focus function not found in ScanImage. Check ScanImage version.');
+                        return;
+                    end
+                else
+                    hSI.startFocus();
+                end
+                
+                obj.updateStatus('Started ScanImage Focus mode');
+                
+                % Start monitoring if not already active
+                if ~obj.hMonitorToggle.Value
+                    obj.hMonitorToggle.Value = true;
+                    obj.monitorToggleChanged(true);
+                end
+            catch ME
+                obj.updateStatus(sprintf('Error starting Focus: %s', ME.message));
+            end
+        end
+        
+        function grabSIFrame(obj)
+            % Grab a single frame in ScanImage
+            try
+                % Make sure ScanImage is available
+                hSI = obj.controller.hSI;
+                if isempty(hSI) || ~isvalid(hSI)
+                    obj.updateStatus('ScanImage handle not available. Cannot grab frame.');
+                    return;
+                end
+                
+                % Show abort button
+                gui.utils.GUIUtils.setVisibility(obj.hFocusButton, false);
+                gui.utils.GUIUtils.setVisibility(obj.hGrabButton, false);
+                gui.utils.GUIUtils.setVisibility(obj.hAbortButton, true);
+                
+                % Stop Focus mode if it's running
+                if isfield(hSI, 'acqState') && isfield(hSI.acqState, 'acquiringFocus') && hSI.acqState.acquiringFocus
+                    hSI.abort();
+                    pause(0.2); % Give time for focus to stop
+                end
+                
+                % Check if startGrab method exists (compatibility check)
+                if ~ismethod(hSI, 'startGrab') 
+                    % Try alternative method
+                    if isfield(hSI, 'hDisplay') && ismethod(hSI.hDisplay, 'startGrab')
+                        hSI.hDisplay.startGrab();
+                    elseif isfield(hSI, 'grab')
+                        hSI.grab();
+                    else
+                        obj.updateStatus('Grab function not found in ScanImage. Check ScanImage version.');
+                        return;
+                    end
+                else
+                    hSI.startGrab();
+                end
+                
+                obj.updateStatus('Grabbed ScanImage frame');
+                
+                % Wait for grab to complete
+                pause(0.5);
+                obj.updateStatus('Frame acquired');
+                
+                % Restore buttons
+                gui.utils.GUIUtils.setVisibility(obj.hFocusButton, true);
+                gui.utils.GUIUtils.setVisibility(obj.hGrabButton, true);
+                gui.utils.GUIUtils.setVisibility(obj.hAbortButton, false);
+            catch ME
+                obj.updateStatus(sprintf('Error grabbing frame: %s', ME.message));
+                
+                % Restore buttons
+                gui.utils.GUIUtils.setVisibility(obj.hFocusButton, true);
+                gui.utils.GUIUtils.setVisibility(obj.hGrabButton, true);
+                gui.utils.GUIUtils.setVisibility(obj.hAbortButton, false);
+            end
+        end
+        
+        function abortAllOperations(obj)
+            % Abort all ongoing operations
+            try
+                % Stop scanning via controller
+                obj.controller.scanner.stop();
+                
+                % Abort any ScanImage acquisition
+                hSI = obj.controller.hSI;
+                if ~isempty(hSI) && isvalid(hSI)
+                    % Try different abort methods based on ScanImage version
+                    if ismethod(hSI, 'abort')
+                        hSI.abort();
+                    elseif isfield(hSI, 'hScan2D') && ismethod(hSI.hScan2D, 'stop')
+                        hSI.hScan2D.stop();
+                    end
+                end
+                
+                % Keep monitoring active for safety
+                if ~obj.controller.monitor.isMonitoring
+                    obj.controller.monitor.start();
+                    obj.hMonitorToggle.Value = true;
+                end
+                
+                obj.updateStatus('All operations aborted');
+            catch ME
+                obj.updateStatus(sprintf('Error during abort: %s', ME.message));
+            end
+        end
+
+        function closeFigure(obj)
+            % Handle figure close request
+            try
+                % Stop components safely via controller
+                if isfield(obj.controller, 'monitor') && ~isempty(obj.controller.monitor)
+                    try
+                        obj.controller.monitor.stop();
+                    catch
+                        % Ignore errors when stopping monitor
+                    end
+                end
+                
+                if isfield(obj.controller, 'scanner') && ~isempty(obj.controller.scanner)
+                    try
+                        obj.controller.scanner.stop();
+                    catch
+                        % Ignore errors when stopping scanner
+                    end
+                end
+                
+                % Delete GUI safely
+                if ishandle(obj.hFig)
+                    delete(obj.hFig);
+                end
+                
+                % Call the controller's delete method to clean up all resources
+                try
+                    delete(obj.controller);
+                catch ME
+                    warning('Error deleting controller: %s', ME.message);
+                end
+                
+                % Allow for creating a new instance
+                fprintf('FocalSweep GUI closed and resources cleaned up.\n');
+            catch ME
+                warning('Error closing figure: %s', ME.message);
             end
         end
     end

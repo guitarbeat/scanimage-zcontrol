@@ -1,13 +1,13 @@
-classdef BrightZ < core.MotorGUI_ZControl
-    % BrightZ - Z-position focus optimization using brightness monitoring
+classdef FocalSweep < core.MotorGUI_ZControl
+    % FocalSweep - Z-position focus optimization using brightness monitoring
     %
     % This class provides automated Z-focus finding based on image brightness.
     % It combines a user interface, brightness monitoring, and Z scanning
     % into an integrated system for microscope focus management.
     %
     % Usage:
-    %   BrightZ.launch();     % Create and launch the focus tool
-    %   zb = BrightZ();       % Create instance directly
+    %   FocalSweep.launch();     % Create and launch the focus tool
+    %   zb = FocalSweep();       % Create instance directly
     %
     % Requirements:
     %   - ScanImage must be running with 'hSI' in base workspace
@@ -36,7 +36,7 @@ classdef BrightZ < core.MotorGUI_ZControl
     
     methods
         %% GUI Construction and Initialization
-        function obj = BrightZ()
+        function obj = FocalSweep()
             % Constructor - Initialize the brightness Z-control system
             
             % Initialize base class
@@ -87,30 +87,13 @@ classdef BrightZ < core.MotorGUI_ZControl
                     % Create GUI last to avoid incomplete initialization issues
                     fprintf('Creating GUI...\n');
                     try
-                        % Try to use v2 GUI first as it's more stable
-                        obj.gui = gui.BrightnessZControlGUIv2(obj);
-                        fprintf('Using BrightnessZControlGUIv2.\n');
+                        % Create the modern FocusGUI interface
+                        obj.gui = gui.FocusGUI(obj);
+                        fprintf('Using FocusGUI.\n');
                     catch ME
-                        fprintf('Failed to create GUI v2: %s\n', ME.message);
-                        
-                        % Try to use the newer v3 GUI as an alternative
-                        fprintf('Trying v3 GUI...\n');
-                        try
-                            obj.gui = gui.FocusGUI(obj);
-                            fprintf('Using FocusGUI.\n');
-                        catch ME2
-                            fprintf('Failed to create Focus GUI: %s\n', ME2.message);
-                            
-                            % Try to use the original GUI class as a last resort fallback
-                            fprintf('Trying original GUI as fallback...\n');
-                            try
-                                obj.gui = gui.BrightnessZControlGUI(obj);
-                                fprintf('Using BrightnessZControlGUI as fallback.\n');
-                            catch ME3
-                                fprintf('Failed to create fallback GUI: %s\n', ME3.message);
-                                rethrow(ME3);
-                            end
-                        end
+                        fprintf('Failed to create GUI: %s\n', ME.message);
+                        disp(getReport(ME));
+                        rethrow(ME);
                     end
                     
                     fprintf('Creating GUI interface...\n');
@@ -608,14 +591,14 @@ classdef BrightZ < core.MotorGUI_ZControl
     
     methods (Static)
         function zb = launch()
-            % Static method to create and launch BrightZ
+            % Static method to create and launch FocalSweep
             % Simplified entry point similar to findZfocus
             try
-                fprintf('Initializing BrightZ focus control...\n');
-                zb = BrightZ();
-                fprintf('BrightZ focus control ready.\n');
+                fprintf('Initializing FocalSweep focus control...\n');
+                zb = FocalSweep();
+                fprintf('FocalSweep focus control ready.\n');
             catch ME
-                fprintf('Error launching BrightZ: %s\n', ME.message);
+                fprintf('Error launching FocalSweep: %s\n', ME.message);
                 fprintf('For detailed error information, check below:\n');
                 disp(getReport(ME));
                 % Don't rethrow - it's cleaner for the user to just see the error message

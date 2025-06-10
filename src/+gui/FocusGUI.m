@@ -1,5 +1,5 @@
 classdef FocusGUI < handle
-    % FocusGUI - Creates and manages the modern GUI for Brightness Z-Control
+    % FocusGUI - Creates and manages the modern GUI for FocalSweep
     % Inspired by modern React-based UI with enhanced styling and functionality
     %
     % This class has been refactored to use helper classes:
@@ -38,7 +38,7 @@ classdef FocusGUI < handle
         function create(obj)
             % Create main figure with modern styling
             fprintf('Creating modern Focus GUI...\n');
-            obj.hFig = uifigure('Name', 'Focus Control - Find optimal focus position', ...
+            obj.hFig = uifigure('Name', 'FocalSweep - Find optimal focus position', ...
                 'Position', [100 100 900 700], ...  % Make slightly taller for instruction panel
                 'Color', [0.95 0.95 0.98], ...
                 'CloseRequestFcn', @(~,~) obj.controller.closeFigure(), ...

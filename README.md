@@ -1,4 +1,4 @@
-# ScanImage Z-Control with Brightness Monitoring
+# FocalSweep - Focus Finding for ScanImage
 
 This MATLAB package provides tools for controlling Z-position in ScanImage while monitoring image brightness to help find optimal focal points.
 
@@ -36,7 +36,7 @@ addpath('src');
 1. Start ScanImage and ensure motor control is enabled
 2. Create the control object:
 ```matlab
-control = SI_BrightnessZControl();
+control = FocalSweep();
 ```
 
 3. The GUI will appear with the following components:
@@ -101,10 +101,10 @@ control.absoluteMove(12000);
 ```
 scanimage-zcontrol/
 ├── src/
-│   ├── SI_BrightnessZControl.m    # Main control class
-│   └── SI_MotorGUI_ZControl.m     # Base motor control class
+│   ├── FocalSweep.m       # Main control class
+│   └── fsweep.m           # Quick launcher function
 ├── docs/
-│   └── ...                        # Documentation files
+│   └── ...                # Documentation files
 ├── LICENSE
 └── README.md
 ```

@@ -47,7 +47,7 @@ classdef UIEventHandlers < handle
             
             success = false;
             try
-                if ~UIEventHandlers.isValidUIComponent(stepSizeValue)
+                if ~gui.handlers.UIEventHandlers.isValidUIComponent(stepSizeValue)
                     return;
                 end
                 
@@ -75,7 +75,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                UIEventHandlers.logError('updateStepSizeDisplay', ME);
+                gui.handlers.UIEventHandlers.logError('updateStepSizeDisplay', ME);
             end
         end
         
@@ -126,7 +126,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                UIEventHandlers.logError('updateCurrentZDisplay', ME);
+                gui.handlers.UIEventHandlers.logError('updateCurrentZDisplay', ME);
             end
         end
         
@@ -143,7 +143,7 @@ classdef UIEventHandlers < handle
             
             success = false;
             try
-                if ~UIEventHandlers.isValidUIComponent(statusText)
+                if ~gui.handlers.UIEventHandlers.isValidUIComponent(statusText)
                     return;
                 end
                 
@@ -170,7 +170,7 @@ classdef UIEventHandlers < handle
                 statusText.Text = displayMessage;
                 
                 % Set color based on severity
-                statusText.FontColor = UIEventHandlers.getSeverityColor(options.Severity);
+                statusText.FontColor = gui.handlers.UIEventHandlers.getSeverityColor(options.Severity);
                 
                 % Flash message for attention if requested
                 if options.FlashMessage
@@ -189,7 +189,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                UIEventHandlers.logError('updateStatusDisplay', ME);
+                gui.handlers.UIEventHandlers.logError('updateStatusDisplay', ME);
             end
         end
         
@@ -206,14 +206,14 @@ classdef UIEventHandlers < handle
             success = false;
             try
                 if isScanActive
-                    success = UIEventHandlers.startScanOperation(params);
+                    success = gui.handlers.UIEventHandlers.startScanOperation(params);
                 else
-                    success = UIEventHandlers.stopScanOperation(params);
+                    success = gui.handlers.UIEventHandlers.stopScanOperation(params);
                 end
                 
             catch ME
-                UIEventHandlers.logError('handleScanToggle', ME);
-                UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
+                gui.handlers.UIEventHandlers.logError('handleScanToggle', ME);
+                gui.handlers.UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
                     "Error during scan toggle operation", Severity="error", FlashMessage=true);
             end
         end
@@ -244,14 +244,14 @@ classdef UIEventHandlers < handle
                 
                 % Update status
                 if isfield(params.UI, 'StatusText')
-                    UIEventHandlers.updateStatusDisplay(params.UI.StatusText, params.Message, ...
+                    gui.handlers.UIEventHandlers.updateStatusDisplay(params.UI.StatusText, params.Message, ...
                         Severity="warning", FlashMessage=true);
                 end
                 
                 success = true;
                 
             catch ME
-                UIEventHandlers.logError('handleAbortOperation', ME);
+                gui.handlers.UIEventHandlers.logError('handleAbortOperation', ME);
             end
         end
         
@@ -316,7 +316,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                UIEventHandlers.logError('updateBrightnessPlot', ME);
+                gui.handlers.UIEventHandlers.logError('updateBrightnessPlot', ME);
             end
         end
         
@@ -359,7 +359,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                UIEventHandlers.logError('toggleUIState', ME);
+                gui.handlers.UIEventHandlers.logError('toggleUIState', ME);
             end
         end
         
@@ -392,7 +392,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                UIEventHandlers.logError('updateStatusBarLayout', ME);
+                gui.handlers.UIEventHandlers.logError('updateStatusBarLayout', ME);
             end
         end
         
@@ -425,7 +425,7 @@ classdef UIEventHandlers < handle
                 success = true;
                 
             catch ME
-                UIEventHandlers.logError('setButtonVisualState', ME);
+                gui.handlers.UIEventHandlers.logError('setButtonVisualState', ME);
             end
         end
         
@@ -447,12 +447,20 @@ classdef UIEventHandlers < handle
                 helpdlg(content, options.DialogTitle);
                 
             catch ME
-                UIEventHandlers.logError('showHelpDialog', ME);
+                gui.handlers.UIEventHandlers.logError('showHelpDialog', ME);
             end
         end
     end
     
-    methods (Static, Access = private)
+    methods (Static)
+        %% Error Handling
+        function logError(functionName, ME)
+            % Logs errors with context information
+            warning('UIEventHandlers:%s:Error', functionName, ...
+                'Error in %s: %s', functionName, ME.message);
+            disp(['Stack trace: ' getReport(ME, 'basic')]);
+        end
+        
         %% Validation Methods
         function isValid = isValidUIComponent(component)
             % Validates UI component handle
@@ -470,6 +478,144 @@ classdef UIEventHandlers < handle
                       ~isempty(plotData.zData);
         end
         
+        %% Utility Methods
+        function color = getSeverityColor(severity)
+            % Returns color based on message severity
+            switch severity
+                case "info"
+                    color = [0.3 0.3 0.3];
+                case "success"
+                    color = [0.2 0.7 0.3];
+                case "warning"
+                    color = [0.9 0.6 0.1];
+                case "error"
+                    color = [0.8 0.2 0.2];
+                otherwise
+                    color = [0.3 0.3 0.3];
+            end
+        end
+        
+        function setComponentState(component, state)
+            % Sets component state (enable/disable, show/hide)
+            switch state
+                case "enable"
+                    component.Enable = 'on';
+                case "disable"
+                    component.Enable = 'off';
+                case "show"
+                    component.Visible = 'on';
+                case "hide"
+                    component.Visible = 'off';
+            end
+        end
+        
+        function setComponentStateWithVisualFeedback(component, state)
+            % Sets component state with visual feedback
+            originalBgColor = [];
+            if isprop(component, 'BackgroundColor')
+                originalBgColor = component.BackgroundColor;
+            end
+            
+            % Apply state change
+            gui.handlers.UIEventHandlers.setComponentState(component, state);
+            
+            % Visual feedback for enable/disable
+            if strcmp(state, 'enable') && ~isempty(originalBgColor)
+                % Flash green for enable
+                component.BackgroundColor = [0.8 1.0 0.8];
+                pause(0.1);
+                component.BackgroundColor = originalBgColor;
+            elseif strcmp(state, 'disable') && ~isempty(originalBgColor)
+                % Flash red for disable
+                component.BackgroundColor = [1.0 0.8 0.8];
+                pause(0.1);
+                component.BackgroundColor = originalBgColor;
+            end
+        end
+        
+        function content = buildHelpContent()
+            % Builds help dialog content
+            content = [ ...
+                'HOW TO FIND THE BEST FOCUS:' newline newline ...
+                '1. SET UP: Adjust the step size (how far to move at each step) and pause time.' newline newline ...
+                '2. AUTOMATIC FOCUS FINDING:' newline ...
+                '   a. Press "Auto Z-Scan" to automatically scan through Z positions' newline ...
+                '   b. When scan completes, press "Move to Max Focus" to jump to best focus' newline ...
+                '3. MANUAL FOCUS FINDING:' newline ...
+                '   a. Press "Monitor Brightness" to start tracking brightness' newline ...
+                '   b. Use Up/Down buttons to move the Z stage while watching brightness' newline ...
+                '   c. The plot will show brightness changes in real-time' newline newline ...
+                '4. PLOT MARKERS:' newline ...
+                '   • Red diamond (◆): Optimal focus position (highest brightness)' newline ...
+                '   • Green circle (○): Scan start position' newline ...
+                '   • Purple circle (○): Scan end position' newline ...
+                '   • Blue X (×): Current Z position' newline newline ...
+                '5. CONTROLS:' newline ...
+                '   • "Monitor Brightness": Tracks image brightness without moving' newline ...
+                '   • "Auto Z-Scan": Automatically scans through Z positions' newline ...
+                '   • "Move to Max Focus": Moves to the position of maximum brightness' newline ...
+                '   • "Focus Mode": Starts continuous scanning in ScanImage' newline ...
+                '   • "Grab Frame": Takes a single image in ScanImage' newline ...
+                '   • "ABORT": Stops all operations immediately' newline newline ...
+                '6. TIPS:' newline ...
+                '   • Use 8-15μm step sizes for more precise focus finding' newline ...
+                '   • Larger step sizes (20-30μm) are good for initial rough scans' newline ...
+                '   • Increase pause time if images appear noisy or inconsistent' newline ...
+                '   • The "Current Z Position" display shows movement direction (▲/▼)' newline ...
+            ];
+        end
+        
+        function toggleScanButtons(ui, isScanActive)
+            % Toggles scan button visibility
+            if isScanActive
+                % Show abort, hide others
+                if isfield(ui, 'FocusButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.FocusButton)
+                    ui.FocusButton.Visible = 'off';
+                end
+                if isfield(ui, 'GrabButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.GrabButton)
+                    ui.GrabButton.Visible = 'off';
+                end
+                if isfield(ui, 'AbortButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.AbortButton)
+                    ui.AbortButton.Visible = 'on';
+                end
+                
+                % Disable settings controls during scan
+                if isfield(ui, 'StepSizeSlider') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.StepSizeSlider)
+                    ui.StepSizeSlider.Enable = 'off';
+                end
+                if isfield(ui, 'PauseTimeEdit') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.PauseTimeEdit)
+                    ui.PauseTimeEdit.Enable = 'off';
+                end
+                if isfield(ui, 'MetricDropDown') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.MetricDropDown)
+                    ui.MetricDropDown.Enable = 'off';
+                end
+            else
+                % Show normal buttons, hide abort
+                if isfield(ui, 'FocusButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.FocusButton)
+                    ui.FocusButton.Visible = 'on';
+                end
+                if isfield(ui, 'GrabButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.GrabButton)
+                    ui.GrabButton.Visible = 'on';
+                end
+                if isfield(ui, 'AbortButton') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.AbortButton)
+                    ui.AbortButton.Visible = 'off';
+                end
+                
+                % Re-enable settings controls after scan
+                if isfield(ui, 'StepSizeSlider') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.StepSizeSlider)
+                    ui.StepSizeSlider.Enable = 'on';
+                end
+                if isfield(ui, 'PauseTimeEdit') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.PauseTimeEdit)
+                    ui.PauseTimeEdit.Enable = 'on';
+                end
+                if isfield(ui, 'MetricDropDown') && gui.handlers.UIEventHandlers.isValidUIComponent(ui.MetricDropDown)
+                    ui.MetricDropDown.Enable = 'on';
+                end
+            end
+        end
+    end
+    
+    methods (Static, Access = private)
         %% Scan Operation Helpers
         function success = startScanOperation(params)
             % Starts scan operation with parameter validation
@@ -479,11 +625,11 @@ classdef UIEventHandlers < handle
                 UIEventHandlers.toggleScanButtons(params.UI, true);
                 
                 % Extract and validate scan parameters
-                scanParams = UIEventHandlers.extractScanParameters(params);
+                scanParams = gui.handlers.UIEventHandlers.extractScanParameters(params);
                 
                 % Visual feedback that scan is starting
                 if isfield(params.UI, 'StatusText')
-                    UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
+                    gui.handlers.UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
                         sprintf("Starting Z-Scan with step size %d μm", scanParams.stepSize), ...
                         Severity="info");
                 end
@@ -496,7 +642,7 @@ classdef UIEventHandlers < handle
                 end
                 
             catch ME
-                UIEventHandlers.logError('startScanOperation', ME);
+                gui.handlers.UIEventHandlers.logError('startScanOperation', ME);
             end
         end
         
@@ -509,7 +655,7 @@ classdef UIEventHandlers < handle
                 
                 % Visual feedback that scan is stopping
                 if isfield(params.UI, 'StatusText')
-                    UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
+                    gui.handlers.UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
                         "Stopping Z-Scan...", Severity="info");
                 end
                 
@@ -519,7 +665,7 @@ classdef UIEventHandlers < handle
                     
                     % Confirmation that scan stopped
                     if isfield(params.UI, 'StatusText')
-                        UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
+                        gui.handlers.UIEventHandlers.updateStatusDisplay(params.UI.StatusText, ...
                             "Z-Scan stopped. Use 'Move to Max Focus' to go to best position.", ...
                             Severity="success");
                     end
@@ -528,10 +674,13 @@ classdef UIEventHandlers < handle
                 end
                 
             catch ME
-                UIEventHandlers.logError('stopScanOperation', ME);
+                gui.handlers.UIEventHandlers.logError('stopScanOperation', ME);
             end
         end
         
+    end
+    
+    methods (Static)
         function scanParams = extractScanParameters(params)
             % Extracts and validates scan parameters from UI
             scanParams = struct();
@@ -555,55 +704,6 @@ classdef UIEventHandlers < handle
                 scanParams.metricType = params.UI.MetricDropDown.Value;
             else
                 scanParams.metricType = 'Mean'; % Default
-            end
-        end
-        
-        function toggleScanButtons(ui, isScanActive)
-            % Toggles scan button visibility
-            if isScanActive
-                % Show abort, hide others
-                if isfield(ui, 'FocusButton') && UIEventHandlers.isValidUIComponent(ui.FocusButton)
-                    ui.FocusButton.Visible = 'off';
-                end
-                if isfield(ui, 'GrabButton') && UIEventHandlers.isValidUIComponent(ui.GrabButton)
-                    ui.GrabButton.Visible = 'off';
-                end
-                if isfield(ui, 'AbortButton') && UIEventHandlers.isValidUIComponent(ui.AbortButton)
-                    ui.AbortButton.Visible = 'on';
-                end
-                
-                % Disable settings controls during scan
-                if isfield(ui, 'StepSizeSlider') && UIEventHandlers.isValidUIComponent(ui.StepSizeSlider)
-                    ui.StepSizeSlider.Enable = 'off';
-                end
-                if isfield(ui, 'PauseTimeEdit') && UIEventHandlers.isValidUIComponent(ui.PauseTimeEdit)
-                    ui.PauseTimeEdit.Enable = 'off';
-                end
-                if isfield(ui, 'MetricDropDown') && UIEventHandlers.isValidUIComponent(ui.MetricDropDown)
-                    ui.MetricDropDown.Enable = 'off';
-                end
-            else
-                % Show normal buttons, hide abort
-                if isfield(ui, 'FocusButton') && UIEventHandlers.isValidUIComponent(ui.FocusButton)
-                    ui.FocusButton.Visible = 'on';
-                end
-                if isfield(ui, 'GrabButton') && UIEventHandlers.isValidUIComponent(ui.GrabButton)
-                    ui.GrabButton.Visible = 'on';
-                end
-                if isfield(ui, 'AbortButton') && UIEventHandlers.isValidUIComponent(ui.AbortButton)
-                    ui.AbortButton.Visible = 'off';
-                end
-                
-                % Re-enable settings controls after scan
-                if isfield(ui, 'StepSizeSlider') && UIEventHandlers.isValidUIComponent(ui.StepSizeSlider)
-                    ui.StepSizeSlider.Enable = 'on';
-                end
-                if isfield(ui, 'PauseTimeEdit') && UIEventHandlers.isValidUIComponent(ui.PauseTimeEdit)
-                    ui.PauseTimeEdit.Enable = 'on';
-                end
-                if isfield(ui, 'MetricDropDown') && UIEventHandlers.isValidUIComponent(ui.MetricDropDown)
-                    ui.MetricDropDown.Enable = 'on';
-                end
             end
         end
         
@@ -792,100 +892,6 @@ classdef UIEventHandlers < handle
                 % If there's no range, create one around the value
                 axes.YLim = [max(0, min(plotData.bData)*0.9), min(plotData.bData)*1.1];
             end
-        end
-        
-        %% Utility Methods
-        function color = getSeverityColor(severity)
-            % Returns color based on message severity
-            switch severity
-                case "info"
-                    color = [0.3 0.3 0.3];
-                case "success"
-                    color = [0.2 0.7 0.3];
-                case "warning"
-                    color = [0.9 0.6 0.1];
-                case "error"
-                    color = [0.8 0.2 0.2];
-                otherwise
-                    color = [0.3 0.3 0.3];
-            end
-        end
-        
-        function setComponentState(component, state)
-            % Sets component state (enable/disable, show/hide)
-            switch state
-                case "enable"
-                    component.Enable = 'on';
-                case "disable"
-                    component.Enable = 'off';
-                case "show"
-                    component.Visible = 'on';
-                case "hide"
-                    component.Visible = 'off';
-            end
-        end
-        
-        function setComponentStateWithVisualFeedback(component, state)
-            % Sets component state with visual feedback
-            originalBgColor = [];
-            if isprop(component, 'BackgroundColor')
-                originalBgColor = component.BackgroundColor;
-            end
-            
-            % Apply state change
-            UIEventHandlers.setComponentState(component, state);
-            
-            % Visual feedback for enable/disable
-            if strcmp(state, 'enable') && ~isempty(originalBgColor)
-                % Flash green for enable
-                component.BackgroundColor = [0.8 1.0 0.8];
-                pause(0.1);
-                component.BackgroundColor = originalBgColor;
-            elseif strcmp(state, 'disable') && ~isempty(originalBgColor)
-                % Flash red for disable
-                component.BackgroundColor = [1.0 0.8 0.8];
-                pause(0.1);
-                component.BackgroundColor = originalBgColor;
-            end
-        end
-        
-        function content = buildHelpContent()
-            % Builds help dialog content
-            content = [ ...
-                'HOW TO FIND THE BEST FOCUS:' newline newline ...
-                '1. SET UP: Adjust the step size (how far to move at each step) and pause time.' newline newline ...
-                '2. AUTOMATIC FOCUS FINDING:' newline ...
-                '   a. Press "Auto Z-Scan" to automatically scan through Z positions' newline ...
-                '   b. When scan completes, press "Move to Max Focus" to jump to best focus' newline newline ...
-                '3. MANUAL FOCUS FINDING:' newline ...
-                '   a. Press "Monitor Brightness" to start tracking brightness' newline ...
-                '   b. Use Up/Down buttons to move the Z stage while watching brightness' newline ...
-                '   c. The plot will show brightness changes in real-time' newline newline ...
-                '4. PLOT MARKERS:' newline ...
-                '   • Red diamond (◆): Optimal focus position (highest brightness)' newline ...
-                '   • Green circle (○): Scan start position' newline ...
-                '   • Purple circle (○): Scan end position' newline ...
-                '   • Blue X (×): Current Z position' newline newline ...
-                '5. CONTROLS:' newline ...
-                '   • "Monitor Brightness": Tracks image brightness without moving' newline ...
-                '   • "Auto Z-Scan": Automatically scans through Z positions' newline ...
-                '   • "Move to Max Focus": Moves to the position of maximum brightness' newline ...
-                '   • "Focus Mode": Starts continuous scanning in ScanImage' newline ...
-                '   • "Grab Frame": Takes a single image in ScanImage' newline ...
-                '   • "ABORT": Stops all operations immediately' newline newline ...
-                '6. TIPS:' newline ...
-                '   • Use 8-15μm step sizes for more precise focus finding' newline ...
-                '   • Larger step sizes (20-30μm) are good for initial rough scans' newline ...
-                '   • Increase pause time if images appear noisy or inconsistent' newline ...
-                '   • The "Current Z Position" display shows movement direction (▲/▼)' newline ...
-            ];
-        end
-        
-        function logError(functionName, ME)
-            % Logs errors with context information
-            warning('UIEventHandlers:%s:Error', functionName, ...
-                'Error in %s: %s', functionName, ME.message);
-            disp(['Stack trace: ' getReport(ME, 'basic')]);
         end
     end
 end

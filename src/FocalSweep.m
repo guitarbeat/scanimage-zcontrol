@@ -84,6 +84,9 @@ classdef FocalSweep < core.MotorGUI_ZControl
             p.addParameter('verbosity', 1, @isnumeric);
             p.parse(varargin{:});
             
+            % Must call superclass constructor FIRST before any object use
+            obj@core.MotorGUI_ZControl();
+            
             % Initialize properties
             obj.verbosity = p.Results.verbosity;
             obj.isInitialized = false;
@@ -113,9 +116,6 @@ classdef FocalSweep < core.MotorGUI_ZControl
             obj.smoothingWindow = 3;
             obj.autoUpdateFrequency = 1;
             obj.lastAutoUpdateTime = 0;
-            
-            % Initialize base class first (must be before any object access)
-            obj@core.MotorGUI_ZControl();
             
             try
                 % Validate ScanImage environment
@@ -200,18 +200,38 @@ classdef FocalSweep < core.MotorGUI_ZControl
                     end
                     
                     % Initialize the current Z position display
-                    obj.updateCurrentZDisplay();
-                    if obj.verbosity > 1
-                        fprintf('Z position display initialized.\n');
+                    obj.updateZPosition();
+                    
+                    % Set up auto-update timer if needed
+                    if obj.autoUpdateFrequency > 0
+                        if obj.verbosity > 1
+                            fprintf('Setting up auto-update timer.\n');
+                        end
+                        obj.startAutoUpdate();
                     end
+                    
+                    % Mark as initialized
+                    obj.isInitialized = true;
+                    
                 catch ME
-                    fprintf('Error during component initialization: %s\n', ME.message);
-                    disp(getReport(ME));
+                    % Cleanup on failure
+                    fprintf('Error during initialization: %s\n', ME.message);
+                    fprintf('Details: %s\n', getReport(ME));
+                    
+                    % Try to clean up
+                    try
+                        if isfield(obj, 'gui') && ~isempty(obj.gui)
+                            delete(obj.gui);
+                        end
+                    catch
+                        % Ignore cleanup errors
+                    end
+                    
+                    % Rethrow the error
                     rethrow(ME);
                 end
-                
             catch ME
-                obj.handleError(ME, 'Failed to initialize brightness Z-control');
+                fprintf('Error in FocalSweep constructor: %s\n', ME.message);
                 rethrow(ME);
             end
         end

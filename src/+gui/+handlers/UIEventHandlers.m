@@ -437,9 +437,11 @@ classdef UIEventHandlers < handle
                 % Update UI based on selected tab
                 switch tabName
                     case 'Manual Focus'
-                        success = gui.handlers.UIEventHandlers.activateManualFocusTab(controller, ui, options);
+                        success = gui.handlers.UIEventHandlers.activateManualFocusTab(controller, ui, ...
+                            'UpdateStatus', options.UpdateStatus);
                     case 'Auto Focus'
-                        success = gui.handlers.UIEventHandlers.activateAutoFocusTab(controller, ui, options);
+                        success = gui.handlers.UIEventHandlers.activateAutoFocusTab(controller, ui, ...
+                            'UpdateStatus', options.UpdateStatus);
                     otherwise
                         if options.UpdateStatus && isfield(ui, 'StatusText')
                             gui.handlers.UIEventHandlers.updateStatusDisplay(ui.StatusText, ...
@@ -534,8 +536,8 @@ classdef UIEventHandlers < handle
                 % Set column widths based on expanded state
                 if isExpanded
                     % Expand plot area
-                    mainGrid.ColumnWidth = {'1.7x', '1x'};
-                    plotToggleButton.Text = '◀ Hide';
+                    mainGrid.ColumnWidth = {'1.5x', '1x'};  % Changed from 1.7x to 1.5x
+                    plotToggleButton.Text = '◀';
                     plotToggleButton.Tooltip = 'Hide plot panel';
                     
                     % Show plot panel if provided
@@ -544,8 +546,8 @@ classdef UIEventHandlers < handle
                     end
                 else
                     % Collapse plot area - but keep header visible for toggle button
-                    mainGrid.ColumnWidth = {'1x', '0.3x'};
-                    plotToggleButton.Text = '▶ Show';
+                    mainGrid.ColumnWidth = {'1x', '0.2x'};  % Changed from 0.3x to 0.2x
+                    plotToggleButton.Text = '▶';
                     plotToggleButton.Tooltip = 'Show plot panel';
                     
                     % Hide plot panel if provided

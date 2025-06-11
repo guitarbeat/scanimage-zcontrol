@@ -30,10 +30,10 @@ classdef UIComponentFactory < handle
         );
         
         SPACING = struct(...
-            'Small', 5, ...
-            'Medium', 10, ...
-            'Large', 15, ...
-            'XLarge', 20 ...
+            'Small', 5, ...     % Reduced from 8
+            'Medium', 8, ...    % Reduced from 15
+            'Large', 10, ...    % Reduced from 20
+            'XLarge', 15 ...    % Reduced from 25
         );
     end
     
@@ -248,9 +248,9 @@ classdef UIComponentFactory < handle
             zControlGrid = uigridlayout(zControlPanel, [3, 2]);
             zControlGrid.RowHeight = {'fit', '1x', 'fit'};
             zControlGrid.ColumnWidth = {'1x', '1x'};
-            zControlGrid.Padding = [12 12 12 12];
-            zControlGrid.RowSpacing = gui.components.UIComponentFactory.SPACING.Medium;
-            zControlGrid.ColumnSpacing = gui.components.UIComponentFactory.SPACING.Large;
+            zControlGrid.Padding = [8 8 8 8];        % Reduced padding
+            zControlGrid.RowSpacing = 6;             % Reduced spacing
+            zControlGrid.ColumnSpacing = 8;          % Reduced spacing
             
             % Current Z position display
             gui.components.UIComponentFactory.createStyledLabel(zControlGrid, 'Current Z Position (µm):', 1, [1 2], ...
@@ -264,7 +264,7 @@ classdef UIComponentFactory < handle
         function axes = createPlotPanel(plotPanel)
             % Creates the brightness plot panel
             plotGrid = uigridlayout(plotPanel, [1, 1]);
-            plotGrid.Padding = [15 15 15 15];
+            plotGrid.Padding = [8 8 8 8];  % Reduced padding
             
             axes = uiaxes(plotGrid);
             gui.components.UIComponentFactory.stylePlotAxes(axes);
@@ -385,8 +385,8 @@ classdef UIComponentFactory < handle
             manualGrid = uigridlayout(tab, [2, 1]);
             manualGrid.RowHeight = {'0.4x', '0.6x'};
             manualGrid.ColumnWidth = {'1x'};
-            manualGrid.Padding = [10 10 10 10];
-            manualGrid.RowSpacing = 12;
+            manualGrid.Padding = [8 8 8 8];     % Reduced padding
+            manualGrid.RowSpacing = 8;          % Reduced spacing
             
             % Z Movement Controls Panel
             zControlPanel = gui.components.UIComponentFactory.createStyledPanel(manualGrid, 'Z Movement Controls', 1, 1);
@@ -399,7 +399,7 @@ classdef UIComponentFactory < handle
             manualActionGrid = uigridlayout(manualActionPanel, [1, 1]);
             manualActionGrid.RowHeight = {'1x'};
             manualActionGrid.ColumnWidth = {'1x'};
-            manualActionGrid.Padding = [12 12 12 12];
+            manualActionGrid.Padding = [8 8 8 8];  % Reduced padding
             
             % Create Monitor button
             monitorToggle = uibutton(manualActionGrid, 'state', ...
@@ -425,8 +425,8 @@ classdef UIComponentFactory < handle
             autoGrid = uigridlayout(tab, [2, 1]);
             autoGrid.RowHeight = {'0.6x', '0.4x'};
             autoGrid.ColumnWidth = {'1x'};
-            autoGrid.Padding = [10 10 10 10];
-            autoGrid.RowSpacing = 12;
+            autoGrid.Padding = [8 8 8 8];     % Reduced padding
+            autoGrid.RowSpacing = 8;          % Reduced spacing
             
             % Z-Scan Parameters Panel
             paramPanel = gui.components.UIComponentFactory.createStyledPanel(autoGrid, 'Z-Scan Parameters', 1, 1);
@@ -439,8 +439,8 @@ classdef UIComponentFactory < handle
             autoActionGrid = uigridlayout(autoActionPanel, [1, 2]);
             autoActionGrid.RowHeight = {'1x'};
             autoActionGrid.ColumnWidth = {'1x', '1x'};
-            autoActionGrid.Padding = [12 12 12 12];
-            autoActionGrid.ColumnSpacing = 15;
+            autoActionGrid.Padding = [8 8 8 8];      % Reduced padding
+            autoActionGrid.ColumnSpacing = 10;       % Reduced spacing
             
             % Create Auto Z-Scan button
             zScanToggle = uibutton(autoActionGrid, 'state', ...
@@ -479,45 +479,46 @@ classdef UIComponentFactory < handle
         end
         
         function components = createScanImageControlPanel(parent, row, column, controller)
-            % Creates the ScanImage control panel with all buttons
-            actionPanel = gui.components.UIComponentFactory.createStyledPanel(parent, 'ScanImage Controls', row, column);
+            % Creates the ScanImage control panel with improved integration
+            actionPanel = gui.components.UIComponentFactory.createStyledPanel(parent, 'ScanImage Controls', row, column, ...
+                BackgroundColor=[0.94 0.96 0.98]); % Slightly different background to distinguish
             
-            % Create action panel grid
-            actionGrid = uigridlayout(actionPanel, [1, 3]);
+            % Create action panel grid with improved spacing
+            actionGrid = uigridlayout(actionPanel, [1, 3]);  % Changed from 2x2 to 1x3
             actionGrid.RowHeight = {'1x'};
             actionGrid.ColumnWidth = {'1x', '1x', '1x'};
-            actionGrid.Padding = [12 12 12 12];
-            actionGrid.ColumnSpacing = 15;
+            actionGrid.Padding = [8 8 8 8];        % Reduced padding
+            actionGrid.ColumnSpacing = 8;          % Reduced spacing
             
-            % Focus Button
+            % Focus Button - using state button
             focusButton = uibutton(actionGrid, 'state', ...
-                'Text', '🔄 Focus Mode', ...
+                'Text', '🔄 Focus', ...            % Shortened text
                 'ValueChangedFcn', [], ... % Will be set by FocusGUI
                 'BackgroundColor', gui.components.UIComponentFactory.COLORS.ActionButton, ...
-                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize+1, ... % Reduced font size
                 'Tooltip', 'Start Focus mode in ScanImage (continuous scanning)', ...
                 'HorizontalAlignment', 'center');
             focusButton.Layout.Row = 1;
             focusButton.Layout.Column = 1;
             
-            % Grab Button
+            % Grab Button - using state button
             grabButton = uibutton(actionGrid, 'state', ...
-                'Text', '📷 Grab Frame', ...
+                'Text', '📷 Grab', ...             % Shortened text
                 'Value', false, ... % Initial state is off
                 'ValueChangedFcn', [], ... % Will be set by FocusGUI
                 'BackgroundColor', [0.95 0.95 0.85], ...
-                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize+1, ... % Reduced font size
                 'Tooltip', 'Grab a single frame in ScanImage (snapshot)', ...
                 'HorizontalAlignment', 'center');
             grabButton.Layout.Row = 1;
             grabButton.Layout.Column = 2;
             
-            % Abort Button
+            % Abort Button - full width across the bottom when shown
             abortButton = uibutton(actionGrid, ...
                 'Text', '❌ ABORT', ...
                 'Tooltip', 'Abort all operations immediately', ...
                 'BackgroundColor', gui.components.UIComponentFactory.COLORS.EmergencyButton, ...
-                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize+1, ... % Reduced font size
                 'FontWeight', 'bold', ...
                 'HorizontalAlignment', 'center');
             abortButton.Layout.Row = 1;
@@ -533,7 +534,7 @@ classdef UIComponentFactory < handle
         end
         
         function [container, plotAxes, toggleButton, plotPanel] = createCollapsiblePlotPanel(parent, row, column)
-            % Creates a collapsible plot panel with toggle button
+            % Creates a collapsible plot panel with improved toggle button
             plotContainer = uipanel(parent, 'BorderType', 'none', 'BackgroundColor', [0.95 0.95 0.98]);
             plotContainer.Layout.Row = row;
             plotContainer.Layout.Column = column;
@@ -543,32 +544,34 @@ classdef UIComponentFactory < handle
             plotContainerGrid.RowHeight = {'fit', '1x'};
             plotContainerGrid.ColumnWidth = {'1x'};
             plotContainerGrid.Padding = [0 0 0 0];
-            plotContainerGrid.RowSpacing = 5;
+            plotContainerGrid.RowSpacing = 0; % Reduced spacing for seamless appearance
             
             % Create a header panel with title and toggle button
-            plotHeaderPanel = uipanel(plotContainerGrid, 'BorderType', 'none', 'BackgroundColor', [0.95 0.95 0.98]);
+            plotHeaderPanel = uipanel(plotContainerGrid, 'BorderType', 'line', 'BackgroundColor', [0.94 0.96 0.98]);
             plotHeaderPanel.Layout.Row = 1;
             plotHeaderPanel.Layout.Column = 1;
             
             % Create grid for header contents
-            plotHeaderGrid = uigridlayout(plotHeaderPanel, [1, 2]);
+            plotHeaderGrid = uigridlayout(plotHeaderPanel, [1, 2]);  % Changed from 3 columns to 2
             plotHeaderGrid.RowHeight = {'fit'};
             plotHeaderGrid.ColumnWidth = {'1x', 'fit'};
-            plotHeaderGrid.Padding = [5 5 5 5];
+            plotHeaderGrid.Padding = [5 5 5 5];  % Reduced padding
+            plotHeaderGrid.ColumnSpacing = 5;    % Reduced spacing
             
-            % Plot title
+            % Plot title with icon
             plotTitle = uilabel(plotHeaderGrid, ...
-                'Text', 'Brightness vs. Z-Position', ...
+                'Text', '📊 Brightness vs. Z-Position', ...  % Combined icon and title
                 'FontWeight', 'bold', ...
                 'FontSize', 12);
             plotTitle.Layout.Row = 1;
             plotTitle.Layout.Column = 1;
             
-            % Toggle button for plot visibility
+            % Toggle button for plot visibility - improved styling
             toggleButton = uibutton(plotHeaderGrid, ...
-                'Text', '◀ Hide', ...
-                'FontSize', 10, ...
-                'Tooltip', 'Toggle plot panel visibility');
+                'Text', '◀', ...
+                'FontSize', 14, ...
+                'BackgroundColor', [0.9 0.9 0.95], ...
+                'Tooltip', 'Hide plot panel');
             toggleButton.Layout.Row = 1;
             toggleButton.Layout.Column = 2;
             
@@ -605,18 +608,19 @@ classdef UIComponentFactory < handle
         
         function paramGrid = setupParameterGrid(paramPanel)
             % Sets up the main parameter grid layout
-            paramGrid = uigridlayout(paramPanel, [5, 4]);
-            paramGrid.RowHeight = {'fit', 5, 'fit', 'fit', 'fit'};
+            paramGrid = uigridlayout(paramPanel, [6, 4]);
+            paramGrid.RowHeight = {'fit', '0.3x', 'fit', 'fit', 'fit', '1x'};
             paramGrid.ColumnWidth = {'fit', '1.5x', 'fit', '1x'};
-            paramGrid.Padding = [12 12 12 12];  % Increased padding for better spacing
-            paramGrid.RowSpacing = 10;  % Increased spacing
-            paramGrid.ColumnSpacing = 12;  % Increased spacing
+            paramGrid.Padding = [8 10 8 10];  % Reduced padding
+            paramGrid.RowSpacing = 6;         % Reduced spacing
+            paramGrid.ColumnSpacing = 8;      % Reduced spacing
         end
         
         function [stepSizeSlider, stepSizeValue] = createStepSizeControls(paramGrid, paramPanel, controller)
             % Creates step size slider and value display
             gui.components.UIComponentFactory.createStyledLabel(paramGrid, 'Step Size (µm):', 1, 1, ...
-                Tooltip="Set the Z scan step size in micrometers");
+                Tooltip="Set the Z scan step size in micrometers", ...
+                FontSize=gui.components.UIComponentFactory.FONTS.DefaultSize+1);
             
             % Slider container
             sliderPanel = uipanel(paramGrid, 'BorderType', 'none', 'BackgroundColor', paramPanel.BackgroundColor);
@@ -684,21 +688,30 @@ classdef UIComponentFactory < handle
                 'HighlightColor', gui.components.UIComponentFactory.COLORS.Border);
             separatorPanel.Layout.Row = 2;
             separatorPanel.Layout.Column = [1 4];
+            
+            % Add section label for better organization
+            sectionLabel = uilabel(paramGrid, ...
+                'Text', 'Scan Settings', ...
+                'FontWeight', 'bold', ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize, ...
+                'HorizontalAlignment', 'left');
+            sectionLabel.Layout.Row = 3;
+            sectionLabel.Layout.Column = 1;
         end
         
         function pauseTimeEdit = createPauseTimeControl(paramGrid, controller)
             % Creates pause time control
-            gui.components.UIComponentFactory.createStyledLabel(paramGrid, 'Pause Time (sec):', 3, 1, ...
+            gui.components.UIComponentFactory.createStyledLabel(paramGrid, 'Pause Time (sec):', 4, 1, ...
                 Tooltip="Pause duration between Z steps (seconds)");
             
-            pauseTimeEdit = gui.components.UIComponentFactory.createStyledEditField(paramGrid, 3, 2, ...
+            pauseTimeEdit = gui.components.UIComponentFactory.createStyledEditField(paramGrid, 4, 2, ...
                 Value=controller.scanPauseTime, Format="%.1f", ...
                 Tooltip="Pause duration between Z steps (seconds)");
         end
         
         function metricDropDown = createMetricControl(paramGrid)
             % Creates brightness metric dropdown
-            gui.components.UIComponentFactory.createStyledLabel(paramGrid, 'Brightness Metric:', 3, 3, ...
+            gui.components.UIComponentFactory.createStyledLabel(paramGrid, 'Brightness Metric:', 4, 3, ...
                 Tooltip="Select brightness calculation method");
             
             metricDropDown = uidropdown(paramGrid, ...
@@ -707,7 +720,7 @@ classdef UIComponentFactory < handle
                 'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize, ...
                 'BackgroundColor', gui.components.UIComponentFactory.COLORS.Surface, ...
                 'Tooltip', 'Select method to calculate brightness (Mean is most common)');
-            metricDropDown.Layout.Row = 3;
+            metricDropDown.Layout.Row = 4;
             metricDropDown.Layout.Column = 4;
         end
         
@@ -717,24 +730,24 @@ classdef UIComponentFactory < handle
             % This uses the App Designer RangeSlider component for more intuitive
             % control of Z scan range limits.
             
+            % Z Range section header
+            gui.components.UIComponentFactory.createStyledLabel(paramGrid, 'Z Scan Range (µm):', 5, 1, ...
+                Tooltip="Set the range for Z scanning", ...
+                FontSize=gui.components.UIComponentFactory.FONTS.DefaultSize, ...
+                FontWeight="bold");
+            
             % Container panel for range slider components
             rangePanel = uipanel(paramGrid, 'BorderType', 'none', 'BackgroundColor', paramGrid.Parent.BackgroundColor);
-            rangePanel.Layout.Row = [4 5];
+            rangePanel.Layout.Row = 6;
             rangePanel.Layout.Column = [1 4];
             
             % Create grid layout for range slider components
-            rangeGrid = uigridlayout(rangePanel, [3, 4]);
-            rangeGrid.RowHeight = {'fit', '1x', 'fit'};
+            rangeGrid = uigridlayout(rangePanel, [2, 4]);  % Changed from 3 rows to 2
+            rangeGrid.RowHeight = {'1x', 'fit'};
             rangeGrid.ColumnWidth = {'fit', '1x', 'fit', '1x'};
-            rangeGrid.Padding = [5 5 5 5];
-            rangeGrid.RowSpacing = 8;
-            rangeGrid.ColumnSpacing = 10;
-            
-            % Z Range label
-            gui.components.UIComponentFactory.createStyledLabel(rangeGrid, 'Z Scan Range (µm):', 1, [1 4], ...
-                Tooltip="Set the range for Z scanning", ...
-                HorizontalAlignment="center", ...
-                FontSize=gui.components.UIComponentFactory.FONTS.DefaultSize+1);
+            rangeGrid.Padding = [5 8 5 8];       % Reduced padding
+            rangeGrid.RowSpacing = 6;            % Reduced spacing
+            rangeGrid.ColumnSpacing = 8;         % Reduced spacing
             
             % Create the range slider
             % Get current Z limits from controller if available
@@ -764,19 +777,19 @@ classdef UIComponentFactory < handle
                 'MinorTicks', [], ...
                 'Tooltip', 'Set the minimum and maximum Z positions for scanning', ...
                 'ValueChangedFcn', @(src,event) onRangeSliderChanged(src, event, controller));
-            rangeSlider.Layout.Row = 2;
+            rangeSlider.Layout.Row = 1;
             rangeSlider.Layout.Column = [1 4];
             
-            % Create value display fields
-            gui.components.UIComponentFactory.createStyledLabel(rangeGrid, 'Min Z:', 3, 1, ...
+            % Create value display fields with set buttons next to them
+            gui.components.UIComponentFactory.createStyledLabel(rangeGrid, 'Min:', 2, 1, ...  % Changed label text
                 Tooltip="Minimum Z position for scanning");
-            minValueField = gui.components.UIComponentFactory.createStyledEditField(rangeGrid, 3, 2, ...
+            minValueField = gui.components.UIComponentFactory.createStyledEditField(rangeGrid, 2, 2, ...
                 Value=rangeSlider.Value(1), Format="%.1f", ...
                 Tooltip="Minimum Z position for scanning");
             
-            gui.components.UIComponentFactory.createStyledLabel(rangeGrid, 'Max Z:', 3, 3, ...
+            gui.components.UIComponentFactory.createStyledLabel(rangeGrid, 'Max:', 2, 3, ...  % Changed label text
                 Tooltip="Maximum Z position for scanning");
-            maxValueField = gui.components.UIComponentFactory.createStyledEditField(rangeGrid, 3, 4, ...
+            maxValueField = gui.components.UIComponentFactory.createStyledEditField(rangeGrid, 2, 4, ...
                 Value=rangeSlider.Value(2), Format="%.1f", ...
                 Tooltip="Maximum Z position for scanning");
             
@@ -784,26 +797,20 @@ classdef UIComponentFactory < handle
             minValueField.ValueChangedFcn = @(src,~) updateRangeSliderLow(src, rangeSlider, controller);
             maxValueField.ValueChangedFcn = @(src,~) updateRangeSliderHigh(src, rangeSlider, controller);
             
-            % Create set limit buttons (removed Width property as it's not supported)
-            setMinBtn = gui.components.UIComponentFactory.createStyledButton(rangeGrid, 'Set Min', 1, 1, ...
-                @(~,~) setCurrentAsMin(controller, rangeSlider, minValueField), ...
-                Tooltip="Set current position as minimum Z limit", ...
-                BackgroundColor=[0.9 0.9 1.0], ...
-                HorizontalAlignment="center");
+            % Create set limit buttons (moved to context menu)
+            minValueField.ContextMenu = uicontextmenu(rangeGrid.Parent.Parent.Parent);
+            uimenu(minValueField.ContextMenu, 'Text', 'Set to Current Z', ...
+                'MenuSelectedFcn', @(~,~) setCurrentAsMin(controller, rangeSlider, minValueField));
             
-            setMaxBtn = gui.components.UIComponentFactory.createStyledButton(rangeGrid, 'Set Max', 1, 3, ...
-                @(~,~) setCurrentAsMax(controller, rangeSlider, maxValueField), ...
-                Tooltip="Set current position as maximum Z limit", ...
-                BackgroundColor=[0.9 0.9 1.0], ...
-                HorizontalAlignment="center");
+            maxValueField.ContextMenu = uicontextmenu(rangeGrid.Parent.Parent.Parent);
+            uimenu(maxValueField.ContextMenu, 'Text', 'Set to Current Z', ...
+                'MenuSelectedFcn', @(~,~) setCurrentAsMax(controller, rangeSlider, maxValueField));
             
             % Package all components into a struct for return
             rangeSliderComponents = struct(...
                 'RangeSlider', rangeSlider, ...
                 'MinValueField', minValueField, ...
-                'MaxValueField', maxValueField, ...
-                'SetMinButton', setMinBtn, ...
-                'SetMaxButton', setMaxBtn);
+                'MaxValueField', maxValueField);
             
             % Nested callback functions
             function onRangeSliderChanged(src, event, controller)
@@ -919,12 +926,12 @@ classdef UIComponentFactory < handle
             % Applies consistent styling to plot axes
             grid(axes, 'on');
             box(axes, 'on');
-            xlabel(axes, 'Z Position (µm)', 'FontWeight', 'bold', ...
+            xlabel(axes, 'Z (µm)', 'FontWeight', 'bold', ...  % Shortened label
                 'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize);
-            ylabel(axes, 'Brightness (a.u.)', 'FontWeight', 'bold', ...
+            ylabel(axes, 'Brightness', 'FontWeight', 'bold', ...  % Shortened label
                 'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize);
-            title(axes, 'Z-Scan Brightness Profile', 'FontWeight', 'bold', ...
-                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize);
+            title(axes, 'Z-Scan Profile', 'FontWeight', 'bold', ...  % Shortened title
+                'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize+1);
             axes.GridAlpha = 0.3;
             axes.LineWidth = 1.2;
             axes.XLim = [0 1];
@@ -933,24 +940,24 @@ classdef UIComponentFactory < handle
         end
         
         function [monitorToggle, zScanToggle, moveToMaxButton] = createScanControls(actionGrid, actionPanel, controller)
-            % Creates main scanning control buttons - simplified version
+            % Creates main scanning control buttons with improved visual prominence
             scanControlsPanel = uipanel(actionGrid, ...
                 'BorderType', 'none', ...
                 'BackgroundColor', actionPanel.BackgroundColor);
             scanControlsPanel.Layout.Row = 1;
             scanControlsPanel.Layout.Column = [1 3];
             
-            % Create simple grid for control buttons
+            % Create grid for control buttons with more space
             scanGrid = uigridlayout(scanControlsPanel, [1, 3]);
             scanGrid.RowHeight = {'1x'};
             scanGrid.ColumnWidth = {'1x', '1x', '1x'};
-            scanGrid.Padding = [0 0 0 0];
-            scanGrid.ColumnSpacing = 15;
+            scanGrid.Padding = [3 5 3 5];           % Reduced padding
+            scanGrid.ColumnSpacing = 8;             % Reduced spacing
             
-            % Monitor toggle
+            % Monitor toggle - improved styling
             monitorToggle = uibutton(scanGrid, 'state', ...
-                'Text', '👁️ Monitor Brightness', ...
-                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'Text', '👁️ Monitor', ...          % Shortened text
+                'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize+1, ... % Reduced font size
                 'FontWeight', 'bold', ...
                 'Tooltip', 'Start/stop real-time brightness monitoring while you manually move Z stage', ...
                 'BackgroundColor', gui.components.UIComponentFactory.COLORS.MonitorButton, ...
@@ -958,10 +965,10 @@ classdef UIComponentFactory < handle
             monitorToggle.Layout.Row = 1;
             monitorToggle.Layout.Column = 1;
             
-            % Z-Scan toggle
+            % Z-Scan toggle - improved styling for more prominence
             zScanToggle = uibutton(scanGrid, 'state', ...
-                'Text', '🔍 Auto Z-Scan', ...
-                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'Text', '🔍 Z-Scan', ...           % Shortened text
+                'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize+1, ... % Reduced font size
                 'FontWeight', 'bold', ...
                 'Tooltip', 'Start automatic Z scan to find focus - scans through Z range and records brightness', ...
                 'BackgroundColor', gui.components.UIComponentFactory.COLORS.ScanButton, ...
@@ -970,14 +977,18 @@ classdef UIComponentFactory < handle
             zScanToggle.Layout.Row = 1;
             zScanToggle.Layout.Column = 2;
             
-            % Move to max button
-            moveToMaxButton = gui.components.UIComponentFactory.createStyledButton(scanGrid, 'Move to Max Focus', 1, 3, ...
-                @(~,~) controller.moveToMaxBrightness(), ...
-                Tooltip="Move to the Z position with maximum brightness (best focus)", ...
-                BackgroundColor=gui.components.UIComponentFactory.COLORS.MaxFocusButton, ...
-                FontSize=gui.components.UIComponentFactory.FONTS.LargeSize, ...
-                Enable="off", Icon="⬆️", ...
-                HorizontalAlignment="center");
+            % Move to max button - improved styling for more prominence
+            moveToMaxButton = uibutton(scanGrid, ...
+                'Text', '⬆️ Max Focus', ...        % Shortened text
+                'FontSize', gui.components.UIComponentFactory.FONTS.DefaultSize+1, ... % Reduced font size
+                'FontWeight', 'bold', ...
+                'Tooltip', 'Move to the Z position with maximum brightness (best focus)', ...
+                'BackgroundColor', gui.components.UIComponentFactory.COLORS.MaxFocusButton, ...
+                'ButtonPushedFcn', @(~,~) controller.moveToMaxBrightness(), ...
+                'Enable', 'off', ...
+                'HorizontalAlignment', 'center');
+            moveToMaxButton.Layout.Row = 1;
+            moveToMaxButton.Layout.Column = 3;
         end
         
         function [focusButton, grabButton, abortButton] = createScanImageControls(actionGrid, controller)

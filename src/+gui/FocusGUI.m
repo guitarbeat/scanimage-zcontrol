@@ -9,7 +9,9 @@ classdef FocusGUI < handle
 
     properties
         % Core properties
-        controller        % Controller object for application logic
+        controller        % Controller object for application logic (implements ControllerInterface)
+        layoutManager     % Responsive layout manager
+        mainGrid          % Main grid layout
         verbosity = 1     % Verbosity level for logging
         
         % Main UI components
@@ -58,7 +60,12 @@ classdef FocusGUI < handle
     methods
         function obj = FocusGUI(controller)
             % Constructor initializes controller and verbosity
-            obj.controller = controller;
+            % Wrap with adapter if controller is not already implementing the interface
+            if ~isa(controller, 'gui.interfaces.ControllerInterface')
+                obj.controller = gui.interfaces.ControllerAdapter(controller);
+            else
+                obj.controller = controller;
+            end
             
             % Inherit verbosity from controller if available
             try
@@ -79,7 +86,7 @@ classdef FocusGUI < handle
             try
                 % Create main figure
                 obj.hFig = uifigure('Name', 'FocalSweep - Automated Z-Focus Finder', ...
-                    'Position', [100 100 950 700], ...
+                    'Position', [100 100 850 600], ...  % Reduced size from 950x700
                     'Color', [0.95 0.95 0.98], ...
                     'CloseRequestFcn', @(~,~) obj.closeFigure(), ...
                     'Resize', 'on');
@@ -93,10 +100,13 @@ classdef FocusGUI < handle
                 % Create main grid layout
                 mainGrid = uigridlayout(obj.hFig, [3, 2]);
                 mainGrid.RowHeight = {'fit', '1x', 'fit'};
-                mainGrid.ColumnWidth = {'1.7x', '1x'};
-                mainGrid.Padding = [15 15 15 15];
-                mainGrid.RowSpacing = 12;
-                mainGrid.ColumnSpacing = 15;
+                mainGrid.ColumnWidth = {'1.5x', '1x'};  % Changed from 1.7x to 1.5x
+                mainGrid.Padding = [10 10 10 10];       % Reduced from 20 20 20 20
+                mainGrid.RowSpacing = 8;                % Reduced from 18
+                mainGrid.ColumnSpacing = 10;            % Reduced from 20
+                
+                % Store main grid reference for later use
+                obj.mainGrid = mainGrid;
                 
                 % --- Create TabGroup for Focus Modes ---
                 obj.tabGroup = gui.components.UIComponentFactory.createModeTabGroup(mainGrid, [1 2], 1);
@@ -145,6 +155,20 @@ classdef FocusGUI < handle
                 % Set up event handlers
                 obj.setupEventHandlers();
                 
+                % Register plot container with layout manager
+                plotContainer = findobj(obj.hFig, 'Type', 'uipanel', 'Tag', 'PlotContainer');
+                if isempty(plotContainer)
+                    % If not tagged yet, find plot panel containing axes
+                    plotContainer = obj.plotPanel;
+                    if ~isempty(plotContainer)
+                        plotContainer.Tag = 'PlotContainer';
+                    end
+                end
+                
+                if ~isempty(plotContainer) && ~isempty(obj.layoutManager)
+                    obj.layoutManager.registerPlotContainer(plotContainer, obj.isPlotExpanded);
+                end
+                
                 % Initialize UI state
                 obj.updateButtonStates();
                 
@@ -186,9 +210,9 @@ classdef FocusGUI < handle
                 % Plot toggle handler
                 obj.plotToggleButton.ButtonPushedFcn = @(~,~) obj.togglePlotVisibility();
                 
-                % Figure resize handler
-                obj.hFig.AutoResizeChildren = 'off';
-                obj.hFig.SizeChangedFcn = @(~,~) obj.updateStatusBarPosition();
+                % Create responsive layout manager
+                obj.layoutManager = gui.utils.ResponsiveLayoutManager(obj.hFig);
+                obj.layoutManager.registerStatusBar(obj.hStatusBar, obj.helpButton);
             catch ME
                 if obj.verbosity > 0
                     warning('Error setting up event handlers: %s', ME.message);
@@ -439,8 +463,22 @@ classdef FocusGUI < handle
                     mainGrid = mainGrid(1);
                 end
                 
+                % Update toggle button appearance
+                if obj.isPlotExpanded
+                    obj.plotToggleButton.Text = '◀';
+                    obj.plotToggleButton.Tooltip = 'Hide plot panel';
+                else
+                    obj.plotToggleButton.Text = '▶';
+                    obj.plotToggleButton.Tooltip = 'Show plot panel';
+                end
+                
                 % Use the handler to toggle visibility
                 gui.handlers.UIEventHandlers.togglePlotVisibility(mainGrid, obj.plotToggleButton, obj.isPlotExpanded, obj.plotPanel);
+                
+                % Update layout manager
+                if ~isempty(obj.layoutManager)
+                    obj.layoutManager.setPlotExpandedState(obj.isPlotExpanded);
+                end
             catch ME
                 warning('Error toggling plot visibility: %s', ME.message);
             end
@@ -554,12 +592,22 @@ classdef FocusGUI < handle
         end
         
         function updateStatusBarPosition(obj)
-            % Update status bar position when window is resized
-            gui.utils.GUIUtils.updateStatusBarLayout(obj.hFig, obj.hStatusBar);
-            
-            % Also update help button position
-            if gui.utils.GUIUtils.isValidUIComponent(obj.helpButton)
-                obj.helpButton.Position = [obj.hFig.Position(3)-70, 2, 60, 20];
+            % This method is kept for backward compatibility
+            % Use layout manager to handle positioning now
+            try
+                if ~isempty(obj.layoutManager)
+                    % No-op - layout manager handles this
+                else
+                    % Fall back to old method for backward compatibility
+                    gui.utils.GUIUtils.updateStatusBarLayout(obj.hFig, obj.hStatusBar);
+                    
+                    % Also update help button position
+                    if gui.utils.GUIUtils.isValidUIComponent(obj.helpButton)
+                        obj.helpButton.Position = [obj.hFig.Position(3)-70, 2, 60, 20];
+                    end
+                end
+            catch
+                % Silently ignore errors
             end
         end
         

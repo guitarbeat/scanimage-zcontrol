@@ -181,5 +181,54 @@ classdef GUIUtils
                 gui.utils.GUIUtils.logError('updateStatusBarLayout', ME);
             end
         end
+        
+        %% Tab Management
+        function selectTabByName(tabGroup, tabName)
+            % Selects a tab by its name/title
+            if ~gui.utils.GUIUtils.isValidUIComponent(tabGroup)
+                return;
+            end
+            
+            % Get all tabs
+            tabs = tabGroup.Children;
+            for i = 1:length(tabs)
+                if strcmp(tabs(i).Title, tabName)
+                    tabGroup.SelectedTab = tabs(i);
+                    return;
+                end
+            end
+        end
+        
+        function tab = getTabByName(tabGroup, tabName)
+            % Returns a tab object by its name/title
+            tab = [];
+            if ~gui.utils.GUIUtils.isValidUIComponent(tabGroup)
+                return;
+            end
+            
+            % Get all tabs
+            tabs = tabGroup.Children;
+            for i = 1:length(tabs)
+                if strcmp(tabs(i).Title, tabName)
+                    tab = tabs(i);
+                    return;
+                end
+            end
+        end
+        
+        function moveToTab(tabGroup, tabName, statusText, message)
+            % Moves to a tab and displays a status message
+            if ~gui.utils.GUIUtils.isValidUIComponent(tabGroup)
+                return;
+            end
+            
+            % Select the tab
+            gui.utils.GUIUtils.selectTabByName(tabGroup, tabName);
+            
+            % Display status message if provided
+            if nargin > 2 && gui.utils.GUIUtils.isValidUIComponent(statusText) && nargin > 3
+                gui.utils.GUIUtils.updateStatus(statusText, message);
+            end
+        end
     end
 end 

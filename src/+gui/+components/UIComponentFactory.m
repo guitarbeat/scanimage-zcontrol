@@ -308,6 +308,281 @@ classdef UIComponentFactory < handle
                 'HighlightColor', gui.components.UIComponentFactory.COLORS.Border, ...
                 'Position', [0 24 statusBar.Position(3) 1]);
         end
+        
+        %% Tab UI Components
+        function tabGroup = createModeTabGroup(parent, row, column, options)
+            % Creates a TabGroup for organizing different focus mode UIs
+            arguments
+                parent
+                row
+                column
+                options.BackgroundColor = gui.components.UIComponentFactory.COLORS.Background
+                options.Padding = [0 0 0 0]
+            end
+            
+            % Create a container panel for the TabGroup
+            tabContainer = uipanel(parent, 'BorderType', 'none', 'BackgroundColor', options.BackgroundColor);
+            
+            if ~isempty(row)
+                tabContainer.Layout.Row = row;
+            end
+            if ~isempty(column)
+                tabContainer.Layout.Column = column;
+            end
+            
+            % Create the TabGroup
+            tabGroup = uitabgroup(tabContainer);
+        end
+        
+        function tab = createModeTab(tabGroup, title, options)
+            % Creates a tab for a specific focus mode
+            arguments
+                tabGroup
+                title string
+                options.BackgroundColor = gui.components.UIComponentFactory.COLORS.Background
+                options.Tooltip string = ""
+            end
+            
+            tab = uitab(tabGroup, 'Title', title, 'BackgroundColor', options.BackgroundColor);
+            
+            if options.Tooltip ~= ""
+                tab.Tooltip = options.Tooltip;
+            end
+        end
+        
+        function [grid, panel] = createTabPanel(tab, title, rows, columns, options)
+            % Creates a panel within a tab with a grid layout
+            arguments
+                tab
+                title string
+                rows = 1
+                columns = 1
+                options.BackgroundColor = gui.components.UIComponentFactory.COLORS.Background
+                options.RowHeight = {'1x'}
+                options.ColumnWidth = {'1x'}
+                options.Padding = [10 10 10 10]
+                options.RowSpacing = 10
+                options.ColumnSpacing = 10
+            end
+            
+            % Create panel inside the tab
+            panel = gui.components.UIComponentFactory.createStyledPanel(tab, title, [], []);
+            
+            % Create grid inside the panel
+            grid = uigridlayout(panel, [rows, columns]);
+            grid.RowHeight = options.RowHeight;
+            grid.ColumnWidth = options.ColumnWidth;
+            grid.Padding = options.Padding;
+            grid.RowSpacing = options.RowSpacing;
+            grid.ColumnSpacing = options.ColumnSpacing;
+        end
+        
+        %% Mode-Specific Panels
+        function components = createManualFocusTab(tab, controller)
+            % Creates all components for the Manual Focus tab
+            
+            % Create main grid layout for the tab
+            manualGrid = uigridlayout(tab, [2, 1]);
+            manualGrid.RowHeight = {'0.4x', '0.6x'};
+            manualGrid.ColumnWidth = {'1x'};
+            manualGrid.Padding = [10 10 10 10];
+            manualGrid.RowSpacing = 12;
+            
+            % Z Movement Controls Panel
+            zControlPanel = gui.components.UIComponentFactory.createStyledPanel(manualGrid, 'Z Movement Controls', 1, 1);
+            currentZLabel = gui.components.UIComponentFactory.createZControlPanel(manualGrid, zControlPanel, controller);
+            
+            % Monitor Button Panel
+            manualActionPanel = gui.components.UIComponentFactory.createStyledPanel(manualGrid, 'Manual Actions', 2, 1);
+            
+            % Create grid for manual action buttons
+            manualActionGrid = uigridlayout(manualActionPanel, [1, 1]);
+            manualActionGrid.RowHeight = {'1x'};
+            manualActionGrid.ColumnWidth = {'1x'};
+            manualActionGrid.Padding = [12 12 12 12];
+            
+            % Create Monitor button
+            monitorToggle = uibutton(manualActionGrid, 'state', ...
+                'Text', '👁️ Monitor Brightness', ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'FontWeight', 'bold', ...
+                'Tooltip', 'Start/stop real-time brightness monitoring while you manually move Z stage', ...
+                'BackgroundColor', gui.components.UIComponentFactory.COLORS.MonitorButton, ...
+                'HorizontalAlignment', 'center');
+            
+            % Return all components
+            components = struct(...
+                'ZControlPanel', zControlPanel, ...
+                'CurrentZLabel', currentZLabel, ...
+                'ManualActionPanel', manualActionPanel, ...
+                'MonitorToggle', monitorToggle);
+        end
+        
+        function components = createAutoFocusTab(tab, controller)
+            % Creates all components for the Auto Focus tab
+            
+            % Create main grid layout for the tab
+            autoGrid = uigridlayout(tab, [2, 1]);
+            autoGrid.RowHeight = {'0.6x', '0.4x'};
+            autoGrid.ColumnWidth = {'1x'};
+            autoGrid.Padding = [10 10 10 10];
+            autoGrid.RowSpacing = 12;
+            
+            % Z-Scan Parameters Panel
+            paramPanel = gui.components.UIComponentFactory.createStyledPanel(autoGrid, 'Z-Scan Parameters', 1, 1);
+            paramComponents = gui.components.UIComponentFactory.createScanParametersPanel(paramPanel, paramPanel, controller);
+            
+            % Auto Z-Scan Buttons Panel
+            autoActionPanel = gui.components.UIComponentFactory.createStyledPanel(autoGrid, 'Auto Focus Actions', 2, 1);
+            
+            % Create grid for auto action buttons
+            autoActionGrid = uigridlayout(autoActionPanel, [1, 2]);
+            autoActionGrid.RowHeight = {'1x'};
+            autoActionGrid.ColumnWidth = {'1x', '1x'};
+            autoActionGrid.Padding = [12 12 12 12];
+            autoActionGrid.ColumnSpacing = 15;
+            
+            % Create Auto Z-Scan button
+            zScanToggle = uibutton(autoActionGrid, 'state', ...
+                'Text', '🔍 Auto Z-Scan', ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'FontWeight', 'bold', ...
+                'Tooltip', 'Start automatic Z scan to find focus - scans through Z range and records brightness', ...
+                'BackgroundColor', gui.components.UIComponentFactory.COLORS.ScanButton, ...
+                'Enable', 'off', ...
+                'HorizontalAlignment', 'center');
+            zScanToggle.Layout.Row = 1;
+            zScanToggle.Layout.Column = 1;
+            
+            % Create Move to Max button
+            moveToMaxButton = uibutton(autoActionGrid, ...
+                'Text', '⬆️ Move to Max Focus', ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'FontWeight', 'bold', ...
+                'Tooltip', 'Move to the Z position with maximum brightness (best focus)', ...
+                'BackgroundColor', gui.components.UIComponentFactory.COLORS.MaxFocusButton, ...
+                'Enable', 'off', ...
+                'HorizontalAlignment', 'center');
+            moveToMaxButton.Layout.Row = 1;
+            moveToMaxButton.Layout.Column = 2;
+            
+            % Return all components
+            components = struct(...
+                'StepSizeSlider', paramComponents.stepSizeSlider, ...
+                'StepSizeValue', paramComponents.stepSizeValue, ...
+                'PauseTimeEdit', paramComponents.pauseTimeEdit, ...
+                'MetricDropDown', paramComponents.metricDropDown, ...
+                'MinZEdit', paramComponents.minZEdit, ...
+                'MaxZEdit', paramComponents.maxZEdit, ...
+                'ZScanToggle', zScanToggle, ...
+                'MoveToMaxButton', moveToMaxButton);
+        end
+        
+        function components = createScanImageControlPanel(parent, row, column, controller)
+            % Creates the ScanImage control panel with all buttons
+            actionPanel = gui.components.UIComponentFactory.createStyledPanel(parent, 'ScanImage Controls', row, column);
+            
+            % Create action panel grid
+            actionGrid = uigridlayout(actionPanel, [1, 3]);
+            actionGrid.RowHeight = {'1x'};
+            actionGrid.ColumnWidth = {'1x', '1x', '1x'};
+            actionGrid.Padding = [12 12 12 12];
+            actionGrid.ColumnSpacing = 15;
+            
+            % Focus Button
+            focusButton = uibutton(actionGrid, 'state', ...
+                'Text', '🔄 Focus Mode', ...
+                'ValueChangedFcn', [], ... % Will be set by FocusGUI
+                'BackgroundColor', gui.components.UIComponentFactory.COLORS.ActionButton, ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'Tooltip', 'Start Focus mode in ScanImage (continuous scanning)', ...
+                'HorizontalAlignment', 'center');
+            focusButton.Layout.Row = 1;
+            focusButton.Layout.Column = 1;
+            
+            % Grab Button
+            grabButton = uibutton(actionGrid, 'state', ...
+                'Text', '📷 Grab Frame', ...
+                'Value', false, ... % Initial state is off
+                'ValueChangedFcn', [], ... % Will be set by FocusGUI
+                'BackgroundColor', [0.95 0.95 0.85], ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'Tooltip', 'Grab a single frame in ScanImage (snapshot)', ...
+                'HorizontalAlignment', 'center');
+            grabButton.Layout.Row = 1;
+            grabButton.Layout.Column = 2;
+            
+            % Abort Button
+            abortButton = uibutton(actionGrid, ...
+                'Text', '❌ ABORT', ...
+                'Tooltip', 'Abort all operations immediately', ...
+                'BackgroundColor', gui.components.UIComponentFactory.COLORS.EmergencyButton, ...
+                'FontSize', gui.components.UIComponentFactory.FONTS.LargeSize, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center');
+            abortButton.Layout.Row = 1;
+            abortButton.Layout.Column = 3;
+            abortButton.Visible = 'off';
+            
+            % Return all components
+            components = struct(...
+                'Panel', actionPanel, ...
+                'FocusButton', focusButton, ...
+                'GrabButton', grabButton, ...
+                'AbortButton', abortButton);
+        end
+        
+        function [container, plotAxes, toggleButton, plotPanel] = createCollapsiblePlotPanel(parent, row, column)
+            % Creates a collapsible plot panel with toggle button
+            plotContainer = uipanel(parent, 'BorderType', 'none', 'BackgroundColor', [0.95 0.95 0.98]);
+            plotContainer.Layout.Row = row;
+            plotContainer.Layout.Column = column;
+            
+            % Create a grid for the plot and its controls - header always visible
+            plotContainerGrid = uigridlayout(plotContainer, [2, 1]);
+            plotContainerGrid.RowHeight = {'fit', '1x'};
+            plotContainerGrid.ColumnWidth = {'1x'};
+            plotContainerGrid.Padding = [0 0 0 0];
+            plotContainerGrid.RowSpacing = 5;
+            
+            % Create a header panel with title and toggle button
+            plotHeaderPanel = uipanel(plotContainerGrid, 'BorderType', 'none', 'BackgroundColor', [0.95 0.95 0.98]);
+            plotHeaderPanel.Layout.Row = 1;
+            plotHeaderPanel.Layout.Column = 1;
+            
+            % Create grid for header contents
+            plotHeaderGrid = uigridlayout(plotHeaderPanel, [1, 2]);
+            plotHeaderGrid.RowHeight = {'fit'};
+            plotHeaderGrid.ColumnWidth = {'1x', 'fit'};
+            plotHeaderGrid.Padding = [5 5 5 5];
+            
+            % Plot title
+            plotTitle = uilabel(plotHeaderGrid, ...
+                'Text', 'Brightness vs. Z-Position', ...
+                'FontWeight', 'bold', ...
+                'FontSize', 12);
+            plotTitle.Layout.Row = 1;
+            plotTitle.Layout.Column = 1;
+            
+            % Toggle button for plot visibility
+            toggleButton = uibutton(plotHeaderGrid, ...
+                'Text', '◀ Hide', ...
+                'FontSize', 10, ...
+                'Tooltip', 'Toggle plot panel visibility');
+            toggleButton.Layout.Row = 1;
+            toggleButton.Layout.Column = 2;
+            
+            % Plot panel
+            plotPanel = uipanel(plotContainerGrid, 'BorderType', 'line', 'BackgroundColor', [1 1 1]);
+            plotPanel.Layout.Row = 2;
+            plotPanel.Layout.Column = 1;
+            
+            % Create plot area
+            plotAxes = gui.components.UIComponentFactory.createPlotPanel(plotPanel);
+            
+            % Return the container and plot axes
+            container = plotContainer;
+        end
     end
     
     methods (Static, Access = private)

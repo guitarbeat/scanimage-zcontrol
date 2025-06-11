@@ -400,6 +400,168 @@ classdef UIEventHandlers < handle
                 gui.utils.GUIUtils.logError('showHelpDialog', ME);
             end
         end
+        
+        %% Tab Management Methods
+        function success = handleTabChanged(tabGroup, controller, ui, options)
+            % Handles tab changed events with proper state management
+            arguments
+                tabGroup
+                controller
+                ui struct
+                options.UpdateStatus logical = true
+                options.DefaultTab string = ""
+            end
+            
+            success = false;
+            try
+                if ~gui.utils.GUIUtils.isValidUIComponent(tabGroup)
+                    return;
+                end
+                
+                % Get selected tab
+                selectedTab = tabGroup.SelectedTab;
+                if isempty(selectedTab)
+                    if options.DefaultTab ~= ""
+                        % Try to select default tab
+                        gui.utils.GUIUtils.selectTabByName(tabGroup, options.DefaultTab);
+                        selectedTab = tabGroup.SelectedTab;
+                    end
+                    
+                    if isempty(selectedTab)
+                        return;
+                    end
+                end
+                
+                tabName = selectedTab.Title;
+                
+                % Update UI based on selected tab
+                switch tabName
+                    case 'Manual Focus'
+                        success = gui.handlers.UIEventHandlers.activateManualFocusTab(controller, ui, options);
+                    case 'Auto Focus'
+                        success = gui.handlers.UIEventHandlers.activateAutoFocusTab(controller, ui, options);
+                    otherwise
+                        if options.UpdateStatus && isfield(ui, 'StatusText')
+                            gui.handlers.UIEventHandlers.updateStatusDisplay(ui.StatusText, ...
+                                sprintf("Unknown tab selected: %s", tabName), Severity="warning");
+                        end
+                end
+                
+            catch ME
+                gui.utils.GUIUtils.logError('handleTabChanged', ME);
+            end
+        end
+        
+        function success = activateManualFocusTab(controller, ui, options)
+            % Activates the Manual Focus tab and updates UI accordingly
+            arguments
+                controller
+                ui struct
+                options.UpdateStatus logical = true
+            end
+            
+            success = false;
+            try
+                % Show status message
+                if options.UpdateStatus && isfield(ui, 'StatusText')
+                    gui.handlers.UIEventHandlers.updateStatusDisplay(ui.StatusText, ...
+                        "Manual Focus mode - Use Z controls and monitor brightness in real-time", ...
+                        Severity="info");
+                end
+                
+                success = true;
+                
+            catch ME
+                gui.utils.GUIUtils.logError('activateManualFocusTab', ME);
+            end
+        end
+        
+        function success = activateAutoFocusTab(controller, ui, options)
+            % Activates the Auto Focus tab and updates UI accordingly
+            arguments
+                controller
+                ui struct
+                options.UpdateStatus logical = true
+            end
+            
+            success = false;
+            try
+                % Show status message
+                if options.UpdateStatus && isfield(ui, 'StatusText')
+                    gui.handlers.UIEventHandlers.updateStatusDisplay(ui.StatusText, ...
+                        "Auto Focus mode - Set scan parameters and run Z-scan to find focus", ...
+                        Severity="info");
+                end
+                
+                % Check Z limits to see if Auto-Scan button should be enabled
+                if isfield(ui, 'MinZEdit') && isfield(ui, 'MaxZEdit') && isfield(ui, 'ZScanToggle')
+                    minZValid = ~isempty(ui.MinZEdit.Value) && ~isnan(ui.MinZEdit.Value);
+                    maxZValid = ~isempty(ui.MaxZEdit.Value) && ~isnan(ui.MaxZEdit.Value);
+                    rangeValid = minZValid && maxZValid && (ui.MaxZEdit.Value > ui.MinZEdit.Value);
+                    
+                    % Enable/disable Z-Scan button based on Z limits
+                    if rangeValid
+                        gui.utils.GUIUtils.toggleComponentState(ui.ZScanToggle, true);
+                    else
+                        gui.utils.GUIUtils.toggleComponentState(ui.ZScanToggle, false);
+                    end
+                end
+                
+                success = true;
+                
+            catch ME
+                gui.utils.GUIUtils.logError('activateAutoFocusTab', ME);
+            end
+        end
+        
+        %% Plot Panel Methods
+        function success = togglePlotVisibility(mainGrid, plotToggleButton, isExpanded, plotPanel)
+            % Toggles plot panel visibility with animation effect
+            arguments
+                mainGrid
+                plotToggleButton
+                isExpanded logical
+                plotPanel = [] % Optional plotPanel to hide/show
+            end
+            
+            success = false;
+            try
+                if ~gui.utils.GUIUtils.isValidUIComponent(mainGrid) || ...
+                   ~gui.utils.GUIUtils.isValidUIComponent(plotToggleButton)
+                    return;
+                end
+                
+                % Set column widths based on expanded state
+                if isExpanded
+                    % Expand plot area
+                    mainGrid.ColumnWidth = {'1.7x', '1x'};
+                    plotToggleButton.Text = '◀ Hide';
+                    plotToggleButton.Tooltip = 'Hide plot panel';
+                    
+                    % Show plot panel if provided
+                    if ~isempty(plotPanel) && gui.utils.GUIUtils.isValidUIComponent(plotPanel)
+                        plotPanel.Visible = 'on';
+                    end
+                else
+                    % Collapse plot area - but keep header visible for toggle button
+                    mainGrid.ColumnWidth = {'1x', '0.3x'};
+                    plotToggleButton.Text = '▶ Show';
+                    plotToggleButton.Tooltip = 'Show plot panel';
+                    
+                    % Hide plot panel if provided
+                    if ~isempty(plotPanel) && gui.utils.GUIUtils.isValidUIComponent(plotPanel)
+                        plotPanel.Visible = 'off';
+                    end
+                end
+                
+                % Refresh layout
+                drawnow;
+                success = true;
+                
+            catch ME
+                gui.utils.GUIUtils.logError('togglePlotVisibility', ME);
+            end
+        end
     end
     
     methods (Static)

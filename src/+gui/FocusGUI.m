@@ -35,17 +35,27 @@ classdef FocusGUI < handle
         previousZValue = 0       % Previous Z value for movement indicator
         tooltipsEnabled = true   % Flag to enable/disable tooltips
         helpButton               % Help button in the status bar
-        verbosity = 1            % Verbosity level (inherited from controller)
+        verbosity = 0            % Verbosity level (inherited from controller)
     end
 
     methods
         function obj = FocusGUI(controller)
             obj.controller = controller;
+            % Inherit verbosity from controller if available
+            try
+                if isfield(controller, 'verbosity')
+                    obj.verbosity = controller.verbosity;
+                end
+            catch
+                % Use default verbosity (0) if not available
+            end
         end
 
         function create(obj)
             % Create main figure with modern styling
-            fprintf('Creating FocalSweep GUI...\n');
+            if obj.verbosity > 0
+                fprintf('Creating FocalSweep GUI...\n');
+            end
             
             % Try to create the UI in a more resilient way
             try
@@ -57,7 +67,7 @@ classdef FocusGUI < handle
                 
                 % Check if we're running in a compatible MATLAB version
                 hasNewUIControls = ~verLessThan('matlab', '9.8'); % R2020a or newer
-                if ~hasNewUIControls
+                if ~hasNewUIControls && obj.verbosity > 0
                     fprintf('Warning: Running on an older MATLAB version. Some UI features may be limited.\n');
                 end
 
@@ -151,7 +161,9 @@ classdef FocusGUI < handle
                 % Show initial status message
                 obj.updateStatus('Ready - Set Z parameters and press "Monitor Brightness" to start');
             catch ME
-                warning('Error creating GUI: %s', ME.message);
+                if obj.verbosity > 0
+                    warning('Error creating GUI: %s', ME.message);
+                end
             end
         end
         
@@ -409,6 +421,9 @@ classdef FocusGUI < handle
             % Destructor to clean up figure
             if ishandle(obj.hFig)
                 delete(obj.hFig);
+            end
+            if obj.verbosity > 1
+                fprintf('FocalSweep GUI closed.\n');
             end
         end
 

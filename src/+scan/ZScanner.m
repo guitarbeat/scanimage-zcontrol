@@ -92,8 +92,8 @@ classdef ZScanner < handle
             % Move Z stage (unified method for up/down movement)
             % direction: 1 for up (decrease Z), -1 for down (increase Z)
             try
-                % If stepSize is not provided, use the current parameter value
-                if nargin < 3
+                % Get current step size if not provided
+                if nargin < 3 || isempty(stepSize)
                     stepSize = obj.controller.params.stepSize;
                 end
                 
@@ -114,30 +114,39 @@ classdef ZScanner < handle
                 obj.controller.updateStatus(sprintf('Moved Z %s by %d to %.2f', dirText, stepSize, currentZ));
                 obj.controller.updateCurrentZDisplay();
             catch ME
-                obj.handleError(ME, sprintf('move Z %s', dirText));
+                obj.handleError(ME, 'move Z');
             end
         end
         
         function moveZUp(obj, stepSize)
-            % Move Z stage up (decrease Z in ScanImage) - wrapper for backward compatibility
+            % Move Z stage up (decrease Z in ScanImage)
             obj.moveZ(1, stepSize);
         end
         
         function moveZDown(obj, stepSize)
-            % Move Z stage down (increase Z in ScanImage) - wrapper for backward compatibility
+            % Move Z stage down (increase Z in ScanImage)
             obj.moveZ(-1, stepSize);
         end
 
         function val = getZLimit(obj, which)
             % Get Z min or max limit from motor controls
-            if strcmpi(which, 'min')
-                val = str2double(get(obj.controller.findByTag('pbMinLim'), 'UserData'));
-                if isnan(val)
-                    val = -Inf;
+            try
+                if strcmpi(which, 'min')
+                    val = str2double(get(obj.controller.findByTag('pbMinLim'), 'UserData'));
+                    if isnan(val)
+                        val = -Inf;
+                    end
+                else
+                    val = str2double(get(obj.controller.findByTag('pbMaxLim'), 'UserData'));
+                    if isnan(val)
+                        val = Inf;
+                    end
                 end
-            else
-                val = str2double(get(obj.controller.findByTag('pbMaxLim'), 'UserData'));
-                if isnan(val)
+            catch
+                % Return infinity if we can't get the actual limit
+                if strcmpi(which, 'min')
+                    val = -Inf;
+                else
                     val = Inf;
                 end
             end
@@ -195,12 +204,12 @@ classdef ZScanner < handle
         end
         
         function setMinZLimit(obj, minZ)
-            % Set minimum Z limit - wrapper for backward compatibility
+            % Set minimum Z limit
             obj.setZLimit(true, minZ);
         end
         
         function setMaxZLimit(obj, maxZ)
-            % Set maximum Z limit - wrapper for backward compatibility
+            % Set maximum Z limit
             obj.setZLimit(false, maxZ);
         end
 
@@ -231,10 +240,11 @@ classdef ZScanner < handle
                 end
             catch ME
                 if state
-                    obj.handleError(ME, 'start Z-scan');
+                    operation = 'start Z-scan';
                 else
-                    obj.handleError(ME, 'stop Z-scan');
+                    operation = 'stop Z-scan';
                 end
+                obj.handleError(ME, operation);
             end
         end
 
@@ -261,17 +271,7 @@ classdef ZScanner < handle
     methods (Access = private)
         function handleError(obj, ME, operation)
             % Standardized error handling
-            errorMsg = sprintf('Error during %s: %s', operation, ME.message);
-            
-            if obj.controller.verbosity > 0
-                warning(errorMsg);
-            end
-            
-            obj.controller.updateStatus(errorMsg);
-            
-            if obj.controller.verbosity > 1
-                disp(getReport(ME));
-            end
+            core.CoreUtils.handleError(obj.controller, ME, operation);
         end
         
         function value = getParameterFromGui(obj, fieldName, defaultValue)

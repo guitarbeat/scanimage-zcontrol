@@ -10,7 +10,7 @@ classdef Initializer < handle
         function obj = Initializer(controller, verbosity)
             obj.controller = controller;
             if nargin < 2
-                obj.verbosity = 1;
+                obj.verbosity = 0;
             else
                 obj.verbosity = verbosity;
             end
@@ -28,7 +28,7 @@ classdef Initializer < handle
                 end
                 
                 if simMode
-                    if obj.verbosity > 0
+                    if obj.verbosity > 1
                         fprintf('Running in SIMULATION MODE - no ScanImage connection.\n');
                     end
                     % Create a simulated hSI structure in base workspace
@@ -126,7 +126,9 @@ classdef Initializer < handle
                 hCSSample = obj.controller.hSI.hCoordinateSystems.hCSSampleRelative;
                 
                 if isempty(hCSFocus) || isempty(hCSSample)
-                    warning('Coordinate systems not fully initialized');
+                    if obj.verbosity > 0
+                        warning('Coordinate systems not fully initialized');
+                    end
                 end
             catch ME
                 error('Failed to initialize coordinate systems: %s', ME.message);
@@ -147,13 +149,17 @@ classdef Initializer < handle
                     channelsActive = obj.controller.hSI.hChannels.channelsActive;
                     
                     if ~ismember(obj.controller.monitor.activeChannel, channelsActive)
-                        warning('Channel %d is not active', obj.controller.monitor.activeChannel);
+                        if obj.verbosity > 0
+                            warning('Channel %d is not active', obj.controller.monitor.activeChannel);
+                        end
                         obj.controller.monitor.activeChannel = channelsActive(1);
                     end
                 end
             catch ME
                 % Just log the error but don't fail
-                warning('Channel settings not initialized: %s', ME.message);
+                if obj.verbosity > 0
+                    warning('Channel settings not initialized: %s', ME.message);
+                end
             end
         end
     end

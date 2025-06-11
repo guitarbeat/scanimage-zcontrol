@@ -29,10 +29,25 @@ classdef CoreUtils
                 prefix = 'Error';
             end
             
-            % Display error in console
+            % Build error message
             errMsg = sprintf('%s: %s', prefix, ME.message);
-            fprintf('%s\n', errMsg);
-            disp(getReport(ME));
+            
+            % Display error in console based on verbosity
+            verbosity = 0;
+            try
+                if isfield(controller, 'verbosity')
+                    verbosity = controller.verbosity;
+                end
+            catch
+                % If we can't get verbosity, default to minimal output
+            end
+            
+            if verbosity > 0
+                fprintf('%s\n', errMsg);
+                if verbosity > 1
+                    disp(getReport(ME));
+                end
+            end
             
             % Update GUI status if available
             if core.CoreUtils.isGuiValid(controller) && ismethod(controller.gui, 'updateStatus')
@@ -46,7 +61,19 @@ classdef CoreUtils
         
         function updateStatus(controller, message, varargin)
             % Update status text in the GUI
-            fprintf('%s\n', message);
+            % Only display console message with verbosity > 0
+            verbosity = 0;
+            try
+                if isfield(controller, 'verbosity')
+                    verbosity = controller.verbosity;
+                end
+            catch
+                % If we can't get verbosity, default to minimal output
+            end
+            
+            if verbosity > 0
+                fprintf('%s\n', message);
+            end
             
             % Only update GUI if it's initialized
             if core.CoreUtils.isGuiValid(controller) && ismethod(controller.gui, 'updateStatus')

@@ -11,7 +11,7 @@ classdef FocalSweepFactory
             
             % Parse inputs
             p = inputParser;
-            p.addParameter('verbosity', 1, @isnumeric);
+            p.addParameter('verbosity', 0, @isnumeric);
             p.addParameter('forceNew', false, @islogical);
             p.parse(varargin{:});
             
@@ -20,40 +20,40 @@ classdef FocalSweepFactory
             
             persistent instance;
             
-            % Check if the existing instance is valid
+            % Check if the existing instance is valid using a simplified check
             isInstanceValid = false;
-            if ~isempty(instance)
-                try
-                    % Use a more focused check to validate instance
-                    isInstanceValid = isvalid(instance) && ...
-                                     core.CoreUtils.isGuiValid(instance) && ...
-                                     ishandle(instance.gui.hFig);
-                catch
-                    % If any error occurs during validation, the instance is not valid
-                    isInstanceValid = false;
-                end
+            try
+                isInstanceValid = ~isempty(instance) && isvalid(instance) && ...
+                                 isfield(instance, 'gui') && ~isempty(instance.gui) && ...
+                                 isvalid(instance.gui) && isfield(instance.gui, 'hFig') && ...
+                                 ishandle(instance.gui.hFig);
+            catch
+                isInstanceValid = false;
             end
             
             % Create a new instance or reuse existing
             if ~isInstanceValid || forceNew
                 if verbosity > 0
-                    fprintf('Initializing FocalSweep focus control...\n');
+                    fprintf('Initializing FocalSweep...\n');
                 end
+                
                 obj = core.FocalSweep('verbosity', verbosity);
                 
                 % Store as singleton
                 instance = obj;
                 
                 if verbosity > 0
-                    fprintf('FocalSweep focus control ready.\n');
+                    fprintf('FocalSweep ready.\n');
                 end
             else
                 % An instance already exists, bring it to the front
                 try
                     figure(instance.gui.hFig);
-                catch ME
+                catch
                     % If bringing window to front fails, create a new instance
-                    warning('Failed to access existing instance: %s\nCreating new instance.', ME.message);
+                    if verbosity > 0
+                        fprintf('Creating new FocalSweep instance.\n');
+                    end
                     obj = core.FocalSweep('verbosity', verbosity);
                     instance = obj;
                 end

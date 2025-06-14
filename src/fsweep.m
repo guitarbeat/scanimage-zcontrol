@@ -15,6 +15,8 @@ function varargout = fsweep(varargin)
     % PARAMETERS:
     %   'forceNew'  - Force creation of a new instance (true/false)
     %                 Default: false
+    %   'verbosity' - Verbosity level (0=quiet, 1=normal, 2=debug)
+    %                 Default: 0
     %   'close'     - Close any existing instances (no value needed)
     %   'version'   - Display version information (no value needed)
     %
@@ -32,7 +34,7 @@ function varargout = fsweep(varargin)
     %   - Access to Motor Controls in ScanImage
     %
     % See also:
-    %   core.FocalSweep, core.FocalSweepFactory
+    %   core.FocalSweep, core.FocalSweepFactory, core.AppConfig
     
     % Copyright (C) 2023-2025
     % Version 1.1.0
@@ -54,9 +56,12 @@ function varargout = fsweep(varargin)
                 end
                 return;
             elseif strcmpi(varargin{1}, 'version')
+                % Display version information
+                core.AppConfig.showVersion();
+                
                 % Return version if output requested
                 if nargout > 0
-                    varargout{1} = FSWEEP_VERSION;
+                    varargout{1} = core.AppConfig.VERSION;
                 end
                 return;
             end
@@ -65,14 +70,16 @@ function varargout = fsweep(varargin)
         % Parse parameters
         p = inputParser;
         p.addParameter('forceNew', false, @islogical);
+        p.addParameter('verbosity', 0, @(x) isnumeric(x) && isscalar(x) && x >= 0);
         p.parse(varargin{:});
         
         % Use the factory to create or get an instance
         if exist('core.FocalSweepFactory', 'class')
-            fs = core.FocalSweepFactory.launch('forceNew', p.Results.forceNew);
+            fs = core.FocalSweepFactory.launch('forceNew', p.Results.forceNew, ...
+                                               'verbosity', p.Results.verbosity);
         else
             % Create a new instance directly if factory not available
-            fs = core.FocalSweep();
+            fs = core.FocalSweep('verbosity', p.Results.verbosity);
         end
         
         % Return the FocalSweep handle if requested
@@ -80,13 +87,14 @@ function varargout = fsweep(varargin)
             varargout{1} = fs;
         end
     catch ME
+        % Display error message
+        errMsg = sprintf('Error launching FocalSweep: %s', ME.message);
+        fprintf('%s\n', errMsg);
+        
         % Return empty if output requested
         if nargout > 0
             varargout{1} = [];
         end
-        
-        % Rethrow to let calling code handle it
-        rethrow(ME);
     end
 end
 
@@ -113,8 +121,10 @@ function closeInstances()
             end
         end
         
-        % Silently close instances without console output
-    catch
-        % Silently handle errors
+        if closedCount > 0
+            fprintf('Closed %d FocalSweep instance(s).\n', closedCount);
+        end
+    catch ME
+        fprintf('Error closing instances: %s\n', ME.message);
     end
 end 

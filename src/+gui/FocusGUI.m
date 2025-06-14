@@ -48,7 +48,7 @@ classdef FocusGUI < handle
                 % Create main figure
                 obj.hFig = uifigure('Name', 'Z-Control', ...
                     'Position', [100 100 300 200], ...
-                    'Color', [0.95 0.95 0.98], ...
+                    'Color', core.AppConfig.UI_COLORS.Background, ...
                     'CloseRequestFcn', @(src,event) obj.closeFigure());
                 
                 % Create main grid layout
@@ -89,15 +89,8 @@ classdef FocusGUI < handle
                     'Text', 'Ready', ...
                     'FontSize', 10);
                 
-                % Use a timer for updating status bar position instead of SizeChangedFcn
-                % This avoids the warning about SizeChangedFcn and AutoResizeChildren
-                t = timer('ExecutionMode', 'fixedRate', ...
-                          'Period', 0.5, ...
-                          'TimerFcn', @(~,~) obj.updateStatusBarPosition());
-                start(t);
-                
-                % Store the timer in a property so we can stop it when closing
-                obj.statusUpdateTimer = t;
+                % Create a timer for updating status bar position
+                gui.GUIUtils.createStatusUpdateTimer(obj, obj.hFig, obj.hStatusBar, obj.hStatusText);
                 
                 % Set up keyboard shortcuts
                 set(obj.hFig, 'KeyPressFcn', @(~,evt) obj.handleKeyPress(evt));
@@ -121,17 +114,17 @@ classdef FocusGUI < handle
                     % Currently active, so stop it
                     obj.controller.stopSIFocus();
                     obj.focusModeActive = false;
-                    obj.hFocusButton.Text = 'Focus';
+                    gui.GUIUtils.setUIProperty(obj.hFocusButton, 'Text', 'Focus');
                     obj.updateStatus('Focus mode stopped');
                 else
                     % Currently inactive, so start it
                     obj.controller.startSIFocus();
                     obj.focusModeActive = true;
-                    obj.hFocusButton.Text = 'Stop Focus';
+                    gui.GUIUtils.setUIProperty(obj.hFocusButton, 'Text', 'Stop Focus');
                     obj.updateStatus('Focus mode active');
                 end
             catch ME
-                obj.updateStatus(sprintf('Error toggling focus mode: %s', ME.message));
+                obj.updateStatus(sprintf('Error toggling focus mode: %s', ME.message), 'error');
             end
         end
         
@@ -141,7 +134,7 @@ classdef FocusGUI < handle
                 obj.controller.grabSIFrame();
                 obj.updateStatus('Grabbed frame');
             catch ME
-                obj.updateStatus(sprintf('Error grabbing frame: %s', ME.message));
+                obj.updateStatus(sprintf('Error grabbing frame: %s', ME.message), 'error');
             end
         end
         
@@ -162,15 +155,18 @@ classdef FocusGUI < handle
                 
                 obj.updateStatus('Operations aborted');
             catch ME
-                obj.updateStatus(sprintf('Error aborting operations: %s', ME.message));
+                obj.updateStatus(sprintf('Error aborting operations: %s', ME.message), 'error');
             end
         end
         
-        function updateStatus(obj, message)
-            % Update status text
+        function updateStatus(obj, message, messageType)
+            % Update status text with optional type-based styling
+            if nargin < 3
+                messageType = 'info';
+            end
+            
             try
-                obj.hStatusText.Text = message;
-                drawnow;
+                gui.GUIUtils.updateStatusBar(obj.hStatusBar, obj.hStatusText, message, messageType);
             catch
                 % Silently handle errors to prevent breaking the UI
             end
@@ -180,22 +176,28 @@ classdef FocusGUI < handle
             % Update the current Z position display
             try
                 currentZ = obj.controller.getZ();
-                obj.hCurrentZLabel.Text = sprintf('Current Z: %.2f', currentZ);
+                newText = sprintf('Current Z: %.2f', currentZ);
                 
                 % Update movement indicator
                 if obj.hasZData
                     if currentZ > obj.previousZValue
-                        obj.hCurrentZLabel.Text = [obj.hCurrentZLabel.Text ' ↑'];
+                        newText = [newText ' ↑'];
                     elseif currentZ < obj.previousZValue
-                        obj.hCurrentZLabel.Text = [obj.hCurrentZLabel.Text ' ↓'];
+                        newText = [newText ' ↓'];
                     end
                 end
                 
+                gui.GUIUtils.setUIProperty(obj.hCurrentZLabel, 'Text', newText);
                 obj.previousZValue = currentZ;
                 obj.hasZData = true;
             catch ME
-                warning('Error updating Z position: %s', ME.message);
+                obj.updateStatus(sprintf('Error updating Z position: %s', ME.message), 'warning');
             end
+        end
+        
+        function updatePlot(obj)
+            % Placeholder for updatePlot method - will be implemented later
+            % This stub exists to maintain API compatibility
         end
         
         function closeFigure(obj)
@@ -204,17 +206,17 @@ classdef FocusGUI < handle
                 % Stop any active operations
                 obj.abortOperation();
                 
-                % Stop and delete the status update timer
+                % Clean up the status update timer
                 core.CoreUtils.cleanupTimer(obj.statusUpdateTimer);
                 
                 % Close the figure
-                if isvalid(obj.hFig)
+                if ~isempty(obj.hFig) && isvalid(obj.hFig)
                     delete(obj.hFig);
                 end
             catch ME
                 warning('Error closing figure: %s', ME.message);
                 % Force close if needed
-                if isvalid(obj.hFig)
+                if ~isempty(obj.hFig) && isvalid(obj.hFig)
                     delete(obj.hFig);
                 end
             end
@@ -229,16 +231,6 @@ classdef FocusGUI < handle
                     obj.controller.moveZDown();
             end
         end
-        
-        function updateStatusBarPosition(obj)
-            % Update status bar position when figure is resized
-            if ~isempty(obj.hStatusBar) && isvalid(obj.hStatusBar)
-                obj.hStatusBar.Position = [0, 0, obj.hFig.Position(3), 24];
-                
-                if ~isempty(obj.hStatusText) && isvalid(obj.hStatusText)
-                    obj.hStatusText.Position = [10, 2, obj.hFig.Position(3)-20, 20];
-                end
-            end
-        end
     end
+end 
 end 

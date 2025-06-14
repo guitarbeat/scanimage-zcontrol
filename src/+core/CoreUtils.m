@@ -180,5 +180,109 @@ classdef CoreUtils
                 value = defaultValue;
             end
         end
+        
+        function validateNumericRange(value, minValue, maxValue, name)
+            % Validate that a numeric value is within a range
+            %
+            % Parameters:
+            %   value - Value to validate
+            %   minValue - Minimum allowed value
+            %   maxValue - Maximum allowed value
+            %   name - Name of the parameter (for error messages)
+            %
+            % Throws an error if validation fails
+            
+            if nargin < 4
+                name = 'Parameter';
+            end
+            
+            if ~isnumeric(value) || ~isscalar(value)
+                error('%s must be a numeric scalar', name);
+            end
+            
+            if value < minValue || value > maxValue
+                error('%s must be between %g and %g', name, minValue, maxValue);
+            end
+        end
+        
+        function result = tryMethod(obj, methodName, defaultResult, varargin)
+            % Try to call a method on an object, returning a default if it fails
+            %
+            % Parameters:
+            %   obj - Object to call method on
+            %   methodName - Name of method to call
+            %   defaultResult - Default result if method call fails
+            %   varargin - Arguments to pass to the method
+            %
+            % Returns:
+            %   result - Result of method call or default
+            
+            result = defaultResult;
+            
+            try
+                if isempty(obj)
+                    return;
+                end
+                
+                if ~isvalid(obj)
+                    return;
+                end
+                
+                if ~ismethod(obj, methodName)
+                    return;
+                end
+                
+                % Call the method
+                if nargin > 3
+                    result = obj.(methodName)(varargin{:});
+                else
+                    result = obj.(methodName)();
+                end
+            catch
+                % Return default result on any error
+                result = defaultResult;
+            end
+        end
+        
+        function logging(verbosity, minLevel, formatStr, varargin)
+            % Log a message with the given verbosity level
+            %
+            % Parameters:
+            %   verbosity - Current verbosity level
+            %   minLevel - Minimum level required to display this message
+            %   formatStr - Format string for the message
+            %   varargin - Arguments for the format string
+            
+            if verbosity >= minLevel
+                % Format the timestamp
+                timestamp = datestr(now, 'HH:MM:SS.FFF');
+                
+                % Create the message with timestamp prefix
+                fullMsg = sprintf('[%s] %s', timestamp, sprintf(formatStr, varargin{:}));
+                
+                % Display the message
+                disp(fullMsg);
+            end
+        end
+        
+        function obj = safeDelete(obj)
+            % Safely delete an object and set it to empty
+            %
+            % Parameters:
+            %   obj - Object to delete
+            %
+            % Returns:
+            %   obj - Empty array after deletion
+            
+            try
+                if ~isempty(obj) && isvalid(obj)
+                    delete(obj);
+                end
+            catch
+                % Silently ignore errors
+            end
+            
+            obj = [];
+        end
     end
 end 

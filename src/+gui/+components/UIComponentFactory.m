@@ -45,8 +45,8 @@ classdef UIComponentFactory < handle
                 title string
                 row
                 column
-                options.BackgroundColor = gui.components.UIComponentFactory.COLORS.Background
-                options.FontSize = gui.components.UIComponentFactory.FONTS.DefaultSize
+                options.BackgroundColor = core.AppConfig.UI_COLORS.Background
+                options.FontSize = core.AppConfig.UI_FONTS.DefaultSize
             end
             
             panel = uipanel(parent, ...
@@ -72,8 +72,8 @@ classdef UIComponentFactory < handle
                 column
                 options.Tooltip string = ""
                 options.FontWeight string = "bold"
-                options.FontSize = gui.components.UIComponentFactory.FONTS.DefaultSize
-                options.FontColor = gui.components.UIComponentFactory.COLORS.Text
+                options.FontSize = core.AppConfig.UI_FONTS.DefaultSize
+                options.FontColor = core.AppConfig.UI_COLORS.Text
                 options.HorizontalAlignment string = "left"
                 options.VerticalAlignment string = "center"
             end
@@ -107,8 +107,8 @@ classdef UIComponentFactory < handle
                 options.Value = 0
                 options.Format string = "%.1f"
                 options.Tooltip string = ""
-                options.FontSize = gui.components.UIComponentFactory.FONTS.DefaultSize
-                options.BackgroundColor = gui.components.UIComponentFactory.COLORS.Surface
+                options.FontSize = core.AppConfig.UI_FONTS.DefaultSize
+                options.BackgroundColor = core.AppConfig.UI_COLORS.Surface
                 options.Width = []
             end
             
@@ -146,7 +146,7 @@ classdef UIComponentFactory < handle
                 callback = [] % Make callback optional with empty default
                 options.Tooltip string = ""
                 options.BackgroundColor = [0.9 0.9 0.95]
-                options.FontSize = gui.components.UIComponentFactory.FONTS.DefaultSize
+                options.FontSize = core.AppConfig.UI_FONTS.DefaultSize
                 options.Enable string = "on"
                 options.Icon string = ""
                 options.Width = []
@@ -197,7 +197,7 @@ classdef UIComponentFactory < handle
                 parent
                 row
                 column
-                options.BackgroundColor = gui.components.UIComponentFactory.COLORS.Surface
+                options.BackgroundColor = core.AppConfig.UI_COLORS.Surface
                 options.BorderType string = "line"
             end
             
@@ -554,6 +554,86 @@ classdef UIComponentFactory < handle
             
             % Container is the same as panel in this simplified version
             container = panel;
+        end
+        
+        %% Helper function to create ZRangeSlider with version compatibility check
+        function rangeSlider = createZRangeSlider(grid, controller)
+            % Creates a Z range slider with min/max edit fields
+            % Falls back to separate min/max controls if range slider not available
+            
+            % Check if RangeSlider is available
+            hasRangeSlider = core.CoreUtils.hasAppDesignerFeature('rangeslider');
+            
+            if hasRangeSlider
+                % Create modern range slider
+                rangeLabel = gui.components.UIComponentFactory.createStyledLabel(grid, ...
+                    'Z Range:', 4, 1, ...
+                    'Tooltip', 'Z-scanning range limits');
+                
+                % Create the range slider control
+                rangeSlider = struct();
+                rs = uislider(grid, 'Range', 'on', ...
+                    'Limits', [-100 100], ...
+                    'Value', [-25 25], ...
+                    'MajorTicks', [-100 -50 0 50 100]);
+                rs.Layout.Row = 4;
+                rs.Layout.Column = 2;
+                
+                % Create min/max value display fields
+                minValuePanel = uipanel(grid, 'BorderType', 'none', ...
+                    'BackgroundColor', core.AppConfig.UI_COLORS.Background);
+                minValuePanel.Layout.Row = 5;
+                minValuePanel.Layout.Column = 1;
+                
+                maxValuePanel = uipanel(grid, 'BorderType', 'none', ...
+                    'BackgroundColor', core.AppConfig.UI_COLORS.Background);
+                maxValuePanel.Layout.Row = 5;
+                maxValuePanel.Layout.Column = 2;
+                
+                minVal = uieditfield(minValuePanel, 'numeric', ...
+                    'Value', -25, ...
+                    'ValueDisplayFormat', '%.1f', ...
+                    'HorizontalAlignment', 'center', ...
+                    'FontSize', core.AppConfig.UI_FONTS.SmallSize);
+                
+                maxVal = uieditfield(maxValuePanel, 'numeric', ...
+                    'Value', 25, ...
+                    'ValueDisplayFormat', '%.1f', ...
+                    'HorizontalAlignment', 'center', ...
+                    'FontSize', core.AppConfig.UI_FONTS.SmallSize);
+                
+                % Store components in the structure
+                rangeSlider.RangeSlider = rs;
+                rangeSlider.MinValueField = minVal;
+                rangeSlider.MaxValueField = maxVal;
+                rangeSlider.MinValuePanel = minValuePanel;
+                rangeSlider.MaxValuePanel = maxValuePanel;
+            else
+                % Fall back to separate min/max edit fields
+                minLabel = gui.components.UIComponentFactory.createStyledLabel(grid, ...
+                    'Min Z:', 4, 1, ...
+                    'Tooltip', 'Minimum Z position');
+                
+                minZEdit = gui.components.UIComponentFactory.createStyledEditField(grid, 4, 2, ...
+                    'Value', core.AppConfig.DEFAULT_RANGE_LOW, ...
+                    'Format', '%.1f', ...
+                    'Tooltip', 'Minimum Z position');
+                
+                maxLabel = gui.components.UIComponentFactory.createStyledLabel(grid, ...
+                    'Max Z:', 5, 1, ...
+                    'Tooltip', 'Maximum Z position');
+                
+                maxZEdit = gui.components.UIComponentFactory.createStyledEditField(grid, 5, 2, ...
+                    'Value', core.AppConfig.DEFAULT_RANGE_HIGH, ...
+                    'Format', '%.1f', ...
+                    'Tooltip', 'Maximum Z position');
+                
+                % Create struct to maintain consistent interface
+                rangeSlider = struct(...
+                    'RangeSlider', [], ...
+                    'MinValueField', minZEdit, ...
+                    'MaxValueField', maxZEdit);
+            end
         end
     end
 end

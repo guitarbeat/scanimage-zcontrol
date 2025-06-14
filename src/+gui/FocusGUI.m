@@ -44,14 +44,12 @@ classdef FocusGUI < handle
 
         function create(obj)
             % Create main figure and UI components using the factory pattern
-            fprintf('Creating minimal Z-Control GUI...\n');
-            
             try
                 % Create main figure
                 obj.hFig = uifigure('Name', 'Z-Control', ...
                     'Position', [100 100 300 200], ...
                     'Color', [0.95 0.95 0.98], ...
-                    'CloseRequestFcn', @(~,~) obj.closeFigure());
+                    'CloseRequestFcn', @(src,event) obj.closeFigure());
                 
                 % Create main grid layout
                 mainGrid = uigridlayout(obj.hFig, [3, 1]);
@@ -173,9 +171,8 @@ classdef FocusGUI < handle
             try
                 obj.hStatusText.Text = message;
                 drawnow;
-            catch ME
+            catch
                 % Silently handle errors to prevent breaking the UI
-                fprintf('Status update error: %s\n', ME.message);
             end
         end
         
@@ -208,17 +205,16 @@ classdef FocusGUI < handle
                 obj.abortOperation();
                 
                 % Stop and delete the status update timer
-                if ~isempty(obj.statusUpdateTimer) && isvalid(obj.statusUpdateTimer)
-                    stop(obj.statusUpdateTimer);
-                    delete(obj.statusUpdateTimer);
-                end
+                core.CoreUtils.cleanupTimer(obj.statusUpdateTimer);
                 
                 % Close the figure
-                delete(obj.hFig);
+                if isvalid(obj.hFig)
+                    delete(obj.hFig);
+                end
             catch ME
                 warning('Error closing figure: %s', ME.message);
                 % Force close if needed
-                if ishandle(obj.hFig)
+                if isvalid(obj.hFig)
                     delete(obj.hFig);
                 end
             end

@@ -28,9 +28,7 @@ classdef Initializer < handle
                 end
                 
                 if simMode
-                    if obj.verbosity > 1
-                        fprintf('Running in SIMULATION MODE - no ScanImage connection.\n');
-                    end
+                    % Silently run in simulation mode
                     % Create a simulated hSI structure in base workspace
                     evalin('base', ['hSI = struct(' ...
                         '''acqState'', struct(''acqState'', ''idle''), ' ...
@@ -60,10 +58,7 @@ classdef Initializer < handle
                     end
                 end
                 
-                % If in debug mode, print state but don't warn
-                if ~isIdle && obj.verbosity > 1
-                    fprintf('Debug: ScanImage is not idle, continuing initialization.\n');
-                end
+                % Silently continue if ScanImage is not idle
             catch
                 % Silently continue if we can't verify state
             end
@@ -73,9 +68,7 @@ classdef Initializer < handle
                 if isfield(hSI, 'hChannels')
                     channelsActive = hSI.hChannels.channelsActive;
                     if isempty(channelsActive) || ~ismember(1, channelsActive)
-                        if obj.verbosity > 1
-                            fprintf('Debug: Channel 1 not active, will use first available channel.\n');
-                        end
+                        % Silently use first available channel
                     end
                 end
             catch
@@ -86,9 +79,7 @@ classdef Initializer < handle
             try
                 if isfield(hSI, 'hDisplay')
                     if isempty(hSI.hDisplay) || ~isfield(hSI.hDisplay, 'lastAveragedFrame') || isempty(hSI.hDisplay.lastAveragedFrame)
-                        if obj.verbosity > 1
-                            fprintf('Debug: Display not fully initialized, will initialize when acquisition starts.\n');
-                        end
+                        % Silently continue if display not initialized
                     end
                 end
             catch

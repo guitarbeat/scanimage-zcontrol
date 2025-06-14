@@ -50,8 +50,7 @@ classdef ZScanner < handle
         function stop(obj)
             % Stop Z-scanning
             if obj.isScanning
-                stop(obj.scanTimer);
-                delete(obj.scanTimer);
+                core.CoreUtils.cleanupTimer(obj.scanTimer);
                 obj.isScanning = false;
                 obj.controller.updateStatus('Scan stopped. Ready to move to max brightness.');
             end
@@ -150,13 +149,15 @@ classdef ZScanner < handle
                             % Default value if all else fails
                             z = 0;
                         end
-                    catch
-                        % Default value if all else fails
+                    catch ME
+                        % Log the error but return a default value
+                        obj.handleError(ME, 'get Z from controller');
                         z = 0;
                     end
                 end
-            catch
-                % Return a default value if all else fails
+            catch ME
+                % Log the error but return a default value
+                obj.handleError(ME, 'get Z position');
                 z = 0;
             end
         end
@@ -201,7 +202,10 @@ classdef ZScanner < handle
                         val = Inf;
                     end
                 end
-            catch
+            catch ME
+                % Log the error but return a sensible default
+                obj.handleError(ME, sprintf('get %s Z limit', which));
+                
                 % Return infinity if we can't get the actual limit
                 if strcmpi(which, 'min')
                     val = -Inf;

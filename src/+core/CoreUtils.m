@@ -32,7 +32,7 @@ classdef CoreUtils
             % Build error message
             errMsg = sprintf('%s: %s', prefix, ME.message);
             
-            % Display error in console based on verbosity
+            % Only display errors in console with verbosity > 1
             verbosity = 0;
             try
                 if isfield(controller, 'verbosity')
@@ -42,11 +42,8 @@ classdef CoreUtils
                 % If we can't get verbosity, default to minimal output
             end
             
-            if verbosity > 0
-                fprintf('%s\n', errMsg);
-                if verbosity > 1
-                    disp(getReport(ME));
-                end
+            if verbosity > 1
+                disp(getReport(ME));
             end
             
             % Update GUI status if available
@@ -61,7 +58,7 @@ classdef CoreUtils
         
         function updateStatus(controller, message, varargin)
             % Update status text in the GUI
-            % Only display console message with verbosity > 0
+            % Only display console message with verbosity > 1
             verbosity = 0;
             try
                 if isfield(controller, 'verbosity')
@@ -69,10 +66,6 @@ classdef CoreUtils
                 end
             catch
                 % If we can't get verbosity, default to minimal output
-            end
-            
-            if verbosity > 0
-                fprintf('%s\n', message);
             end
             
             % Only update GUI if it's initialized
@@ -83,6 +76,108 @@ classdef CoreUtils
                 catch
                     % Silently ignore errors when updating GUI
                 end
+            end
+        end
+        
+        function cleanupTimer(timerObj)
+            % Safely clean up a timer object
+            % 
+            % Parameters:
+            %   timerObj - Timer object to clean up
+            
+            try
+                if ~isempty(timerObj) && isvalid(timerObj)
+                    if strcmp(timerObj.Running, 'on')
+                        stop(timerObj);
+                    end
+                    delete(timerObj);
+                end
+            catch ME
+                warning('Error cleaning up timer: %s', ME.message);
+            end
+        end
+        
+        function hasFeature = hasAppDesignerFeature(featureName)
+            % Check if a specific App Designer feature is available
+            % 
+            % Parameters:
+            %   featureName - Name of the feature to check (e.g., 'RangeSlider')
+            %
+            % Returns:
+            %   hasFeature - True if the feature is available
+            
+            % Check MATLAB version first
+            hasFeature = false;
+            
+            switch lower(featureName)
+                case 'rangeslider'
+                    % RangeSlider was introduced in R2020b (9.9)
+                    hasFeature = ~verLessThan('matlab', '9.9');
+                case 'statebutton'
+                    % StateButton was introduced in R2019b (9.7)
+                    hasFeature = ~verLessThan('matlab', '9.7');
+                case 'buttongroup'
+                    % ButtonGroup was introduced in R2019a (9.6)
+                    hasFeature = ~verLessThan('matlab', '9.6');
+                case 'treeview'
+                    % TreeView was introduced in R2020a (9.8)
+                    hasFeature = ~verLessThan('matlab', '9.8');
+                otherwise
+                    % Default to checking MATLAB version
+                    hasFeature = ~verLessThan('matlab', '9.6'); % R2019a or newer
+            end
+            
+            % Additional check - try to create the component
+            if hasFeature
+                try
+                    % Create a temporary figure for testing
+                    f = uifigure('Visible', 'off');
+                    
+                    % Try to create the component
+                    switch lower(featureName)
+                        case 'rangeslider'
+                            uislider(f, 'Range', 'on');
+                        case 'statebutton'
+                            uibutton(f, 'state');
+                        case 'buttongroup'
+                            uibuttongroup(f);
+                        case 'treeview'
+                            uitree(f);
+                    end
+                    
+                    % If we got here, the component exists
+                    delete(f);
+                catch
+                    % Component creation failed
+                    hasFeature = false;
+                    
+                    % Clean up
+                    if exist('f', 'var') && isvalid(f)
+                        delete(f);
+                    end
+                end
+            end
+        end
+        
+        function value = validateParameter(value, defaultValue, validationFcn)
+            % Validate a parameter value with a validation function
+            % 
+            % Parameters:
+            %   value - Value to validate
+            %   defaultValue - Default value to use if validation fails
+            %   validationFcn - Function handle for validation
+            %
+            % Returns:
+            %   value - Validated value or default
+            
+            try
+                % Check if the validation function passes
+                if isempty(value) || ~validationFcn(value)
+                    value = defaultValue;
+                end
+            catch
+                % If any error occurs during validation, use default
+                value = defaultValue;
             end
         end
     end

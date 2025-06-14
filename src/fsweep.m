@@ -54,9 +54,6 @@ function varargout = fsweep(varargin)
                 end
                 return;
             elseif strcmpi(varargin{1}, 'version')
-                % Display version information
-                fprintf('FocalSweep Z-Control version %s (%s)\n', FSWEEP_VERSION, FSWEEP_DATE);
-                
                 % Return version if output requested
                 if nargout > 0
                     varargout{1} = FSWEEP_VERSION;
@@ -116,9 +113,7 @@ function closeInstances()
             end
         end
         
-        if closedCount > 0
-            fprintf('FocalSweep: %d instance(s) closed.\n', closedCount);
-        end
+        % Silently close instances without console output
     catch
         % Silently handle errors
     end

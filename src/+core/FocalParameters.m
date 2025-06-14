@@ -48,18 +48,18 @@ classdef FocalParameters < handle
             p = inputParser;
             p.KeepUnmatched = true;
             
-            % Define parameters with validation
-            p.addParameter('stepSize', obj.stepSize, @isnumeric);
-            p.addParameter('initialStepSize', obj.initialStepSize, @isnumeric);
-            p.addParameter('scanPauseTime', obj.scanPauseTime, @isnumeric);
-            p.addParameter('rangeLow', obj.rangeLow, @isnumeric);
-            p.addParameter('rangeHigh', obj.rangeHigh, @isnumeric);
-            p.addParameter('smoothingWindow', obj.smoothingWindow, @isnumeric);
-            p.addParameter('autoUpdateFrequency', obj.autoUpdateFrequency, @isnumeric);
-            p.addParameter('maxPoints', obj.maxPoints, @isnumeric);
-            p.addParameter('defaultMetric', obj.defaultMetric, @isnumeric);
-            p.addParameter('averageTimeWindow', obj.averageTimeWindow, @isnumeric);
-            p.addParameter('monitoringTimerPeriod', obj.monitoringTimerPeriod, @isnumeric);
+            % Define parameters with more specific validation
+            p.addParameter('stepSize', obj.stepSize, @(x) isnumeric(x) && isscalar(x) && x > 0);
+            p.addParameter('initialStepSize', obj.initialStepSize, @(x) isnumeric(x) && isscalar(x) && x > 0);
+            p.addParameter('scanPauseTime', obj.scanPauseTime, @(x) isnumeric(x) && isscalar(x) && x >= 0);
+            p.addParameter('rangeLow', obj.rangeLow, @(x) isnumeric(x) && isscalar(x));
+            p.addParameter('rangeHigh', obj.rangeHigh, @(x) isnumeric(x) && isscalar(x));
+            p.addParameter('smoothingWindow', obj.smoothingWindow, @(x) isnumeric(x) && isscalar(x) && x > 0 && mod(x,1) == 0);
+            p.addParameter('autoUpdateFrequency', obj.autoUpdateFrequency, @(x) isnumeric(x) && isscalar(x) && x > 0);
+            p.addParameter('maxPoints', obj.maxPoints, @(x) isnumeric(x) && isscalar(x) && x > 0 && mod(x,1) == 0);
+            p.addParameter('defaultMetric', obj.defaultMetric, @(x) isnumeric(x) && isscalar(x) && x > 0 && mod(x,1) == 0);
+            p.addParameter('averageTimeWindow', obj.averageTimeWindow, @(x) isnumeric(x) && isscalar(x) && x > 0);
+            p.addParameter('monitoringTimerPeriod', obj.monitoringTimerPeriod, @(x) isnumeric(x) && isscalar(x) && x > 0);
             
             % Parse parameters
             p.parse(varargin{:});

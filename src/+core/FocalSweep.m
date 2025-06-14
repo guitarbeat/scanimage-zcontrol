@@ -78,9 +78,6 @@ classdef FocalSweep < core.MotorGUI_ZControl
                 obj.initializeComponents();
                 obj.isInitialized = true;
             catch ME
-                % Cleanup on failure
-                    fprintf('Error during initialization: %s\n', ME.message);
-                
                 % Try to clean up
                 obj.cleanupOnError();
                 
@@ -102,8 +99,6 @@ classdef FocalSweep < core.MotorGUI_ZControl
             end
             
             if obj.simulationMode
-                    fprintf('Creating simulated ScanImage handle...\n');
-                
                 % Create a simulated hSI structure in base workspace
                 evalin('base', ['hSI = struct(' ...
                     '''acqState'', struct(''acqState'', ''idle''), ' ...
@@ -115,20 +110,16 @@ classdef FocalSweep < core.MotorGUI_ZControl
                 
                 % Get the simulated handle
                 obj.hSI = evalin('base', 'hSI');
-                
-                    fprintf('Simulated ScanImage handle created.\n');
             else
                 % Validate ScanImage environment for real usage
                 initializer.validateScanImageEnvironment();
                 
                 % Get ScanImage handle
-                    fprintf('Getting ScanImage handle...\n');
                 try
                     obj.hSI = evalin('base', 'hSI');
                     if ~isobject(obj.hSI)
                         error('hSI is not a valid object');
                     end
-                        fprintf('ScanImage handle acquired.\n');
                 catch ME
                     error('Failed to access ScanImage handle. Make sure ScanImage is running.');
                 end
@@ -158,7 +149,6 @@ classdef FocalSweep < core.MotorGUI_ZControl
         end
         
         function createScanner(obj)
-                fprintf('Creating scanner component...\n');
             try
                 obj.scanner = scan.ZScanner(obj);
             catch ME
@@ -167,13 +157,11 @@ classdef FocalSweep < core.MotorGUI_ZControl
         end
         
         function initializeOtherComponents(obj)
-                fprintf('Initializing components...\n');
             initializer = core.Initializer(obj);
             initializer.initializeComponents();
         end
         
         function createGUI(obj)
-                fprintf('Creating GUI...\n');
             try
                 % Create the modern FocusGUI interface
                 obj.gui = gui.FocusGUI(obj);

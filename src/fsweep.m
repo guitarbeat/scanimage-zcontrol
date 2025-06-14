@@ -13,8 +13,6 @@ function varargout = fsweep(varargin)
     %   fs = fsweep(...)          % Return the FocalSweep instance
     %
     % PARAMETERS:
-    %   'verbosity' - Level of output messages (0=quiet, 1=normal, 2=debug)
-    %                 Default: 0
     %   'forceNew'  - Force creation of a new instance (true/false)
     %                 Default: false
     %   'close'     - Close any existing instances (no value needed)
@@ -25,7 +23,6 @@ function varargout = fsweep(varargin)
     %
     % EXAMPLES:
     %   fsweep                       % Launch with default settings
-    %   fsweep('verbosity', 2)       % Launch with debug messages
     %   fs = fsweep('forceNew', true) % Force new instance and get handle
     %   fsweep('close')              % Close any existing instances
     %   fsweep('version')            % Display version information
@@ -68,18 +65,17 @@ function varargout = fsweep(varargin)
             end
         end
         
-        % Parse parameters - default to quiet mode (verbosity=0)
+        % Parse parameters
         p = inputParser;
-        p.addParameter('verbosity', 0, @isnumeric);
         p.addParameter('forceNew', false, @islogical);
         p.parse(varargin{:});
         
         % Use the factory to create or get an instance
         if exist('core.FocalSweepFactory', 'class')
-            fs = core.FocalSweepFactory.launch('verbosity', p.Results.verbosity, 'forceNew', p.Results.forceNew);
+            fs = core.FocalSweepFactory.launch('forceNew', p.Results.forceNew);
         else
             % Create a new instance directly if factory not available
-            fs = core.FocalSweep('verbosity', p.Results.verbosity);
+            fs = core.FocalSweep();
         end
         
         % Return the FocalSweep handle if requested
@@ -87,11 +83,6 @@ function varargout = fsweep(varargin)
             varargout{1} = fs;
         end
     catch ME
-        % Handle errors with minimal output
-        if p.Results.verbosity > 0
-            fprintf('Error: %s\n', ME.message);
-        end
-        
         % Return empty if output requested
         if nargout > 0
             varargout{1} = [];

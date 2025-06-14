@@ -1,5 +1,5 @@
 classdef ControllerInterface < handle
-    % ControllerInterface - Abstract interface for controller implementations
+    % ControllerInterface - Minimal interface for controller implementations
     % Provides a standard interface that UI components can depend on
     % without tight coupling to specific controller implementation
     
@@ -8,18 +8,11 @@ classdef ControllerInterface < handle
         z = getZ(obj)
         moveZUp(obj)
         moveZDown(obj)
-        setZ(obj, position)
         
-        % Scanning control
-        toggleZScan(obj, enable, varargin)
-        toggleMonitor(obj, enable)
-        moveToMaxBrightness(obj)
-        
-        % Limits and parameters
-        limit = getZLimit(obj, which)  % which: 'min' or 'max'
-        setMinZLimit(obj, value)
-        setMaxZLimit(obj, value)
-        updateStepSizeImmediate(obj, value)
+        % ScanImage control
+        startSIFocus(obj)
+        stopSIFocus(obj)
+        grabSIFrame(obj)
         
         % Operations
         abortAllOperations(obj)

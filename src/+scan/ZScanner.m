@@ -128,6 +128,65 @@ classdef ZScanner < handle
             obj.moveZ(-1, stepSize);
         end
 
+        function z = getZ(obj)
+            % Get current Z position
+            try
+                % In simulation mode, use a simulated Z position
+                if isfield(obj.controller, 'simulationMode') && obj.controller.simulationMode
+                    % If we have a stored Z position, return it
+                    if isfield(obj, 'scanCurrentZ') && ~isempty(obj.scanCurrentZ)
+                        z = obj.scanCurrentZ;
+                    else
+                        % Otherwise return a default value
+                        z = 50; % Default simulated Z position
+                    end
+                else
+                    % In real mode, try to get Z from ScanImage
+                    try
+                        % Try to get Z from controller if it has a getZ method
+                        if ismethod(obj.controller, 'getZ')
+                            z = obj.controller.getZ();
+                        else
+                            % Default value if all else fails
+                            z = 0;
+                        end
+                    catch
+                        % Default value if all else fails
+                        z = 0;
+                    end
+                end
+            catch
+                % Return a default value if all else fails
+                z = 0;
+            end
+        end
+        
+        function moveToZ(obj, zPosition)
+            % Move to a specific Z position
+            try
+                % Store the target position
+                obj.scanCurrentZ = zPosition;
+                
+                % In simulation mode, just update the stored position
+                if isfield(obj.controller, 'simulationMode') && obj.controller.simulationMode
+                    % Update position display
+                    obj.controller.updateZPosition();
+                    obj.controller.updateStatus(sprintf('Moved to Z: %.2f', zPosition));
+                else
+                    % In real mode, use controller's absoluteMove if available
+                    if ismethod(obj.controller, 'absoluteMove')
+                        obj.controller.absoluteMove(zPosition);
+                    end
+                    
+                    % Update position display
+                    obj.controller.updateZPosition();
+                    obj.controller.updateStatus(sprintf('Moved to Z: %.2f', zPosition));
+                end
+            catch ME
+                obj.handleError(ME, 'move to Z position');
+            end
+        end
+
         function val = getZLimit(obj, which)
             % Get Z min or max limit from motor controls
             try

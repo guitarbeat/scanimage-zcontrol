@@ -16,6 +16,15 @@ classdef FocusGUI < handle
         hCurrentZLabel
         hStatusText
         hStatusBar
+        
+        % Parameter controls
+        stepSizeSpinner
+        initialStepSizeSpinner
+        scanPauseTimeSpinner
+        rangeLowSpinner
+        rangeHighSpinner
+        smoothingWindowSpinner
+        autoUpdateFreqSpinner
     end
 
     properties (Access = private)
@@ -29,17 +38,18 @@ classdef FocusGUI < handle
 
         function create(obj)
             obj.hFig = uifigure('Name', 'FocalSweep Z-Control', ...
-                'Position', [100, 100, 320, 400], ...
+                'Position', [100, 100, 400, 600], ...
                 'Color', obj.UI_COLORS.Background, ...
                 'CloseRequestFcn', @(~,~) obj.closeFigure(), ...
                 'KeyPressFcn', @(~,evt) obj.handleKeyPress(evt));
 
-            mainGrid = uigridlayout(obj.hFig, [3,1]);
-            mainGrid.RowHeight = {'fit', 'fit', '1x'};
+            mainGrid = uigridlayout(obj.hFig, [4,1]);
+            mainGrid.RowHeight = {'fit', 'fit', '1x', 'fit'};
             mainGrid.Padding = [10, 10, 10, 10];
 
             obj.createZControls(mainGrid);
             obj.createSIControls(mainGrid);
+            obj.createParameterControls(mainGrid);
             obj.createStatusBar();
 
             obj.updateStatus('Ready');
@@ -98,9 +108,55 @@ classdef FocusGUI < handle
             grid = uigridlayout(panel, [1,3]);
             grid.ColumnWidth = {'1x', '1x', '1x'};
 
-            uibutton(grid, 'Text', 'Focus', 'ButtonPushedFcn', @(~,~) obj.controller.startSIFocus());
-            uibutton(grid, 'Text', 'Grab', 'ButtonPushedFcn', @(~,~) obj.controller.grabSIFrame());
+            uibutton(grid, 'Text', 'Focus', 'ButtonPushedFcn', @(~,~) obj.startSIFocus());
+            uibutton(grid, 'Text', 'Grab', 'ButtonPushedFcn', @(~,~) obj.grabSIFrame());
             uibutton(grid, 'Text', 'Abort', 'ButtonPushedFcn', @(~,~) obj.controller.abortAllOperations());
+        end
+
+        function createParameterControls(obj, parent)
+            panel = uipanel(parent, 'Title', 'Parameters', ...
+                'BackgroundColor', obj.UI_COLORS.Background, ...
+                'FontWeight', 'bold');
+            
+            grid = uigridlayout(panel, [7,2]);
+            grid.RowHeight = repmat({'fit'}, 1, 7);
+            grid.ColumnWidth = {'fit', '1x'};
+            grid.Padding = [10 10 10 10];
+            
+            % Step Size
+            uilabel(grid, 'Text', 'Step Size (µm):', 'HorizontalAlignment', 'right');
+            obj.stepSizeSpinner = uispinner(grid, 'Value', obj.controller.stepSize, ...
+                'Limits', [0.1 100], 'ValueChangedFcn', @(src,~) obj.updateStepSize(src.Value));
+            
+            % Initial Step Size
+            uilabel(grid, 'Text', 'Initial Step Size (µm):', 'HorizontalAlignment', 'right');
+            obj.initialStepSizeSpinner = uispinner(grid, 'Value', obj.controller.initialStepSize, ...
+                'Limits', [1 200], 'ValueChangedFcn', @(src,~) obj.updateParameter('initialStepSize', src.Value));
+            
+            % Scan Pause Time
+            uilabel(grid, 'Text', 'Scan Pause Time (s):', 'HorizontalAlignment', 'right');
+            obj.scanPauseTimeSpinner = uispinner(grid, 'Value', obj.controller.scanPauseTime, ...
+                'Limits', [0.05 5], 'Step', 0.05, 'ValueChangedFcn', @(src,~) obj.updateParameter('scanPauseTime', src.Value));
+            
+            % Range Low
+            uilabel(grid, 'Text', 'Range Low (µm):', 'HorizontalAlignment', 'right');
+            obj.rangeLowSpinner = uispinner(grid, 'Value', obj.controller.rangeLow, ...
+                'Limits', [-1000 0], 'ValueChangedFcn', @(src,~) obj.updateParameter('rangeLow', src.Value));
+            
+            % Range High
+            uilabel(grid, 'Text', 'Range High (µm):', 'HorizontalAlignment', 'right');
+            obj.rangeHighSpinner = uispinner(grid, 'Value', obj.controller.rangeHigh, ...
+                'Limits', [0 1000], 'ValueChangedFcn', @(src,~) obj.updateParameter('rangeHigh', src.Value));
+            
+            % Smoothing Window
+            uilabel(grid, 'Text', 'Smoothing Window:', 'HorizontalAlignment', 'right');
+            obj.smoothingWindowSpinner = uispinner(grid, 'Value', obj.controller.smoothingWindow, ...
+                'Limits', [0 10], 'Step', 1, 'ValueChangedFcn', @(src,~) obj.updateParameter('smoothingWindow', src.Value));
+            
+            % Auto Update Frequency
+            uilabel(grid, 'Text', 'Auto Update (Hz):', 'HorizontalAlignment', 'right');
+            obj.autoUpdateFreqSpinner = uispinner(grid, 'Value', obj.controller.autoUpdateFrequency, ...
+                'Limits', [0.1 10], 'Step', 0.1, 'ValueChangedFcn', @(src,~) obj.updateParameter('autoUpdateFrequency', src.Value));
         end
 
         function createStatusBar(obj)
@@ -118,6 +174,41 @@ classdef FocusGUI < handle
         function handleKeyPress(obj, evt)
             if strcmp(evt.Key, 'uparrow'), obj.controller.moveZUp(); end
             if strcmp(evt.Key, 'downarrow'), obj.controller.moveZDown(); end
+        end
+        
+        function updateStepSize(obj, value)
+            obj.controller.stepSize = value;
+            obj.updateStatus(sprintf('Step size set to %.2f µm', value), 'success');
+        end
+        
+        function updateParameter(obj, paramName, value)
+            obj.controller.updateParameters(struct(paramName, value));
+        end
+        
+        function startSIFocus(obj)
+            try
+                if obj.controller.simulationMode
+                    obj.updateStatus('Focus mode activated (simulation)', 'info');
+                else
+                    obj.controller.hSI.startFocus();
+                    obj.updateStatus('Focus mode activated', 'success');
+                end
+            catch e
+                obj.updateStatus(['Error starting focus mode: ' e.message], 'error');
+            end
+        end
+        
+        function grabSIFrame(obj)
+            try
+                if obj.controller.simulationMode
+                    obj.updateStatus('Frame grabbed (simulation)', 'info');
+                else
+                    obj.controller.hSI.startGrab();
+                    obj.updateStatus('Frame grabbed successfully', 'success');
+                end
+            catch e
+                obj.updateStatus(['Error grabbing frame: ' e.message], 'error');
+            end
         end
     end
 end

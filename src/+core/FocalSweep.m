@@ -215,6 +215,51 @@ classdef FocalSweep < core.MotorGUI_ZControl
             end
         end
         
+        function moveZUp(obj, stepSize)
+            % Move Z stage up
+            if nargin < 2
+                stepSize = 10; % Default step size
+            end
+            
+            % Use scanner to move Z up
+            if ~isempty(obj.scanner)
+                try
+                    currentZ = obj.getZ();
+                    obj.scanner.moveToZ(currentZ + stepSize);
+                    obj.updateZPosition();
+                catch ME
+                    warning('Error moving Z up: %s', ME.message);
+                end
+            end
+        end
+        
+        function moveZDown(obj, stepSize)
+            % Move Z stage down
+            if nargin < 2
+                stepSize = 10; % Default step size
+            end
+            
+            % Use scanner to move Z down
+            if ~isempty(obj.scanner)
+                try
+                    currentZ = obj.getZ();
+                    obj.scanner.moveToZ(currentZ - stepSize);
+                    obj.updateZPosition();
+                catch ME
+                    warning('Error moving Z down: %s', ME.message);
+                end
+            end
+        end
+        
+        function z = getZ(obj)
+            % Get current Z position
+            if ~isempty(obj.scanner)
+                z = obj.scanner.getZ();
+            else
+                z = 0;
+            end
+        end
+        
         function startScan(obj)
             % Start the Z-scan process
             if ~obj.isRunning

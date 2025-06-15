@@ -43,14 +43,15 @@ classdef FocusGUI < handle
                 'CloseRequestFcn', @(~,~) obj.closeFigure(), ...
                 'KeyPressFcn', @(~,evt) obj.handleKeyPress(evt));
 
-            mainGrid = uigridlayout(obj.hFig, [4,1]);
-            mainGrid.RowHeight = {'fit', 'fit', '1x', 'fit'};
+            mainGrid = uigridlayout(obj.hFig, [5,1]);
+            mainGrid.RowHeight = {'fit', 'fit', '1x', 'fit', 25};
             mainGrid.Padding = [10, 10, 10, 10];
+            mainGrid.RowSpacing = 10;
 
             obj.createZControls(mainGrid);
             obj.createSIControls(mainGrid);
             obj.createParameterControls(mainGrid);
-            obj.createStatusBar();
+            obj.createStatusBar(mainGrid);
 
             obj.updateStatus('Ready');
         end
@@ -125,52 +126,63 @@ classdef FocusGUI < handle
             
             % Step Size
             uilabel(grid, 'Text', 'Step Size (µm):', 'HorizontalAlignment', 'right');
-            obj.stepSizeSpinner = uispinner(grid, 'Value', obj.controller.stepSize, ...
+            stepSize = obj.getValidValue('stepSize', obj.controller.DEFAULT_STEP_SIZE);
+            obj.stepSizeSpinner = uispinner(grid, 'Value', stepSize, ...
                 'Limits', [0.1 100], 'ValueChangedFcn', @(src,~) obj.updateStepSize(src.Value));
             
             % Initial Step Size
             uilabel(grid, 'Text', 'Initial Step Size (µm):', 'HorizontalAlignment', 'right');
-            obj.initialStepSizeSpinner = uispinner(grid, 'Value', obj.controller.initialStepSize, ...
+            initialStepSize = obj.getValidValue('initialStepSize', obj.controller.DEFAULT_INITIAL_STEP_SIZE);
+            obj.initialStepSizeSpinner = uispinner(grid, 'Value', initialStepSize, ...
                 'Limits', [1 200], 'ValueChangedFcn', @(src,~) obj.updateParameter('initialStepSize', src.Value));
             
             % Scan Pause Time
             uilabel(grid, 'Text', 'Scan Pause Time (s):', 'HorizontalAlignment', 'right');
-            obj.scanPauseTimeSpinner = uispinner(grid, 'Value', obj.controller.scanPauseTime, ...
+            scanPauseTime = obj.getValidValue('scanPauseTime', obj.controller.DEFAULT_SCAN_PAUSE_TIME);
+            obj.scanPauseTimeSpinner = uispinner(grid, 'Value', scanPauseTime, ...
                 'Limits', [0.05 5], 'Step', 0.05, 'ValueChangedFcn', @(src,~) obj.updateParameter('scanPauseTime', src.Value));
             
             % Range Low
             uilabel(grid, 'Text', 'Range Low (µm):', 'HorizontalAlignment', 'right');
-            obj.rangeLowSpinner = uispinner(grid, 'Value', obj.controller.rangeLow, ...
+            rangeLow = obj.getValidValue('rangeLow', obj.controller.DEFAULT_RANGE_LOW);
+            obj.rangeLowSpinner = uispinner(grid, 'Value', rangeLow, ...
                 'Limits', [-1000 0], 'ValueChangedFcn', @(src,~) obj.updateParameter('rangeLow', src.Value));
             
             % Range High
             uilabel(grid, 'Text', 'Range High (µm):', 'HorizontalAlignment', 'right');
-            obj.rangeHighSpinner = uispinner(grid, 'Value', obj.controller.rangeHigh, ...
+            rangeHigh = obj.getValidValue('rangeHigh', obj.controller.DEFAULT_RANGE_HIGH);
+            obj.rangeHighSpinner = uispinner(grid, 'Value', rangeHigh, ...
                 'Limits', [0 1000], 'ValueChangedFcn', @(src,~) obj.updateParameter('rangeHigh', src.Value));
             
             % Smoothing Window
             uilabel(grid, 'Text', 'Smoothing Window:', 'HorizontalAlignment', 'right');
-            obj.smoothingWindowSpinner = uispinner(grid, 'Value', obj.controller.smoothingWindow, ...
+            smoothingWindow = obj.getValidValue('smoothingWindow', obj.controller.DEFAULT_SMOOTHING_WINDOW);
+            obj.smoothingWindowSpinner = uispinner(grid, 'Value', smoothingWindow, ...
                 'Limits', [0 10], 'Step', 1, 'ValueChangedFcn', @(src,~) obj.updateParameter('smoothingWindow', src.Value));
             
             % Auto Update Frequency
             uilabel(grid, 'Text', 'Auto Update (Hz):', 'HorizontalAlignment', 'right');
-            obj.autoUpdateFreqSpinner = uispinner(grid, 'Value', obj.controller.autoUpdateFrequency, ...
+            autoUpdateFreq = obj.getValidValue('autoUpdateFrequency', obj.controller.DEFAULT_AUTO_UPDATE_FREQUENCY);
+            obj.autoUpdateFreqSpinner = uispinner(grid, 'Value', autoUpdateFreq, ...
                 'Limits', [0.1 10], 'Step', 0.1, 'ValueChangedFcn', @(src,~) obj.updateParameter('autoUpdateFrequency', src.Value));
         end
-
-        function createStatusBar(obj)
-            obj.hStatusBar = uipanel(obj.hFig, 'Position', [0, 0, obj.hFig.Position(3), 25], ...
-                'BackgroundColor', [0.9, 0.9, 0.95]);
-            obj.hStatusText = uilabel(obj.hStatusBar, 'Position', [10, 5, obj.hFig.Position(3)-20, 15]);
-            obj.hFig.SizeChangedFcn = @(~,~) obj.resizeStatusBar();
+        
+        function value = getValidValue(obj, propName, defaultVal)
+            % Helper function to get valid value or default
+            if isprop(obj.controller, propName) && ~isempty(obj.controller.(propName))
+                value = obj.controller.(propName);
+            else
+                value = defaultVal;
+            end
         end
 
-        function resizeStatusBar(obj)
-            obj.hStatusBar.Position(3) = obj.hFig.Position(3);
-            obj.hStatusText.Position(3) = obj.hFig.Position(3) - 20;
+        function createStatusBar(obj, parent)
+            obj.hStatusBar = uipanel(parent, 'BackgroundColor', [0.9, 0.9, 0.95], 'BorderType', 'none');
+            statusGrid = uigridlayout(obj.hStatusBar, [1,1]);
+            statusGrid.Padding = [5 0 5 0];
+            obj.hStatusText = uilabel(statusGrid, 'Text', '');
         end
-
+        
         function handleKeyPress(obj, evt)
             if strcmp(evt.Key, 'uparrow'), obj.controller.moveZUp(); end
             if strcmp(evt.Key, 'downarrow'), obj.controller.moveZDown(); end

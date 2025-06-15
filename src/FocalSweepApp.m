@@ -90,19 +90,46 @@ classdef FocalSweepApp < handle
         end
 
         function checkSimulationMode(obj)
-            obj.simulationMode = evalin('base', 'exist(''SIM_MODE'', ''var'') && SIM_MODE');
+            try
+                obj.simulationMode = evalin('base', 'exist(''SIM_MODE'', ''var'') && SIM_MODE');
+            catch
+                % If we can't check for SIM_MODE, default to simulation mode
+                obj.simulationMode = true;
+                assignin('base', 'SIM_MODE', true);
+                obj.log(1, 'SIM_MODE not found, defaulting to simulation mode.');
+            end
         end
 
         function initializeSI(obj)
             if obj.simulationMode
                 obj.log(1, 'Simulation mode active.');
-                obj.hSI = evalin('base', 'hSI');
+                % Create a simple simulation structure with required functions
+                obj.hSI = struct();
+                obj.hSI.startFocus = @() obj.log(1, 'Simulated: Focus started');
+                obj.hSI.startGrab = @() obj.log(1, 'Simulated: Frame grabbed');
+                obj.hSI.abort = @() obj.log(1, 'Simulated: Operation aborted');
                 return;
             end
-
-            if ~evalin('base', 'exist(''hSI'', ''var'') && isobject(hSI)')
-                error('ScanImage must be running with valid hSI.');
+            
+            % Check if hSI exists and is an object
+            siExists = evalin('base', 'exist(''hSI'', ''var'')');
+            if ~siExists
+                obj.log(1, 'ScanImage not running, switching to simulation mode.');
+                obj.simulationMode = true;
+                obj.initializeSI(); % Recursive call to set up simulation
+                return;
             end
+            
+            % Now check if it's a valid object
+            isValidSI = evalin('base', 'isobject(hSI)');
+            if ~isValidSI
+                obj.log(1, 'hSI is not a valid object, switching to simulation mode.');
+                obj.simulationMode = true;
+                obj.initializeSI(); % Recursive call to set up simulation
+                return;
+            end
+            
+            % ScanImage is running with valid hSI
             obj.hSI = evalin('base', 'hSI');
         end
 
@@ -114,7 +141,9 @@ classdef FocalSweepApp < handle
 
             obj.motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
             if isempty(obj.motorFig)
-                error('Motor Controls window not found.');
+                obj.log(1, 'Motor Controls window not found, switching to simulation mode.');
+                obj.simulationMode = true;
+                return;
             end
 
             obj.etZPos = findall(obj.motorFig, 'Tag', 'etZPos');
@@ -123,7 +152,8 @@ classdef FocalSweepApp < handle
             obj.Zinc = findall(obj.motorFig, 'Tag', 'Zinc');
 
             if any(cellfun(@isempty, {obj.etZPos, obj.Zstep, obj.Zdec, obj.Zinc}))
-                error('Missing UI elements in Motor Controls.');
+                obj.log(1, 'Missing UI elements in Motor Controls, switching to simulation mode.');
+                obj.simulationMode = true;
             end
         end
     end

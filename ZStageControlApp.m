@@ -108,9 +108,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
             try
                 cleanup(app);
             catch ex
-                warning('Error during cleanup: %s', ex.message);
+                warning(ex.identifier, '%s', ex.message);
             end
-
+            
             % Delete UI figure if it's still valid
             if isvalid(app.UIFigure)
                 try
@@ -550,6 +550,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
         end
 
         function setPosition(app, position)
+            import java.awt.Robot;
+            import java.awt.event.KeyEvent;
+            
             fprintf('[DEBUG] SET POS: Starting setPosition to %.1f μm\n', position);
 
             if app.SimulationMode
@@ -621,8 +624,6 @@ classdef ZStageControlApp < matlab.apps.AppBase
                         % Try to simulate Enter key press using Java robot
                         fprintf('[DEBUG] SET POS: Attempting Enter key simulation\n');
                         try
-                            import java.awt.Robot;
-                            import java.awt.event.KeyEvent;
                             robot = Robot();
                             robot.keyPress(KeyEvent.VK_ENTER);
                             robot.delay(50);
@@ -916,6 +917,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
         end
 
         function goToMarkedPosition(app, index)
+            import java.awt.event.KeyEvent;
+            import java.awt.Robot;
+            
             if index < 1 || index > length(app.MarkedPositions.Positions) || app.IsAutoRunning
                 return;
             end
@@ -946,32 +950,11 @@ classdef ZStageControlApp < matlab.apps.AppBase
                     drawnow; % Update display
 
                     % Create and send a key press event with Enter key
-                    import java.awt.event.KeyEvent;
-                    import java.awt.Robot;
-
-                    % Try using Java Robot to simulate Enter key
-                    fprintf('[DEBUG] GO TO: Attempting Java Robot Enter key simulation\n');
-                    try
-                        robot = Robot();
-                        robot.keyPress(KeyEvent.VK_ENTER);
-                        robot.keyRelease(KeyEvent.VK_ENTER);
-                        pause(0.1);
-                        fprintf('[DEBUG] GO TO: Java Robot Enter key simulation completed\n');
-                    catch javaErr
-                        fprintf('[DEBUG] GO TO: Java Robot failed: %s\n', javaErr.message);
-                        % If Java Robot fails, try the callback directly
-                        if ~isempty(app.etZPos.Callback)
-                            fprintf('[DEBUG] GO TO: Trying direct callback with Key=return\n');
-                            if isa(app.etZPos.Callback, 'function_handle')
-                                app.etZPos.Callback(app.etZPos, struct('Key', 'return'));
-                            elseif iscell(app.etZPos.Callback)
-                                app.etZPos.Callback{1}(app.etZPos, struct('Key', 'return'), app.etZPos.Callback{2:end});
-                            end
-                            fprintf('[DEBUG] GO TO: Callback execution completed\n');
-                        else
-                            fprintf('[DEBUG] GO TO: No callback found for etZPos\n');
-                        end
-                    end
+                    robot = Robot();
+                    robot.keyPress(KeyEvent.VK_ENTER);
+                    robot.keyRelease(KeyEvent.VK_ENTER);
+                    pause(0.1);
+                    fprintf('[DEBUG] GO TO: Java Robot Enter key simulation completed\n');
 
                     % Allow time for stage to move
                     fprintf('[DEBUG] GO TO: Waiting for stage movement to complete...\n');
@@ -1067,9 +1050,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
             try
                 cleanup(app);
             catch ex
-                warning('Error during cleanup: %s', ex.message);
+                warning(ex.identifier, '%s', ex.message);
             end
-
+            
             try
                 delete(app);
             catch

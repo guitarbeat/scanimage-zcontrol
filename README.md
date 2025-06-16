@@ -44,6 +44,35 @@ fsweep('version')
 fsweep('close')
 ```
 
+## ScanImage Integration
+
+FocalSweep automatically detects ScanImage's presence and connects to its UI components through the following process:
+
+1. **Detection**: 
+   - On startup, fsweep checks if the `hSI` variable exists in the MATLAB base workspace
+   - It verifies that `hSI` is a valid object with the expected methods
+   - If `hSI` is not found or not valid, fsweep automatically switches to simulation mode
+
+2. **Motor Control Connection**:
+   - fsweep locates the ScanImage Motor Controls window by searching for figures with Tag='MotorControls'
+   - It finds specific UI elements within that window:
+     - `etZPos`: The field displaying current Z-position
+     - `Zstep`: The field controlling movement step size
+     - `Zdec` & `Zinc`: The buttons for Z-axis movement
+   - These elements are accessed via their Tag properties using MATLAB's `findall()` function
+
+3. **Operation**:
+   - When you use fsweep's Z controls, it programmatically updates the `Zstep` field and triggers the `Zdec`/`Zinc` button callbacks
+   - This ensures that ScanImage's internal state stays synchronized with fsweep's commands
+   - Focus and Grab operations directly call the corresponding methods on the `hSI` object
+
+4. **Fallback Safety**:
+   - If any required component is missing, fsweep automatically switches to simulation mode
+   - This allows testing and training without requiring ScanImage to be running
+   - All operations in simulation mode are logged but don't affect physical hardware
+
+This design allows fsweep to act as a seamless extension of ScanImage, while maintaining the flexibility to run independently when needed.
+
 ## Code Organization
 
 The codebase is organized into several modules:

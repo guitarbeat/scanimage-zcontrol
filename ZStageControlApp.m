@@ -1,6 +1,6 @@
 classdef ZStageControlApp < matlab.apps.AppBase
     % ZStageControlApp - Streamlined Z-stage positioning control interface
-    % Provides manual control, auto-stepping, and position bookmarking
+    % Provides manual and automatic z control, and position bookmarking
     
     %% Constants
     properties (Constant, Access = private)

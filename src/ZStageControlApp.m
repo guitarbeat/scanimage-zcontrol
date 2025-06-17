@@ -6,7 +6,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
     properties (Constant, Access = private)
         % Window Configuration
         WINDOW_WIDTH = 320
-        WINDOW_HEIGHT = 340
+        WINDOW_HEIGHT = 380  % Increased height to accommodate metric display
         
         % Step Size Options
         STEP_SIZES = [0.1, 0.5, 1, 5, 10, 50]
@@ -19,6 +19,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         % Timer Configuration
         POSITION_REFRESH_PERIOD = 0.5
+        METRIC_REFRESH_PERIOD = 1.0
         MOVEMENT_WAIT_TIME = 0.2
         STATUS_RESET_DELAY = 5
         
@@ -43,6 +44,10 @@ classdef ZStageControlApp < matlab.apps.AppBase
             'WindowNotFound', 'Motor Controls window not found', ...
             'MissingElements', 'Missing UI elements in Motor Controls', ...
             'LostConnection', 'Lost connection')
+        
+        % Metric Options
+        METRIC_TYPES = {'Mean', 'Median', 'Std Dev', 'Max', 'Focus Score'}
+        DEFAULT_METRIC = 'Focus Score'
     end
     
     %% Public Properties - UI Components
@@ -56,6 +61,13 @@ classdef ZStageControlApp < matlab.apps.AppBase
     properties (Access = private)
         % Position Display
         PositionDisplay = struct('Label', [], 'Status', [])
+        
+        % Metric Display Components
+        MetricDisplay = struct(...
+            'Label', [], ...
+            'Value', [], ...
+            'TypeDropdown', [], ...
+            'RefreshButton', [])
         
         % Manual Control Components
         ManualControls = struct(...
@@ -71,7 +83,8 @@ classdef ZStageControlApp < matlab.apps.AppBase
             'DelayField', [], ...
             'UpButton', [], ...
             'DownButton', [], ...
-            'StartStopButton', [])
+            'StartStopButton', [], ...
+            'RecordMetricsCheckbox', [])
         
         % Bookmark Components
         BookmarkControls = struct(...
@@ -89,7 +102,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
     properties (Access = private)
         % Position State
         CurrentPosition (1,1) double = 0
-        MarkedPositions = struct('Labels', {{}}, 'Positions', [])
+        MarkedPositions = struct('Labels', {{}}, 'Positions', [], 'Metrics', {{}})
         
         % Auto Step State
         IsAutoRunning (1,1) logical = false
@@ -97,6 +110,12 @@ classdef ZStageControlApp < matlab.apps.AppBase
         CurrentStep (1,1) double = 0
         TotalSteps (1,1) double = 0
         AutoDirection (1,1) double = 1  % 1 for up, -1 for down
+        RecordMetrics (1,1) logical = false
+        AutoStepMetrics = struct('Positions', [], 'Values', [])
+        
+        % Metric State
+        CurrentMetric (1,1) double = 0
+        CurrentMetricType char = 'Focus Score'
         
         % ScanImage Integration
         SimulationMode (1,1) logical = true
@@ -109,6 +128,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         % Timers
         RefreshTimer
+        MetricTimer
     end
     
     %% Constructor and Destructor
@@ -147,11 +167,17 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 'StepSizeDropdown', [], 'ZeroButton', []);
             app.AutoControls = struct(...
                 'StepField', [], 'StepsField', [], 'DelayField', [], ...
-                'UpButton', [], 'DownButton', [], 'StartStopButton', []);
+                'UpButton', [], 'DownButton', [], 'StartStopButton', [], ...
+                'RecordMetricsCheckbox', []);
             app.BookmarkControls = struct(...
                 'PositionList', [], 'MarkField', [], 'MarkButton', [], ...
                 'GoToButton', [], 'DeleteButton', []);
             app.StatusControls = struct('Label', [], 'RefreshButton', []);
+            app.MetricDisplay = struct(...
+                'Label', [], ...
+                'Value', [], ...
+                'TypeDropdown', [], ...
+                'RefreshButton', []);
         end
         
         function initializeApplication(app)
@@ -161,8 +187,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
             % Update initial display
             updateAllUI(app);
             
-            % Start refresh timer
+            % Start refresh timers
             startRefreshTimer(app);
+            startMetricTimer(app);
         end
         
         function connectToScanImage(app)
@@ -228,6 +255,14 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 'TimerFcn', @(~,~) refreshPosition(app));
             start(app.RefreshTimer);
         end
+        
+        function startMetricTimer(app)
+            app.MetricTimer = timer(...
+                'ExecutionMode', 'fixedRate', ...
+                'Period', app.METRIC_REFRESH_PERIOD, ...
+                'TimerFcn', @(~,~) updateMetric(app));
+            start(app.MetricTimer);
+        end
     end
     
     %% UI Creation Methods
@@ -248,16 +283,47 @@ classdef ZStageControlApp < matlab.apps.AppBase
             app.UIFigure.Resize = 'on';
             
             % Create main layout
-            app.MainLayout = uigridlayout(app.UIFigure, [3, 1]);
-            app.MainLayout.RowHeight = {'fit', '1x', 'fit'};
+            app.MainLayout = uigridlayout(app.UIFigure, [4, 1]);
+            app.MainLayout.RowHeight = {'fit', 'fit', '1x', 'fit'};
             app.MainLayout.ColumnWidth = {'1x'};
             app.MainLayout.Padding = [10 10 10 10];
             app.MainLayout.RowSpacing = 10;
             
             % Create sections
+            createMetricDisplay(app);
             createPositionDisplay(app);
             createTabGroup(app);
             createStatusBar(app);
+        end
+        
+        function createMetricDisplay(app)
+            % Create metric display panel
+            metricPanel = uigridlayout(app.MainLayout, [1, 3]);
+            metricPanel.ColumnWidth = {'fit', '1x', 'fit'};
+            metricPanel.Layout.Row = 1;
+            
+            % Metric type dropdown
+            app.MetricDisplay.TypeDropdown = uidropdown(metricPanel);
+            app.MetricDisplay.TypeDropdown.Items = app.METRIC_TYPES;
+            app.MetricDisplay.TypeDropdown.Value = app.DEFAULT_METRIC;
+            app.MetricDisplay.TypeDropdown.FontSize = 9;
+            app.MetricDisplay.TypeDropdown.ValueChangedFcn = ...
+                createCallbackFcn(app, @onMetricTypeChanged, true);
+            
+            % Metric value label
+            app.MetricDisplay.Value = uilabel(metricPanel);
+            app.MetricDisplay.Value.Text = 'N/A';
+            app.MetricDisplay.Value.FontSize = 12;
+            app.MetricDisplay.Value.FontWeight = 'bold';
+            app.MetricDisplay.Value.HorizontalAlignment = 'center';
+            app.MetricDisplay.Value.BackgroundColor = app.COLORS.Light;
+            
+            % Refresh button
+            app.MetricDisplay.RefreshButton = uibutton(metricPanel, 'push');
+            app.MetricDisplay.RefreshButton.Text = '↻';
+            app.MetricDisplay.RefreshButton.FontSize = 11;
+            app.MetricDisplay.RefreshButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @onMetricRefreshButtonPushed, true);
         end
         
         function createPositionDisplay(app)
@@ -265,7 +331,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             positionPanel = uigridlayout(app.MainLayout, [2, 1]);
             positionPanel.RowHeight = {'fit', 'fit'};
             positionPanel.RowSpacing = 5;
-            positionPanel.Layout.Row = 1;
+            positionPanel.Layout.Row = 2;
             
             % Position label
             app.PositionDisplay.Label = uilabel(positionPanel);
@@ -286,13 +352,13 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         function createTabGroup(app)
             app.ControlTabs = uitabgroup(app.MainLayout);
-            app.ControlTabs.Layout.Row = 2;
+            app.ControlTabs.Layout.Row = 3;
         end
         
         function createStatusBar(app)
             statusBar = uigridlayout(app.MainLayout, [1, 2]);
             statusBar.ColumnWidth = {'1x', 'fit'};
-            statusBar.Layout.Row = 3;
+            statusBar.Layout.Row = 4;
             
             % Status label
             app.StatusControls.Label = uilabel(statusBar);
@@ -345,7 +411,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         function createAutoStepTab(app)
             tab = uitab(app.ControlTabs, 'Title', 'Auto Step');
-            grid = uigridlayout(tab, [3, 4]);
+            grid = uigridlayout(tab, [4, 4]);  % Added a row for the checkbox
             configureGridLayout(app, grid);
             
             % Step size field
@@ -373,6 +439,15 @@ classdef ZStageControlApp < matlab.apps.AppBase
             app.AutoControls.DelayField.FontSize = 9;
             app.AutoControls.DelayField.Layout.Row = 2;
             app.AutoControls.DelayField.Layout.Column = 2;
+            
+            % Record metrics checkbox
+            app.AutoControls.RecordMetricsCheckbox = uicheckbox(grid);
+            app.AutoControls.RecordMetricsCheckbox.Text = 'Record Metrics';
+            app.AutoControls.RecordMetricsCheckbox.FontSize = 9;
+            app.AutoControls.RecordMetricsCheckbox.Layout.Row = 2;
+            app.AutoControls.RecordMetricsCheckbox.Layout.Column = [3 4];
+            app.AutoControls.RecordMetricsCheckbox.ValueChangedFcn = ...
+                createCallbackFcn(app, @onRecordMetricsChanged, true);
             
             % Direction buttons
             app.AutoControls.UpButton = createStyledButton(app, grid, ...
@@ -560,6 +635,12 @@ classdef ZStageControlApp < matlab.apps.AppBase
             
             stepSize = app.AutoControls.StepField.Value * app.AutoDirection;
             
+            % Reset metrics collection if enabled
+            app.RecordMetrics = app.AutoControls.RecordMetricsCheckbox.Value;
+            if app.RecordMetrics
+                app.AutoStepMetrics = struct('Positions', [], 'Values', []);
+            end
+            
             app.AutoTimer = timer(...
                 'ExecutionMode', 'fixedRate', ...
                 'Period', app.AutoControls.DelayField.Value, ...
@@ -579,6 +660,11 @@ classdef ZStageControlApp < matlab.apps.AppBase
             updateAllUI(app);
             
             fprintf('Auto-stepping completed at position %.1f μm\n', app.CurrentPosition);
+            
+            % If metrics were recorded, show a plot
+            if app.RecordMetrics && ~isempty(app.AutoStepMetrics.Positions)
+                plotAutoStepMetrics(app);
+            end
         end
         
         function executeAutoStep(app, stepSize)
@@ -622,14 +708,19 @@ classdef ZStageControlApp < matlab.apps.AppBase
             if any(existingIdx)
                 app.MarkedPositions.Labels(existingIdx) = [];
                 app.MarkedPositions.Positions(existingIdx) = [];
+                app.MarkedPositions.Metrics(existingIdx) = [];
             end
             
-            % Add new bookmark
+            % Add new bookmark with current metric
             app.MarkedPositions.Labels{end+1} = label;
             app.MarkedPositions.Positions(end+1) = app.CurrentPosition;
+            app.MarkedPositions.Metrics{end+1} = struct(...
+                'Type', app.CurrentMetricType, ...
+                'Value', app.CurrentMetric);
             
             updateBookmarksList(app);
-            fprintf('Position marked: "%s" at %.1f μm\n', label, app.CurrentPosition);
+            fprintf('Position marked: "%s" at %.1f μm (Metric: %.2f)\n', ...
+                label, app.CurrentPosition, app.CurrentMetric);
         end
         
         function goToMarkedPosition(app, index)
@@ -652,6 +743,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             label = app.MarkedPositions.Labels{index};
             app.MarkedPositions.Labels(index) = [];
             app.MarkedPositions.Positions(index) = [];
+            app.MarkedPositions.Metrics(index) = [];
             
             updateBookmarksList(app);
             fprintf('Deleted bookmark: "%s"\n', label);
@@ -679,6 +771,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             updateStatusDisplay(app);
             updateBookmarksList(app);
             updateControlStates(app);
+            updateMetricDisplay(app);
         end
         
         function updatePositionDisplay(app)
@@ -703,10 +796,12 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 return;
             end
             
-            % Format bookmark items
-            items = arrayfun(@(i) sprintf('%-12s %7.1f μm', ...
+            % Format bookmark items with metrics
+            items = arrayfun(@(i) sprintf('%-10s %6.1f μm %6.1f %s', ...
                 app.MarkedPositions.Labels{i}, ...
-                app.MarkedPositions.Positions(i)), ...
+                app.MarkedPositions.Positions(i), ...
+                app.MarkedPositions.Metrics{i}.Value, ...
+                app.MarkedPositions.Metrics{i}.Type), ...
                 1:length(app.MarkedPositions.Labels), ...
                 'UniformOutput', false);
             
@@ -762,6 +857,10 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 app.AutoControls.StartStopButton.Text = 'START';
                 app.AutoControls.StartStopButton.BackgroundColor = app.COLORS.Success;
             end
+        end
+        
+        function updateMetricDisplay(app)
+            app.MetricDisplay.Value.Text = sprintf('%.2f', app.CurrentMetric);
         end
     end
     
@@ -850,6 +949,20 @@ classdef ZStageControlApp < matlab.apps.AppBase
             cleanup(app);
             delete(app);
         end
+        
+        % Metric Events
+        function onMetricTypeChanged(app, event)
+            app.CurrentMetricType = event.Value;
+            updateMetric(app);
+        end
+        
+        function onMetricRefreshButtonPushed(app, ~)
+            updateMetric(app);
+        end
+        
+        function onRecordMetricsChanged(app, event)
+            app.RecordMetrics = event.Value;
+        end
     end
     
     %% Helper Methods
@@ -880,6 +993,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
             % Stop timers
             stopTimer(app, app.RefreshTimer);
             app.RefreshTimer = [];
+            
+            stopTimer(app, app.MetricTimer);
+            app.MetricTimer = [];
             
             % Clean up any other timers
             allTimers = timerfindall;

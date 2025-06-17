@@ -263,6 +263,99 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 'TimerFcn', @(~,~) updateMetric(app));
             start(app.MetricTimer);
         end
+        
+        function updateMetric(app)
+            if app.SimulationMode
+                % Simulate a metric value based on position
+                app.CurrentMetric = 100 - mod(abs(app.CurrentPosition), 100);
+            else
+                try
+                    % Get real image data from ScanImage
+                    pixelData = getImageData(app);
+                    if ~isempty(pixelData)
+                        app.CurrentMetric = calculateMetric(app, pixelData);
+                    end
+                catch
+                    % If error occurs, use a default value
+                    app.CurrentMetric = NaN;
+                end
+            end
+            
+            % Update display
+            updateMetricDisplay(app);
+            
+            % If recording metrics during auto-stepping
+            if app.IsAutoRunning && app.RecordMetrics
+                recordCurrentMetric(app);
+            end
+        end
+        
+        function pixelData = getImageData(app)
+            pixelData = [];
+            try
+                if ~isempty(app.hSI) && isprop(app.hSI, 'hDisplay')
+                    % Try to get ROI data array
+                    roiData = app.hSI.hDisplay.getRoiDataArray();
+                    if ~isempty(roiData) && isprop(roiData(1), 'imageData') && ~isempty(roiData(1).imageData)
+                        pixelData = roiData(1).imageData{1}{1};
+                    end
+                    
+                    % If that fails, try buffer method
+                    if isempty(pixelData) && isprop(app.hSI.hDisplay, 'stripeDataBuffer')
+                        buffer = app.hSI.hDisplay.stripeDataBuffer;
+                        if ~isempty(buffer) && iscell(buffer) && ~isempty(buffer{1})
+                            pixelData = buffer{1}.roiData{1}.imageData{1}{1};
+                        end
+                    end
+                end
+            catch
+                pixelData = [];
+            end
+        end
+        
+        function value = calculateMetric(app, pixelData)
+            if isempty(pixelData)
+                value = NaN;
+                return;
+            end
+            
+            % Convert to double for calculations
+            pixelData = double(pixelData);
+            
+            % Calculate the requested metric
+            switch app.CurrentMetricType
+                case 'Mean'
+                    value = mean(pixelData(:));
+                case 'Median'
+                    value = median(pixelData(:));
+                case 'Std Dev'
+                    value = std(pixelData(:));
+                case 'Max'
+                    value = max(pixelData(:));
+                case 'Focus Score'
+                    % Calculate gradient-based focus score
+                    [Gx, Gy] = gradient(pixelData);
+                    value = mean(sqrt(Gx.^2 + Gy.^2), 'all');
+                otherwise
+                    value = mean(pixelData(:));
+            end
+        end
+        
+        function recordCurrentMetric(app)
+            % Add current position and metric to the auto step metrics
+            app.AutoStepMetrics.Positions(end+1) = app.CurrentPosition;
+            app.AutoStepMetrics.Values(end+1) = app.CurrentMetric;
+        end
+        
+        function plotAutoStepMetrics(app)
+            % Create a figure to display the metrics
+            fig = figure('Name', sprintf('%s vs Z Position', app.CurrentMetricType));
+            plot(app.AutoStepMetrics.Positions, app.AutoStepMetrics.Values, 'o-', 'LineWidth', 2);
+            grid on;
+            xlabel('Z Position (μm)');
+            ylabel(app.CurrentMetricType);
+            title(sprintf('%s vs Z Position', app.CurrentMetricType));
+        end
     end
     
     %% UI Creation Methods

@@ -1,0 +1,18 @@
+ScanImage Focus Analysis Report
+Generated: 16-Jun-2025 21:21:54
+=====================================
+
+SYSTEM STATUS:
+Z Position: 1.00 μm
+Active Channels: 1
+
+DATA ACCESS RESULTS:
+Successful methods: 2/5
+❌ lastFrame
+❌ lastAveragedFrame
+❌ getRoiDataArray
+✅ stripeDataBuffer
+✅ channelWindows
+
+PIXEL DATA ANALYSIS:
+Extraction method: lastStripeData.roiData

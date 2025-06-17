@@ -111,10 +111,14 @@ classdef ZStageControlApp < matlab.apps.AppBase
         TotalSteps (1,1) double = 0
         AutoDirection (1,1) double = 1  % 1 for up, -1 for down
         RecordMetrics (1,1) logical = false
-        AutoStepMetrics = struct('Positions', [], 'Values', [])
+        AutoStepMetrics = struct('Positions', [], 'Values', struct())
+        MetricsPlotFigure
+        MetricsPlotAxes
+        MetricsPlotLines = {}
         
         % Metric State
         CurrentMetric (1,1) double = 0
+        AllMetrics struct = struct()
         CurrentMetricType char = 'Focus Score'
         
         % ScanImage Integration
@@ -266,19 +270,54 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         function updateMetric(app)
             if app.SimulationMode
-                % Simulate a metric value based on position
-                app.CurrentMetric = 100 - mod(abs(app.CurrentPosition), 100);
+                % Simulate metric values based on position
+                for i = 1:length(app.METRIC_TYPES)
+                    metricType = app.METRIC_TYPES{i};
+                    % Convert to valid field name
+                    fieldName = strrep(metricType, ' ', '_');
+                    
+                    % Generate different simulated metrics
+                    switch metricType
+                        case 'Mean'
+                            app.AllMetrics.(fieldName) = 100 - mod(abs(app.CurrentPosition), 100);
+                        case 'Median'
+                            app.AllMetrics.(fieldName) = 80 - mod(abs(app.CurrentPosition), 80);
+                        case 'Std Dev'
+                            app.AllMetrics.(fieldName) = 20 + mod(abs(app.CurrentPosition), 30);
+                        case 'Max'
+                            app.AllMetrics.(fieldName) = 200 - mod(abs(app.CurrentPosition), 150);
+                        case 'Focus Score'
+                            app.AllMetrics.(fieldName) = 50 - abs(mod(app.CurrentPosition, 100) - 50);
+                    end
+                end
             else
                 try
                     % Get real image data from ScanImage
                     pixelData = getImageData(app);
                     if ~isempty(pixelData)
-                        app.CurrentMetric = calculateMetric(app, pixelData);
+                        % Calculate all metrics
+                        for i = 1:length(app.METRIC_TYPES)
+                            metricType = app.METRIC_TYPES{i};
+                            fieldName = strrep(metricType, ' ', '_');
+                            app.AllMetrics.(fieldName) = calculateMetric(app, pixelData, metricType);
+                        end
                     end
                 catch
-                    % If error occurs, use a default value
-                    app.CurrentMetric = NaN;
+                    % If error occurs, use default values
+                    for i = 1:length(app.METRIC_TYPES)
+                        metricType = app.METRIC_TYPES{i};
+                        fieldName = strrep(metricType, ' ', '_');
+                        app.AllMetrics.(fieldName) = NaN;
+                    end
                 end
+            end
+            
+            % Set the current selected metric
+            fieldName = strrep(app.CurrentMetricType, ' ', '_');
+            if isfield(app.AllMetrics, fieldName)
+                app.CurrentMetric = app.AllMetrics.(fieldName);
+            else
+                app.CurrentMetric = NaN;
             end
             
             % Update display
@@ -313,7 +352,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             end
         end
         
-        function value = calculateMetric(app, pixelData)
+        function value = calculateMetric(app, pixelData, metricType)
             if isempty(pixelData)
                 value = NaN;
                 return;
@@ -323,7 +362,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             pixelData = double(pixelData);
             
             % Calculate the requested metric
-            switch app.CurrentMetricType
+            switch metricType
                 case 'Mean'
                     value = mean(pixelData(:));
                 case 'Median'
@@ -342,19 +381,154 @@ classdef ZStageControlApp < matlab.apps.AppBase
         end
         
         function recordCurrentMetric(app)
-            % Add current position and metric to the auto step metrics
+            % Add current position to the auto step metrics
             app.AutoStepMetrics.Positions(end+1) = app.CurrentPosition;
-            app.AutoStepMetrics.Values(end+1) = app.CurrentMetric;
+            
+            % Record all metrics
+            for i = 1:length(app.METRIC_TYPES)
+                metricType = app.METRIC_TYPES{i};
+                fieldName = strrep(metricType, ' ', '_');
+                if ~isfield(app.AutoStepMetrics.Values, fieldName)
+                    app.AutoStepMetrics.Values.(fieldName) = [];
+                end
+                app.AutoStepMetrics.Values.(fieldName)(end+1) = app.AllMetrics.(fieldName);
+            end
+            
+            % Update plot in real-time
+            updateMetricsPlot(app);
+        end
+        
+        function initializeMetricsPlot(app)
+            % Create a figure to display the metrics
+            app.MetricsPlotFigure = figure('Name', 'Metrics vs Z Position', ...
+                'NumberTitle', 'off', ...
+                'Position', [100, 100, 800, 500], ...
+                'DeleteFcn', @(src,~) app.onMetricsPlotClosed());
+            
+            % Create axes
+            app.MetricsPlotAxes = axes(app.MetricsPlotFigure);
+            hold(app.MetricsPlotAxes, 'on');
+            grid(app.MetricsPlotAxes, 'on');
+            xlabel(app.MetricsPlotAxes, 'Z Position (μm)');
+            ylabel(app.MetricsPlotAxes, 'Metric Value');
+            title(app.MetricsPlotAxes, 'Metrics vs Z Position');
+            
+            % Set initial axis limits to prevent errors
+            xlim(app.MetricsPlotAxes, [0, 1]);
+            ylim(app.MetricsPlotAxes, [0, 1]);
+            
+            % Create a legend
+            legend(app.MetricsPlotAxes, 'Location', 'eastoutside');
+            
+            % Initialize empty plot lines with different colors
+            colors = {'b', 'r', 'g', 'm', 'c', 'k', 'y'};
+            app.MetricsPlotLines = {};
+            
+            for i = 1:length(app.METRIC_TYPES)
+                metricType = app.METRIC_TYPES{i};
+                colorIdx = mod(i-1, length(colors)) + 1;
+                app.MetricsPlotLines{i} = plot(app.MetricsPlotAxes, NaN, NaN, ...
+                    [colors{colorIdx}, 'o-'], 'LineWidth', 2, 'DisplayName', metricType);
+            end
+            
+            % Force initial draw
+            drawnow;
+        end
+        
+        function onMetricsPlotClosed(app)
+            % Handle the case when the user closes the metrics plot window
+            app.MetricsPlotFigure = [];
+            app.MetricsPlotAxes = [];
+            app.MetricsPlotLines = {};
+        end
+        
+        function updateMetricsPlot(app)
+            % If figure doesn't exist, create it
+            if isempty(app.MetricsPlotFigure) || ~isvalid(app.MetricsPlotFigure)
+                initializeMetricsPlot(app);
+            end
+            
+            try
+                % Update each metric line
+                for i = 1:length(app.METRIC_TYPES)
+                    metricType = app.METRIC_TYPES{i};
+                    fieldName = strrep(metricType, ' ', '_');
+                    if isfield(app.AutoStepMetrics.Values, fieldName) && ~isempty(app.MetricsPlotLines) && i <= length(app.MetricsPlotLines) && isvalid(app.MetricsPlotLines{i})
+                        set(app.MetricsPlotLines{i}, 'XData', app.AutoStepMetrics.Positions, ...
+                            'YData', app.AutoStepMetrics.Values.(fieldName));
+                    end
+                end
+                
+                % Update axes limits
+                if ~isempty(app.AutoStepMetrics.Positions) && length(app.AutoStepMetrics.Positions) > 1
+                    % Set x-axis limits with some padding
+                    xMin = min(app.AutoStepMetrics.Positions);
+                    xMax = max(app.AutoStepMetrics.Positions);
+                    
+                    % Add a small buffer if min and max are the same
+                    if abs(xMax - xMin) < 0.001
+                        xMin = xMin - 1;
+                        xMax = xMax + 1;
+                    end
+                    
+                    xRange = xMax - xMin;
+                    xPadding = xRange * 0.05;  % 5% padding
+                    
+                    % Only set if we have valid limits
+                    if xMax > xMin
+                        xlim(app.MetricsPlotAxes, [xMin - xPadding, xMax + xPadding]);
+                    end
+                    
+                    % Calculate y limits across all metrics
+                    yValues = [];
+                    for i = 1:length(app.METRIC_TYPES)
+                        metricType = app.METRIC_TYPES{i};
+                        fieldName = strrep(metricType, ' ', '_');
+                        if isfield(app.AutoStepMetrics.Values, fieldName)
+                            yValues = [yValues, app.AutoStepMetrics.Values.(fieldName)];
+                        end
+                    end
+                    
+                    if ~isempty(yValues)
+                        yMin = min(yValues);
+                        yMax = max(yValues);
+                        
+                        % Add a small buffer if min and max are the same
+                        if abs(yMax - yMin) < 0.001
+                            yMin = yMin - 1;
+                            yMax = yMax + 1;
+                        end
+                        
+                        yRange = yMax - yMin;
+                        yPadding = max(yRange * 0.1, 0.1);  % 10% padding or at least 0.1
+                        
+                        % Only set if we have valid limits
+                        if yMax > yMin
+                            ylim(app.MetricsPlotAxes, [yMin - yPadding, yMax + yPadding]);
+                        end
+                    end
+                    
+                    % Update the figure title to show the Z range
+                    title(app.MetricsPlotAxes, sprintf('Metrics vs Z Position (%.1f - %.1f μm)', ...
+                        xMin, xMax));
+                end
+                
+                % Force drawing update
+                drawnow;
+            catch e
+                % Handle any errors without crashing
+                fprintf('Error updating plot: %s\n', e.message);
+            end
         end
         
         function plotAutoStepMetrics(app)
-            % Create a figure to display the metrics
-            fig = figure('Name', sprintf('%s vs Z Position', app.CurrentMetricType));
-            plot(app.AutoStepMetrics.Positions, app.AutoStepMetrics.Values, 'o-', 'LineWidth', 2);
-            grid on;
-            xlabel('Z Position (μm)');
-            ylabel(app.CurrentMetricType);
-            title(sprintf('%s vs Z Position', app.CurrentMetricType));
+            % Update or create the metrics plot
+            updateMetricsPlot(app);
+            
+            % Bring figure to front
+            if ~isempty(app.MetricsPlotFigure) && isvalid(app.MetricsPlotFigure)
+                figure(app.MetricsPlotFigure);
+            end
         end
     end
     
@@ -548,6 +722,10 @@ classdef ZStageControlApp < matlab.apps.AppBase
             app.AutoControls.DownButton = createStyledButton(app, grid, ...
                 'warning', '▼', @onAutoDirectionChanged, [3, 2]);
             
+            % Initialize direction button appearance based on default direction (1)
+            app.AutoControls.UpButton.BackgroundColor = app.COLORS.Success;
+            app.AutoControls.DownButton.BackgroundColor = app.COLORS.Light;
+            
             % Start/stop button
             app.AutoControls.StartStopButton = createStyledButton(app, grid, ...
                 'success', 'START', @onStartStopButtonPushed, [3, [3 4]]);
@@ -726,12 +904,18 @@ classdef ZStageControlApp < matlab.apps.AppBase
             app.CurrentStep = 0;
             app.TotalSteps = app.AutoControls.StepsField.Value;
             
-            stepSize = app.AutoControls.StepField.Value * app.AutoDirection;
+            % Get the step size without applying direction
+            stepSize = app.AutoControls.StepField.Value;
             
             % Reset metrics collection if enabled
             app.RecordMetrics = app.AutoControls.RecordMetricsCheckbox.Value;
             if app.RecordMetrics
-                app.AutoStepMetrics = struct('Positions', [], 'Values', []);
+                app.AutoStepMetrics = struct('Positions', [], 'Values', struct());
+                
+                % Initialize metrics plot for real-time display
+                if isempty(app.MetricsPlotFigure) || ~isvalid(app.MetricsPlotFigure)
+                    initializeMetricsPlot(app);
+                end
             end
             
             app.AutoTimer = timer(...
@@ -743,31 +927,56 @@ classdef ZStageControlApp < matlab.apps.AppBase
             updateAllUI(app);
             
             fprintf('Auto-stepping started: %d steps of %.1f μm\n', ...
-                app.TotalSteps, abs(stepSize));
+                app.TotalSteps, stepSize);
         end
         
         function stopAutoStepping(app)
-            stopTimer(app, app.AutoTimer);
-            app.AutoTimer = [];
-            app.IsAutoRunning = false;
-            updateAllUI(app);
-            
-            fprintf('Auto-stepping completed at position %.1f μm\n', app.CurrentPosition);
-            
-            % If metrics were recorded, show a plot
-            if app.RecordMetrics && ~isempty(app.AutoStepMetrics.Positions)
-                plotAutoStepMetrics(app);
+            try
+                stopTimer(app, app.AutoTimer);
+                app.AutoTimer = [];
+                app.IsAutoRunning = false;
+                updateAllUI(app);
+                
+                fprintf('Auto-stepping completed at position %.1f μm\n', app.CurrentPosition);
+                
+                % If metrics were recorded, show a plot
+                if app.RecordMetrics && ~isempty(app.AutoStepMetrics.Positions)
+                    plotAutoStepMetrics(app);
+                end
+            catch e
+                % Handle any errors
+                fprintf('Error in stopAutoStepping: %s\n', e.message);
+                app.IsAutoRunning = false;
+                app.AutoTimer = [];
             end
         end
         
         function executeAutoStep(app, stepSize)
-            app.CurrentStep = app.CurrentStep + 1;
-            moveStage(app, stepSize);
-            
-            if app.CurrentStep >= app.TotalSteps
-                stopAutoStepping(app);
-            else
-                updateStatusDisplay(app);
+            try
+                % Check if app is still valid and auto running
+                if ~isvalid(app) || ~app.IsAutoRunning
+                    return;
+                end
+                
+                app.CurrentStep = app.CurrentStep + 1;
+                % Apply direction at execution time
+                moveStage(app, stepSize * app.AutoDirection);
+                
+                if app.CurrentStep >= app.TotalSteps
+                    stopAutoStepping(app);
+                else
+                    updateStatusDisplay(app);
+                end
+            catch e
+                % Handle any errors that might occur
+                fprintf('Error in executeAutoStep: %s\n', e.message);
+                try
+                    if isvalid(app)
+                        stopAutoStepping(app);
+                    end
+                catch
+                    % Suppress any errors during cleanup
+                end
             end
         end
         
@@ -1097,6 +1306,12 @@ classdef ZStageControlApp < matlab.apps.AppBase
                     stop(timer);
                     delete(timer);
                 end
+            end
+            
+            % Clean up metrics plot
+            if ~isempty(app.MetricsPlotFigure) && isvalid(app.MetricsPlotFigure)
+                delete(app.MetricsPlotFigure);
+                app.MetricsPlotFigure = [];
             end
         end
         

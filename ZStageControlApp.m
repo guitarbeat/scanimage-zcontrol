@@ -473,6 +473,11 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 % Set step size
                 app.Zstep.String = num2str(abs(microns));
                 
+                % Simulate pressing Enter in the step field to apply the value
+                if isfield(app.Zstep, 'Callback') && ~isempty(app.Zstep.Callback)
+                    app.Zstep.Callback(app.Zstep, []);
+                end
+                
                 % Press button
                 if microns > 0
                     app.Zinc.Callback(app.Zinc, []);

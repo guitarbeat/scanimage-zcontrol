@@ -100,7 +100,12 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         % ScanImage Integration
         SimulationMode (1,1) logical = true
-        ScanImageInterface  % Encapsulated ScanImage interface
+        hSI                         % ScanImage handle
+        motorFig                    % Motor Controls figure handle
+        etZPos                      % Z position field
+        Zstep                       % Z step field
+        Zdec                        % Z decrease button
+        Zinc                        % Z increase button
         
         % Timers
         RefreshTimer
@@ -151,7 +156,6 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         function initializeApplication(app)
             % Initialize ScanImage interface
-            app.ScanImageInterface = ScanImageInterface();
             connectToScanImage(app);
             
             % Update initial display
@@ -162,16 +166,58 @@ classdef ZStageControlApp < matlab.apps.AppBase
         end
         
         function connectToScanImage(app)
-            % Connect to ScanImage and update status
-            [connected, message] = app.ScanImageInterface.connect();
+            % Check if ScanImage is running
+            try
+                % Check if hSI exists
+                if ~evalin('base', 'exist(''hSI'', ''var'') && isobject(hSI)')
+                    setSimulationMode(app, true, app.TEXT.NotRunning);
+                    return;
+                end
+                
+                % Get ScanImage handle
+                app.hSI = evalin('base', 'hSI');
+                
+                % Find motor controls window
+                app.motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
+                if isempty(app.motorFig)
+                    setSimulationMode(app, true, app.TEXT.WindowNotFound);
+                    return;
+                end
+                
+                % Find motor UI elements
+                app.etZPos = findall(app.motorFig, 'Tag', 'etZPos');
+                app.Zstep = findall(app.motorFig, 'Tag', 'Zstep');
+                app.Zdec = findall(app.motorFig, 'Tag', 'Zdec');
+                app.Zinc = findall(app.motorFig, 'Tag', 'Zinc');
+                
+                if any(cellfun(@isempty, {app.etZPos, app.Zstep, app.Zdec, app.Zinc}))
+                    setSimulationMode(app, true, app.TEXT.MissingElements);
+                    return;
+                end
+                
+                % Successfully connected
+                setSimulationMode(app, false, app.TEXT.Connected);
+                
+                % Initialize position
+                app.CurrentPosition = str2double(app.etZPos.String);
+                if isnan(app.CurrentPosition)
+                    app.CurrentPosition = 0;
+                end
+                
+            catch ex
+                setSimulationMode(app, true, ['Error: ' ex.message]);
+            end
+        end
+        
+        function setSimulationMode(app, isSimulation, message)
+            app.SimulationMode = isSimulation;
             
-            if connected
-                app.SimulationMode = false;
-                app.CurrentPosition = app.ScanImageInterface.getPosition();
-                setStatus(app, app.TEXT.Connected, app.COLORS.Success);
+            if isSimulation
+                app.StatusControls.Label.Text = ['ScanImage: Simulation (' message ')'];
+                app.StatusControls.Label.FontColor = app.COLORS.Warning;
             else
-                app.SimulationMode = true;
-                setStatus(app, ['ScanImage: Simulation (' message ')'], app.COLORS.Warning);
+                app.StatusControls.Label.Text = ['ScanImage: ' message];
+                app.StatusControls.Label.FontColor = app.COLORS.Success;
             end
         end
         
@@ -271,10 +317,10 @@ classdef ZStageControlApp < matlab.apps.AppBase
         function createManualControlTab(app)
             tab = uitab(app.ControlTabs, 'Title', 'Manual Control');
             grid = uigridlayout(tab, [2, 4]);
-            configureGridLayout(grid);
+            configureGridLayout(app, grid);
             
             % Step size controls
-            createLabeledControl(grid, 'Step:', 1, 1);
+            createLabeledControl(app, grid, 'Step:', 1, 1);
             
             app.ManualControls.StepSizeDropdown = uidropdown(grid);
             app.ManualControls.StepSizeDropdown.Items = ...
@@ -300,15 +346,33 @@ classdef ZStageControlApp < matlab.apps.AppBase
         function createAutoStepTab(app)
             tab = uitab(app.ControlTabs, 'Title', 'Auto Step');
             grid = uigridlayout(tab, [3, 4]);
-            configureGridLayout(grid);
+            configureGridLayout(app, grid);
             
-            % Parameter fields
-            createNumericField(app, grid, 'Size:', app.DEFAULT_AUTO_STEP, ...
-                @onAutoStepSizeChanged, 1, 1, 'StepField', app.AutoControls);
-            createNumericField(app, grid, 'Steps:', app.DEFAULT_AUTO_STEPS, ...
-                [], 1, 3, 'StepsField', app.AutoControls);
-            createNumericField(app, grid, 'Delay:', app.DEFAULT_AUTO_DELAY, ...
-                [], 2, 1, 'DelayField', app.AutoControls);
+            % Step size field
+            createLabeledControl(app, grid, 'Size:', 1, 1);
+            app.AutoControls.StepField = uieditfield(grid, 'numeric');
+            app.AutoControls.StepField.Value = app.DEFAULT_AUTO_STEP;
+            app.AutoControls.StepField.FontSize = 9;
+            app.AutoControls.StepField.Layout.Row = 1;
+            app.AutoControls.StepField.Layout.Column = 2;
+            app.AutoControls.StepField.ValueChangedFcn = ...
+                createCallbackFcn(app, @onAutoStepSizeChanged, true);
+            
+            % Steps field
+            createLabeledControl(app, grid, 'Steps:', 1, 3);
+            app.AutoControls.StepsField = uieditfield(grid, 'numeric');
+            app.AutoControls.StepsField.Value = app.DEFAULT_AUTO_STEPS;
+            app.AutoControls.StepsField.FontSize = 9;
+            app.AutoControls.StepsField.Layout.Row = 1;
+            app.AutoControls.StepsField.Layout.Column = 4;
+            
+            % Delay field
+            createLabeledControl(app, grid, 'Delay:', 2, 1);
+            app.AutoControls.DelayField = uieditfield(grid, 'numeric');
+            app.AutoControls.DelayField.Value = app.DEFAULT_AUTO_DELAY;
+            app.AutoControls.DelayField.FontSize = 9;
+            app.AutoControls.DelayField.Layout.Row = 2;
+            app.AutoControls.DelayField.Layout.Column = 2;
             
             % Direction buttons
             app.AutoControls.UpButton = createStyledButton(app, grid, ...
@@ -324,7 +388,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
         function createBookmarksTab(app)
             tab = uitab(app.ControlTabs, 'Title', 'Bookmarks');
             grid = uigridlayout(tab, [4, 2]);
-            configureGridLayout(grid);
+            configureGridLayout(app, grid);
             
             % Mark controls
             app.BookmarkControls.MarkField = uieditfield(grid, 'text');
@@ -358,7 +422,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
     
     %% UI Helper Methods
     methods (Access = private)
-        function configureGridLayout(~, grid)
+        function configureGridLayout(app, grid)
             grid.RowHeight = {'fit', 'fit', 'fit'};
             grid.ColumnWidth = {'fit', 'fit', '1x', '1x'};
             grid.Padding = [10 10 10 10];
@@ -366,29 +430,10 @@ classdef ZStageControlApp < matlab.apps.AppBase
             grid.ColumnSpacing = 10;
         end
         
-        function createLabeledControl(~, parent, text, row, col)
+        function createLabeledControl(app, parent, text, row, col)
             label = uilabel(parent, 'Text', text, 'FontSize', 9);
             label.Layout.Row = row;
             label.Layout.Column = col;
-        end
-        
-        function field = createNumericField(app, parent, labelText, defaultValue, ...
-                callback, row, labelCol, fieldName, container)
-            createLabeledControl(app, parent, labelText, row, labelCol);
-            
-            field = uieditfield(parent, 'numeric');
-            field.Value = defaultValue;
-            field.FontSize = 9;
-            field.Layout.Row = row;
-            field.Layout.Column = labelCol + 1;
-            
-            if ~isempty(callback)
-                field.ValueChangedFcn = createCallbackFcn(app, callback, true);
-            end
-            
-            if nargin >= 9 && ~isempty(fieldName) && ~isempty(container)
-                container.(fieldName) = field;
-            end
         end
         
         function button = createStyledButton(app, parent, style, text, callback, position)
@@ -425,22 +470,43 @@ classdef ZStageControlApp < matlab.apps.AppBase
             if app.SimulationMode
                 app.CurrentPosition = app.CurrentPosition + microns;
             else
-                app.CurrentPosition = app.ScanImageInterface.moveRelative(microns);
+                % Set step size
+                app.Zstep.String = num2str(abs(microns));
+                
+                % Press button
+                if microns > 0
+                    app.Zinc.Callback(app.Zinc, []);
+                else
+                    app.Zdec.Callback(app.Zdec, []);
+                end
+                
+                % Read position
+                pause(0.1);
+                zPos = str2double(app.etZPos.String);
+                if ~isnan(zPos)
+                    app.CurrentPosition = zPos;
+                else
+                    app.CurrentPosition = app.CurrentPosition + microns;
+                end
             end
             
             updatePositionDisplay(app);
-            logMovement(app, microns);
+            fprintf('Stage moved %.1f μm to position %.1f μm\n', microns, app.CurrentPosition);
         end
         
         function setPosition(app, position)
             if app.SimulationMode
                 app.CurrentPosition = position;
             else
-                app.CurrentPosition = app.ScanImageInterface.moveAbsolute(position);
+                % Calculate delta
+                delta = position - app.CurrentPosition;
+                
+                if abs(delta) > 0.01
+                    moveStage(app, delta);
+                end
             end
             
             updatePositionDisplay(app);
-            logPosition(app, position);
         end
         
         function resetPosition(app)
@@ -453,9 +519,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
         function refreshPosition(app)
             if shouldRefreshPosition(app)
                 try
-                    newPosition = app.ScanImageInterface.getPosition();
-                    if ~isnan(newPosition) && newPosition ~= app.CurrentPosition
-                        app.CurrentPosition = newPosition;
+                    zPos = str2double(app.etZPos.String);
+                    if ~isnan(zPos) && zPos ~= app.CurrentPosition
+                        app.CurrentPosition = zPos;
                         updatePositionDisplay(app);
                     end
                 catch
@@ -467,13 +533,12 @@ classdef ZStageControlApp < matlab.apps.AppBase
         function should = shouldRefreshPosition(app)
             should = ~app.SimulationMode && ...
                      ~app.IsAutoRunning && ...
-                     app.ScanImageInterface.isConnected();
+                     isvalid(app.etZPos);
         end
         
         function handleConnectionLoss(app)
             app.SimulationMode = true;
-            setStatus(app, ['ScanImage: Simulation (' app.TEXT.LostConnection ')'], ...
-                app.COLORS.Warning);
+            setSimulationMode(app, true, app.TEXT.LostConnection);
         end
     end
     
@@ -498,15 +563,17 @@ classdef ZStageControlApp < matlab.apps.AppBase
             start(app.AutoTimer);
             updateAllUI(app);
             
-            logAutoStepStart(app, app.TotalSteps, abs(stepSize));
+            fprintf('Auto-stepping started: %d steps of %.1f μm\n', ...
+                app.TotalSteps, abs(stepSize));
         end
         
         function stopAutoStepping(app)
-            stopTimer(app.AutoTimer);
+            stopTimer(app, app.AutoTimer);
             app.AutoTimer = [];
             app.IsAutoRunning = false;
             updateAllUI(app);
-            logAutoStepComplete(app);
+            
+            fprintf('Auto-stepping completed at position %.1f μm\n', app.CurrentPosition);
         end
         
         function executeAutoStep(app, stepSize)
@@ -557,7 +624,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             app.MarkedPositions.Positions(end+1) = app.CurrentPosition;
             
             updateBookmarksList(app);
-            logBookmark(app, label);
+            fprintf('Position marked: "%s" at %.1f μm\n', label, app.CurrentPosition);
         end
         
         function goToMarkedPosition(app, index)
@@ -691,11 +758,6 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 app.AutoControls.StartStopButton.BackgroundColor = app.COLORS.Success;
             end
         end
-        
-        function setStatus(app, text, color)
-            app.StatusControls.Label.Text = text;
-            app.StatusControls.Label.FontColor = color;
-        end
     end
     
     %% Event Handlers
@@ -716,7 +778,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
         end
         
         function onStepSizeChanged(app, event)
-            stepValue = extractStepValue(event.Value);
+            stepValue = str2double(extractBefore(event.Value, ' μm'));
             app.AutoControls.StepField.Value = stepValue;
         end
         
@@ -793,15 +855,11 @@ classdef ZStageControlApp < matlab.apps.AppBase
             stepSize = app.STEP_SIZES(idx);
         end
         
-        function stepValue = extractStepValue(~, stepText)
-            stepValue = str2double(extractBefore(stepText, ' μm'));
-        end
-        
         function showError(app, message)
             uialert(app.UIFigure, message, 'Invalid Parameter');
         end
         
-        function stopTimer(~, timer)
+        function stopTimer(app, timer)
             if ~isempty(timer) && isvalid(timer)
                 stop(timer);
                 delete(timer);
@@ -815,7 +873,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             end
             
             % Stop timers
-            stopTimer(app.RefreshTimer);
+            stopTimer(app, app.RefreshTimer);
             app.RefreshTimer = [];
             
             % Clean up any other timers
@@ -826,146 +884,12 @@ classdef ZStageControlApp < matlab.apps.AppBase
                     delete(timer);
                 end
             end
-            
-            % Clean up ScanImage interface
-            if ~isempty(app.ScanImageInterface)
-                delete(app.ScanImageInterface);
-            end
         end
         
         function deleteUIFigure(app)
             if isvalid(app.UIFigure)
                 delete(app.UIFigure);
             end
-        end
-    end
-    
-    %% Logging Methods
-    methods (Access = private, Static)
-        function logMovement(~, microns)
-            fprintf('Stage moved %.1f μm\n', microns);
-        end
-        
-        function logPosition(~, position)
-            fprintf('Stage moved to position %.1f μm\n', position);
-        end
-        
-        function logAutoStepStart(~, steps, stepSize)
-            fprintf('Auto-stepping started: %d steps of %.1f μm\n', steps, stepSize);
-        end
-        
-        function logAutoStepComplete(app)
-            fprintf('Auto-stepping completed at position %.1f μm\n', app.CurrentPosition);
-        end
-        
-        function logBookmark(app, label)
-            fprintf('Position marked: "%s" at %.1f μm\n', label, app.CurrentPosition);
-        end
-    end
-end
-
-%% ScanImage Interface Class (Separate file recommended)
-classdef ScanImageInterface < handle
-    % ScanImageInterface - Encapsulates ScanImage communication
-    
-    properties (Access = private)
-        hSI         % ScanImage handle
-        motorFig    % Motor Controls figure
-        etZPos      % Z position field
-        Zstep       % Z step field  
-        Zdec        % Z decrease button
-        Zinc        % Z increase button
-        connected = false
-    end
-    
-    methods
-        function [success, message] = connect(obj)
-            success = false;
-            message = '';
-            
-            try
-                % Check for ScanImage
-                if ~evalin('base', 'exist(''hSI'', ''var'') && isobject(hSI)')
-                    message = 'ScanImage not running';
-                    return;
-                end
-                
-                obj.hSI = evalin('base', 'hSI');
-                
-                % Find motor controls
-                obj.motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
-                if isempty(obj.motorFig)
-                    message = 'Motor Controls window not found';
-                    return;
-                end
-                
-                % Find UI elements
-                obj.etZPos = findall(obj.motorFig, 'Tag', 'etZPos');
-                obj.Zstep = findall(obj.motorFig, 'Tag', 'Zstep');
-                obj.Zdec = findall(obj.motorFig, 'Tag', 'Zdec');
-                obj.Zinc = findall(obj.motorFig, 'Tag', 'Zinc');
-                
-                if any(cellfun(@isempty, {obj.etZPos, obj.Zstep, obj.Zdec, obj.Zinc}))
-                    message = 'Missing UI elements';
-                    return;
-                end
-                
-                obj.connected = true;
-                success = true;
-                message = 'Connected';
-                
-            catch ex
-                message = ex.message;
-            end
-        end
-        
-        function position = getPosition(obj)
-            position = 0;
-            if obj.connected && isvalid(obj.etZPos)
-                position = str2double(obj.etZPos.String);
-                if isnan(position)
-                    position = 0;
-                end
-            end
-        end
-        
-        function position = moveRelative(obj, microns)
-            if ~obj.connected
-                position = nan;
-                return;
-            end
-            
-            % Set step size and press button
-            obj.Zstep.String = num2str(abs(microns));
-            
-            if microns > 0
-                obj.Zinc.Callback(obj.Zinc, []);
-            else
-                obj.Zdec.Callback(obj.Zdec, []);
-            end
-            
-            pause(0.1);
-            position = obj.getPosition();
-        end
-        
-        function position = moveAbsolute(obj, targetPosition)
-            if ~obj.connected
-                position = nan;
-                return;
-            end
-            
-            currentPosition = obj.getPosition();
-            delta = targetPosition - currentPosition;
-            
-            if abs(delta) > 0.01  % Only move if significant
-                position = obj.moveRelative(delta);
-            else
-                position = currentPosition;
-            end
-        end
-        
-        function tf = isConnected(obj)
-            tf = obj.connected && isvalid(obj.motorFig);
         end
     end
 end

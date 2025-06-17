@@ -301,9 +301,16 @@ classdef ZStageControlApp < matlab.apps.AppBase
                             fieldName = strrep(metricType, ' ', '_');
                             app.AllMetrics.(fieldName) = calculateMetric(app, pixelData, metricType);
                         end
+                    else
+                        % If no pixel data, set all metrics to NaN
+                        for i = 1:length(app.METRIC_TYPES)
+                            metricType = app.METRIC_TYPES{i};
+                            fieldName = strrep(metricType, ' ', '_');
+                            app.AllMetrics.(fieldName) = NaN;
+                        end
                     end
                 catch
-                    % If error occurs, use default values
+                    % If error occurs, set all metrics to NaN
                     for i = 1:length(app.METRIC_TYPES)
                         metricType = app.METRIC_TYPES{i};
                         fieldName = strrep(metricType, ' ', '_');
@@ -392,10 +399,52 @@ classdef ZStageControlApp < matlab.apps.AppBase
                     app.AutoStepMetrics.Values.(fieldName) = [];
                 end
                 app.AutoStepMetrics.Values.(fieldName)(end+1) = app.AllMetrics.(fieldName);
+                
+                % Check if this is a new maximum for this metric
+                currentValue = app.AllMetrics.(fieldName);
+                if ~isnan(currentValue)
+                    % Get existing values for this metric
+                    values = app.AutoStepMetrics.Values.(fieldName);
+                    values = values(~isnan(values));  % Remove any NaN values
+                    
+                    % If this is the first value or a new maximum
+                    if isempty(values) || currentValue == max(values)
+                        % Create a bookmark for this maximum
+                        createMaxBookmark(app, metricType, currentValue);
+                    end
+                end
             end
             
             % Update plot in real-time
             updateMetricsPlot(app);
+        end
+        
+        function createMaxBookmark(app, metricType, value)
+            % Create a bookmark for a maximum value
+            % Format: "Max [Metric Type] (value)"
+            label = sprintf('Max %s (%.1f)', metricType, value);
+            
+            % Remove any existing bookmark with the same metric type
+            existingIdx = cellfun(@(x) startsWith(x, ['Max ' metricType]), app.MarkedPositions.Labels);
+            if any(existingIdx)
+                app.MarkedPositions.Labels(existingIdx) = [];
+                app.MarkedPositions.Positions(existingIdx) = [];
+                app.MarkedPositions.Metrics(existingIdx) = [];
+            end
+            
+            % Add new bookmark
+            app.MarkedPositions.Labels{end+1} = label;
+            app.MarkedPositions.Positions(end+1) = app.CurrentPosition;
+            app.MarkedPositions.Metrics{end+1} = struct(...
+                'Type', metricType, ...
+                'Value', value);
+            
+            % Update the bookmarks list
+            updateBookmarksList(app);
+            
+            % Log the bookmark creation
+            fprintf('Created bookmark for maximum %s: %.1f at position %.1f μm\n', ...
+                metricType, value, app.CurrentPosition);
         end
         
         function initializeMetricsPlot(app)
@@ -418,18 +467,29 @@ classdef ZStageControlApp < matlab.apps.AppBase
             ylim(app.MetricsPlotAxes, [0, 1]);
             
             % Create a legend
-            legend(app.MetricsPlotAxes, 'Location', 'eastoutside');
+            legend(app.MetricsPlotAxes, 'Location', 'eastoutside', 'Interpreter', 'none');
             
-            % Initialize empty plot lines with different colors
-            colors = {'b', 'r', 'g', 'm', 'c', 'k', 'y'};
+            % Initialize empty plot lines with different colors and markers
+            colors = {'#0072BD', '#D95319', '#EDB120', '#7E2F8E', '#77AC30', '#4DBEEE', '#A2142F'};
+            markers = {'o', 's', 'd', '^', 'v', '>', '<'};
             app.MetricsPlotLines = {};
             
             for i = 1:length(app.METRIC_TYPES)
                 metricType = app.METRIC_TYPES{i};
                 colorIdx = mod(i-1, length(colors)) + 1;
+                markerIdx = mod(i-1, length(markers)) + 1;
                 app.MetricsPlotLines{i} = plot(app.MetricsPlotAxes, NaN, NaN, ...
-                    [colors{colorIdx}, 'o-'], 'LineWidth', 2, 'DisplayName', metricType);
+                    'Color', colors{colorIdx}, ...
+                    'Marker', markers{markerIdx}, ...
+                    'LineStyle', '-', ...
+                    'LineWidth', 2, ...
+                    'MarkerSize', 6, ...
+                    'DisplayName', metricType);
             end
+            
+            % Set figure properties for better visualization
+            set(app.MetricsPlotFigure, 'Color', 'white');
+            set(app.MetricsPlotAxes, 'Box', 'on', 'TickDir', 'out', 'LineWidth', 1);
             
             % Force initial draw
             drawnow;
@@ -454,8 +514,25 @@ classdef ZStageControlApp < matlab.apps.AppBase
                     metricType = app.METRIC_TYPES{i};
                     fieldName = strrep(metricType, ' ', '_');
                     if isfield(app.AutoStepMetrics.Values, fieldName) && ~isempty(app.MetricsPlotLines) && i <= length(app.MetricsPlotLines) && isvalid(app.MetricsPlotLines{i})
-                        set(app.MetricsPlotLines{i}, 'XData', app.AutoStepMetrics.Positions, ...
-                            'YData', app.AutoStepMetrics.Values.(fieldName));
+                        % Get the data
+                        xData = app.AutoStepMetrics.Positions;
+                        yData = app.AutoStepMetrics.Values.(fieldName);
+                        
+                        % Remove any NaN values
+                        validIdx = ~isnan(yData);
+                        xData = xData(validIdx);
+                        yData = yData(validIdx);
+                        
+                        % Normalize to first value if we have data
+                        if ~isempty(yData)
+                            firstValue = yData(1);
+                            if firstValue ~= 0  % Avoid division by zero
+                                yData = yData / firstValue;
+                            end
+                        end
+                        
+                        % Update the line
+                        set(app.MetricsPlotLines{i}, 'XData', xData, 'YData', yData);
                     end
                 end
                 
@@ -485,7 +562,15 @@ classdef ZStageControlApp < matlab.apps.AppBase
                         metricType = app.METRIC_TYPES{i};
                         fieldName = strrep(metricType, ' ', '_');
                         if isfield(app.AutoStepMetrics.Values, fieldName)
-                            yValues = [yValues, app.AutoStepMetrics.Values.(fieldName)];
+                            validY = app.AutoStepMetrics.Values.(fieldName)(~isnan(app.AutoStepMetrics.Values.(fieldName)));
+                            if ~isempty(validY)
+                                % Normalize to first value
+                                firstValue = validY(1);
+                                if firstValue ~= 0  % Avoid division by zero
+                                    validY = validY / firstValue;
+                                end
+                                yValues = [yValues, validY];
+                            end
                         end
                     end
                     
@@ -508,10 +593,13 @@ classdef ZStageControlApp < matlab.apps.AppBase
                         end
                     end
                     
-                    % Update the figure title to show the Z range
-                    title(app.MetricsPlotAxes, sprintf('Metrics vs Z Position (%.1f - %.1f μm)', ...
+                    % Update the figure title to show the Z range and normalization info
+                    title(app.MetricsPlotAxes, sprintf('Normalized Metrics vs Z Position (%.1f - %.1f μm)', ...
                         xMin, xMax));
                 end
+                
+                % Update y-axis label to indicate normalization
+                ylabel(app.MetricsPlotAxes, 'Normalized Metric Value (relative to first value)');
                 
                 % Force drawing update
                 drawnow;

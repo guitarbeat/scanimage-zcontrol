@@ -20,8 +20,8 @@ classdef ZStageController < handle
         STATUS_RESET_DELAY = 5
         
         % Metric Options
-        METRIC_TYPES = {'Mean', 'Median', 'Std Dev', 'Max', 'Focus Score'}
-        DEFAULT_METRIC = 'Focus Score'
+        METRIC_TYPES = {'Std Dev', 'Mean', 'Max'}
+        DEFAULT_METRIC = 'Std Dev'
         
         % Status Messages
         TEXT = struct(...
@@ -228,16 +228,13 @@ classdef ZStageController < handle
                     
                     % Generate different simulated metrics
                     switch metricType
+                        case 'Std Dev'
+                            % Simulate focus-like behavior: peak at certain positions
+                            obj.AllMetrics.(fieldName) = 50 - abs(mod(obj.CurrentPosition, 100) - 50);
                         case 'Mean'
                             obj.AllMetrics.(fieldName) = 100 - mod(abs(obj.CurrentPosition), 100);
-                        case 'Median'
-                            obj.AllMetrics.(fieldName) = 80 - mod(abs(obj.CurrentPosition), 80);
-                        case 'Std Dev'
-                            obj.AllMetrics.(fieldName) = 20 + mod(abs(obj.CurrentPosition), 30);
                         case 'Max'
                             obj.AllMetrics.(fieldName) = 200 - mod(abs(obj.CurrentPosition), 150);
-                        case 'Focus Score'
-                            obj.AllMetrics.(fieldName) = 50 - abs(mod(obj.CurrentPosition, 100) - 50);
                     end
                 end
             else
@@ -469,20 +466,14 @@ classdef ZStageController < handle
             
             % Calculate the requested metric
             switch metricType
-                case 'Mean'
-                    value = mean(pixelData(:));
-                case 'Median'
-                    value = median(pixelData(:));
                 case 'Std Dev'
                     value = std(pixelData(:));
+                case 'Mean'
+                    value = mean(pixelData(:));
                 case 'Max'
                     value = max(pixelData(:));
-                case 'Focus Score'
-                    % Calculate gradient-based focus score
-                    [Gx, Gy] = gradient(pixelData);
-                    value = mean(sqrt(Gx.^2 + Gy.^2), 'all');
                 otherwise
-                    value = mean(pixelData(:));
+                    value = std(pixelData(:));  % Default to Std Dev for focus
             end
         end
         

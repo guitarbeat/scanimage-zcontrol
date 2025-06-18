@@ -7,6 +7,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
         % Window Configuration
         WINDOW_WIDTH = 320
         WINDOW_HEIGHT = 380  % Increased height to accommodate metric display
+        PLOT_WIDTH = 400     % Width of the plot area when expanded
         
         % UI Theme Colors
         COLORS = struct(...
@@ -27,6 +28,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
     %% Public Properties - UI Components
     properties (Access = public)
         UIFigure                    matlab.ui.Figure
+        MainPanel                   matlab.ui.container.Panel
         MainLayout                  matlab.ui.container.GridLayout
         ControlTabs                 matlab.ui.container.TabGroup
     end
@@ -70,6 +72,14 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         % Status Components
         StatusControls = struct('Label', [], 'RefreshButton', [])
+        
+        % Metrics Plot Components
+        MetricsPlotControls = struct(...
+            'Panel', [], ...
+            'Axes', [], ...
+            'ClearButton', [], ...
+            'ExportButton', [], ...
+            'ExpandButton', [])
     end
     
     %% Private Properties - Application State
@@ -78,9 +88,8 @@ classdef ZStageControlApp < matlab.apps.AppBase
         Controller                  ZStageController
         
         % UI State
-        MetricsPlotFigure
-        MetricsPlotAxes
         MetricsPlotLines = {}
+        IsPlotExpanded = false
         
         % Timers
         RefreshTimer
@@ -171,14 +180,14 @@ classdef ZStageControlApp < matlab.apps.AppBase
         
         function onControllerAutoStepComplete(app)
             updateControlStates(app);
-            % If metrics were recorded, show a plot
+            % If metrics were recorded, update the plot and expand the GUI
             if app.Controller.RecordMetrics
                 metrics = app.Controller.getAutoStepMetrics();
                 if ~isempty(metrics.Positions)
                     updateMetricsPlot(app);
-                    % Bring figure to front
-                    if ~isempty(app.MetricsPlotFigure) && isvalid(app.MetricsPlotFigure)
-                        figure(app.MetricsPlotFigure);
+                    % Expand the GUI to show the plot
+                    if ~app.IsPlotExpanded
+                        expandGUI(app);
                     end
                 end
             end
@@ -205,29 +214,13 @@ classdef ZStageControlApp < matlab.apps.AppBase
             app.MetricDisplay.Value.Text = sprintf('%.2f', app.Controller.CurrentMetric);
         end
         
-
-        
         function initializeMetricsPlot(app)
-            % Create a figure to display the metrics
-            app.MetricsPlotFigure = figure('Name', 'Metrics vs Z Position', ...
-                'NumberTitle', 'off', ...
-                'Position', [100, 100, 800, 500], ...
-                'DeleteFcn', @(src,~) onMetricsPlotClosed(app));
-            
-            % Create axes
-            app.MetricsPlotAxes = axes(app.MetricsPlotFigure);
-            hold(app.MetricsPlotAxes, 'on');
-            grid(app.MetricsPlotAxes, 'on');
-            xlabel(app.MetricsPlotAxes, 'Z Position (μm)');
-            ylabel(app.MetricsPlotAxes, 'Metric Value');
-            title(app.MetricsPlotAxes, 'Metrics vs Z Position');
-            
             % Set initial axis limits to prevent errors
-            xlim(app.MetricsPlotAxes, [0, 1]);
-            ylim(app.MetricsPlotAxes, [0, 1]);
+            xlim(app.MetricsPlotControls.Axes, [0, 1]);
+            ylim(app.MetricsPlotControls.Axes, [0, 1]);
             
             % Create a legend
-            legend(app.MetricsPlotAxes, 'Location', 'eastoutside', 'Interpreter', 'none');
+            legend(app.MetricsPlotControls.Axes, 'Location', 'northeast', 'Interpreter', 'none');
             
             % Initialize empty plot lines with different colors and markers
             colors = {'#0072BD', '#D95319', '#EDB120', '#7E2F8E', '#77AC30', '#4DBEEE', '#A2142F'};
@@ -238,37 +231,42 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 metricType = ZStageController.METRIC_TYPES{i};
                 colorIdx = mod(i-1, length(colors)) + 1;
                 markerIdx = mod(i-1, length(markers)) + 1;
-                app.MetricsPlotLines{i} = plot(app.MetricsPlotAxes, NaN, NaN, ...
+                app.MetricsPlotLines{i} = plot(app.MetricsPlotControls.Axes, NaN, NaN, ...
                     'Color', colors{colorIdx}, ...
                     'Marker', markers{markerIdx}, ...
                     'LineStyle', '-', ...
-                    'LineWidth', 2, ...
-                    'MarkerSize', 6, ...
+                    'LineWidth', 1.5, ...
+                    'MarkerSize', 4, ...
                     'DisplayName', metricType);
             end
             
-            % Set figure properties for better visualization
-            set(app.MetricsPlotFigure, 'Color', 'white');
-            set(app.MetricsPlotAxes, 'Box', 'on', 'TickDir', 'out', 'LineWidth', 1);
+            % Set axes properties for better visualization
+            set(app.MetricsPlotControls.Axes, 'Box', 'on', 'TickDir', 'out', 'LineWidth', 1);
             
             % Force initial draw
             drawnow;
         end
         
-
-        function onMetricsPlotClosed(app)
-            % Handle the case when the user closes the metrics plot window
-            app.MetricsPlotFigure = [];
-            app.MetricsPlotAxes = [];
-            app.MetricsPlotLines = {};
+        function clearMetricsPlot(app)
+            % Clear all plot lines
+            for i = 1:length(app.MetricsPlotLines)
+                if ~isempty(app.MetricsPlotLines{i}) && isvalid(app.MetricsPlotLines{i})
+                    set(app.MetricsPlotLines{i}, 'XData', NaN, 'YData', NaN);
+                end
+            end
+            
+            % Reset axes limits
+            xlim(app.MetricsPlotControls.Axes, [0, 1]);
+            ylim(app.MetricsPlotControls.Axes, [0, 1]);
+            
+            % Reset title and labels
+            title(app.MetricsPlotControls.Axes, 'Metrics vs Z Position');
+            ylabel(app.MetricsPlotControls.Axes, 'Normalized Metric Value');
+            
+            drawnow;
         end
         
         function updateMetricsPlot(app)
-            % If figure doesn't exist, create it
-            if isempty(app.MetricsPlotFigure) || ~isvalid(app.MetricsPlotFigure)
-                initializeMetricsPlot(app);
-            end
-            
             try
                 % Get metrics data from controller
                 metrics = app.Controller.getAutoStepMetrics();
@@ -317,7 +315,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
                     
                     % Only set if we have valid limits
                     if xMax > xMin
-                        xlim(app.MetricsPlotAxes, [xMin - xPadding, xMax + xPadding]);
+                        xlim(app.MetricsPlotControls.Axes, [xMin - xPadding, xMax + xPadding]);
                     end
                     
                     % Calculate y limits across all metrics
@@ -353,17 +351,17 @@ classdef ZStageControlApp < matlab.apps.AppBase
                         
                         % Only set if we have valid limits
                         if yMax > yMin
-                            ylim(app.MetricsPlotAxes, [yMin - yPadding, yMax + yPadding]);
+                            ylim(app.MetricsPlotControls.Axes, [yMin - yPadding, yMax + yPadding]);
                         end
                     end
                     
-                    % Update the figure title to show the Z range and normalization info
-                    title(app.MetricsPlotAxes, sprintf('Normalized Metrics vs Z Position (%.1f - %.1f μm)', ...
+                    % Update the title to show the Z range and normalization info
+                    title(app.MetricsPlotControls.Axes, sprintf('Normalized Metrics vs Z Position (%.1f - %.1f μm)', ...
                         xMin, xMax));
                 end
                 
                 % Update y-axis label to indicate normalization
-                ylabel(app.MetricsPlotAxes, 'Normalized Metric Value (relative to first value)');
+                ylabel(app.MetricsPlotControls.Axes, 'Normalized Metric Value (relative to first value)');
                 
                 % Force drawing update
                 drawnow;
@@ -372,8 +370,6 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 fprintf('Error updating plot: %s\n', e.message);
             end
         end
-        
-
     end
     
     %% UI Creation Methods
@@ -386,24 +382,38 @@ classdef ZStageControlApp < matlab.apps.AppBase
             createAutoStepTab(app);
             createBookmarksTab(app);
             
+            % Create expandable plot area
+            createMetricsPlotArea(app);
+            
             app.UIFigure.Visible = 'on';
         end
         
         function createMainWindow(app)
             % Create main figure
             app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Units = 'pixels';  % Use pixels for precise control
             app.UIFigure.Position = [100 100 app.WINDOW_WIDTH app.WINDOW_HEIGHT];
             app.UIFigure.Name = app.TEXT.WindowTitle;
             app.UIFigure.Color = app.COLORS.Background;
             app.UIFigure.CloseRequestFcn = createCallbackFcn(app, @onWindowClose, true);
-            app.UIFigure.Resize = 'on';
+            app.UIFigure.Resize = 'off';  % Disable resize to control expansion manually
+            app.UIFigure.AutoResizeChildren = 'off';  % Prevent automatic child resizing
             
-            % Create main layout
-            app.MainLayout = uigridlayout(app.UIFigure, [4, 1]);
-            app.MainLayout.RowHeight = {'fit', 'fit', '1x', 'fit'};
+            % Create main panel with fixed position for the original UI
+            app.MainPanel = uipanel(app.UIFigure);
+            app.MainPanel.Position = [0, 0, app.WINDOW_WIDTH, app.WINDOW_HEIGHT];
+            app.MainPanel.BorderType = 'none';
+            app.MainPanel.BackgroundColor = app.COLORS.Background;
+            app.MainPanel.AutoResizeChildren = 'off';  % Prevent automatic resizing
+            app.MainPanel.Units = 'pixels';  % Use pixels for precise control
+            
+            % Create main layout within the fixed panel
+            app.MainLayout = uigridlayout(app.MainPanel, [5, 1]);
+            app.MainLayout.RowHeight = {'fit', 'fit', '1x', 'fit', 'fit'};
             app.MainLayout.ColumnWidth = {'1x'};
             app.MainLayout.Padding = [10 10 10 10];
             app.MainLayout.RowSpacing = 10;
+            app.MainLayout.Scrollable = 'off';  % Disable scrolling to prevent size changes
             
             % Create sections
             createMetricDisplay(app);
@@ -412,6 +422,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
             % Create tab group
             app.ControlTabs = uitabgroup(app.MainLayout);
             app.ControlTabs.Layout.Row = 3;
+            
+            % Create expand button
+            createExpandButton(app);
             
             createStatusBar(app);
         end
@@ -470,12 +483,23 @@ classdef ZStageControlApp < matlab.apps.AppBase
             app.PositionDisplay.Status.FontColor = app.COLORS.TextMuted;
         end
         
-
+        function createExpandButton(app)
+            % Create expand/collapse button
+            app.MetricsPlotControls.ExpandButton = uibutton(app.MainLayout, 'push');
+            app.MetricsPlotControls.ExpandButton.Layout.Row = 4;
+            app.MetricsPlotControls.ExpandButton.Text = '📊 Show Plot';
+            app.MetricsPlotControls.ExpandButton.FontSize = 10;
+            app.MetricsPlotControls.ExpandButton.FontWeight = 'bold';
+            app.MetricsPlotControls.ExpandButton.BackgroundColor = app.COLORS.Primary;
+            app.MetricsPlotControls.ExpandButton.FontColor = [1 1 1];
+            app.MetricsPlotControls.ExpandButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @onExpandButtonPushed, true);
+        end
         
         function createStatusBar(app)
             statusBar = uigridlayout(app.MainLayout, [1, 2]);
             statusBar.ColumnWidth = {'1x', 'fit'};
-            statusBar.Layout.Row = 4;
+            statusBar.Layout.Row = 5;
             
             % Status label
             app.StatusControls.Label = uilabel(statusBar);
@@ -490,8 +514,6 @@ classdef ZStageControlApp < matlab.apps.AppBase
             app.StatusControls.RefreshButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @onRefreshButtonPushed, true);
         end
-        
-
         
         function createManualControlTab(app)
             tab = uitab(app.ControlTabs, 'Title', 'Manual Control');
@@ -636,6 +658,49 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 'danger', 'DELETE', @onDeleteButtonPushed, [3, 2]);
             app.BookmarkControls.DeleteButton.Enable = 'off';
         end
+        
+        function createMetricsPlotArea(app)
+            % Create panel for plot area (initially hidden and positioned off-screen)
+            app.MetricsPlotControls.Panel = uipanel(app.UIFigure);
+            app.MetricsPlotControls.Panel.Units = 'pixels';  % Use pixels for precise control
+            app.MetricsPlotControls.Panel.Position = [app.WINDOW_WIDTH + 10, 10, app.PLOT_WIDTH, app.WINDOW_HEIGHT - 20];
+            app.MetricsPlotControls.Panel.Title = 'Metrics Plot';
+            app.MetricsPlotControls.Panel.FontSize = 12;
+            app.MetricsPlotControls.Panel.FontWeight = 'bold';
+            app.MetricsPlotControls.Panel.Visible = 'off';
+            app.MetricsPlotControls.Panel.AutoResizeChildren = 'off';  % Prevent automatic resizing
+            
+            % Create grid layout within the panel
+            grid = uigridlayout(app.MetricsPlotControls.Panel, [2, 2]);
+            grid.RowHeight = {'1x', 'fit'};
+            grid.ColumnWidth = {'1x', 'fit'};
+            grid.Padding = [10 10 10 10];
+            grid.RowSpacing = 10;
+            grid.ColumnSpacing = 10;
+            
+            % Create axes for the plot
+            app.MetricsPlotControls.Axes = uiaxes(grid);
+            app.MetricsPlotControls.Axes.Layout.Row = 1;
+            app.MetricsPlotControls.Axes.Layout.Column = [1 2];
+            
+            % Set up the axes
+            hold(app.MetricsPlotControls.Axes, 'on');
+            app.MetricsPlotControls.Axes.XGrid = 'on';
+            app.MetricsPlotControls.Axes.YGrid = 'on';
+            xlabel(app.MetricsPlotControls.Axes, 'Z Position (μm)');
+            ylabel(app.MetricsPlotControls.Axes, 'Normalized Metric Value');
+            title(app.MetricsPlotControls.Axes, 'Metrics vs Z Position');
+            
+            % Control buttons
+            app.MetricsPlotControls.ClearButton = createStyledButton(app, grid, ...
+                'warning', 'CLEAR', @onClearPlotButtonPushed, [2, 1]);
+            
+            app.MetricsPlotControls.ExportButton = createStyledButton(app, grid, ...
+                'primary', 'EXPORT', @onExportPlotButtonPushed, [2, 2]);
+            
+            % Initialize plot lines
+            initializeMetricsPlot(app);
+        end
     end
     
     %% UI Helper Methods
@@ -668,8 +733,6 @@ classdef ZStageControlApp < matlab.apps.AppBase
         end
     end
     
-
-    
     %% Auto Step Methods
     methods (Access = private)
         function startAutoStepping(app)
@@ -684,11 +747,9 @@ classdef ZStageControlApp < matlab.apps.AppBase
             direction = app.Controller.AutoDirection;
             recordMetrics = app.AutoControls.RecordMetricsCheckbox.Value;
             
-            % Initialize metrics plot if recording
+            % Clear previous plot data if recording metrics
             if recordMetrics
-                if isempty(app.MetricsPlotFigure) || ~isvalid(app.MetricsPlotFigure)
-                    initializeMetricsPlot(app);
-                end
+                clearMetricsPlot(app);
             end
             
             % Start auto stepping in controller
@@ -859,8 +920,6 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 app.AutoControls.StartStopButton.BackgroundColor = app.COLORS.Success;
             end
         end
-        
-
     end
     
     %% Event Handlers
@@ -971,10 +1030,155 @@ classdef ZStageControlApp < matlab.apps.AppBase
         function onRecordMetricsChanged(app, event)
             % This is handled by the UI when starting auto stepping
         end
+        
+        % Plot Control Events
+        function onExpandButtonPushed(app, ~)
+            if app.IsPlotExpanded
+                collapseGUI(app);
+            else
+                expandGUI(app);
+            end
+        end
+        
+        function onClearPlotButtonPushed(app, ~)
+            clearMetricsPlot(app);
+        end
+        
+        function onExportPlotButtonPushed(app, ~)
+            % Export the current plot data to a file
+            metrics = app.Controller.getAutoStepMetrics();
+            if isempty(metrics.Positions)
+                uialert(app.UIFigure, 'No data to export. Run auto-stepping with "Record Metrics" enabled first.', 'No Data');
+                return;
+            end
+            
+            % Ask user for filename
+            [file, path] = uiputfile('*.mat', 'Save Metrics Data');
+            if file == 0
+                return; % User cancelled
+            end
+            
+            try
+                % Save the metrics data
+                save(fullfile(path, file), 'metrics');
+                uialert(app.UIFigure, sprintf('Data exported to %s', fullfile(path, file)), 'Export Complete', 'Icon', 'success');
+            catch e
+                uialert(app.UIFigure, sprintf('Error exporting data: %s', e.message), 'Export Error');
+            end
+        end
     end
     
     %% Helper Methods
     methods (Access = private)
+        function expandGUI(app)
+            % Expand the GUI to show the plot
+            if app.IsPlotExpanded
+                return;
+            end
+            
+            % Get current figure position
+            figPos = app.UIFigure.Position;
+            
+            % Expand figure width
+            newWidth = app.WINDOW_WIDTH + app.PLOT_WIDTH + 20; % +20 for padding
+            app.UIFigure.Position = [figPos(1), figPos(2), newWidth, figPos(4)];
+            
+            % Position and show the plot panel
+            app.MetricsPlotControls.Panel.Position = [app.WINDOW_WIDTH + 10, 10, app.PLOT_WIDTH, app.WINDOW_HEIGHT - 20];
+            app.MetricsPlotControls.Panel.Visible = 'on';
+            
+            % Ensure main panel stays in correct position after any MATLAB adjustments
+            ensureCorrectPositions(app);
+            
+            % Update button text and state
+            app.MetricsPlotControls.ExpandButton.Text = '📊 Hide Plot';
+            app.MetricsPlotControls.ExpandButton.BackgroundColor = app.COLORS.Warning;
+            app.IsPlotExpanded = true;
+            
+            % Update window title
+            app.UIFigure.Name = sprintf('%s - Plot Expanded', app.TEXT.WindowTitle);
+        end
+        
+        function collapseGUI(app)
+            % Collapse the GUI to hide the plot
+            if ~app.IsPlotExpanded
+                return;
+            end
+            
+            % Hide the plot panel first
+            app.MetricsPlotControls.Panel.Visible = 'off';
+            
+            % Get current figure position
+            figPos = app.UIFigure.Position;
+            
+            % Collapse figure width back to original
+            app.UIFigure.Position = [figPos(1), figPos(2), app.WINDOW_WIDTH, figPos(4)];
+            
+            % Ensure main panel stays in correct position after any MATLAB adjustments
+            ensureCorrectPositions(app);
+            
+            % Update button text and state
+            app.MetricsPlotControls.ExpandButton.Text = '📊 Show Plot';
+            app.MetricsPlotControls.ExpandButton.BackgroundColor = app.COLORS.Primary;
+            app.IsPlotExpanded = false;
+            
+            % Update window title
+            app.UIFigure.Name = app.TEXT.WindowTitle;
+        end
+        
+        function ensureCorrectPositions(app)
+            % Force correct positions and handle any MATLAB automatic adjustments
+            drawnow;  % Let MATLAB finish any automatic adjustments
+            
+            % Ensure figure units are pixels
+            app.UIFigure.Units = 'pixels';
+            
+            % Ensure main panel is in correct position and size
+            app.MainPanel.Units = 'pixels';
+            app.MainPanel.Position = [0, 0, app.WINDOW_WIDTH, app.WINDOW_HEIGHT];
+            
+            % If expanded, ensure plot panel is in correct position
+            if app.IsPlotExpanded
+                app.MetricsPlotControls.Panel.Units = 'pixels';
+                app.MetricsPlotControls.Panel.Position = [app.WINDOW_WIDTH + 10, 10, app.PLOT_WIDTH, app.WINDOW_HEIGHT - 20];
+            end
+            
+            % Force the main layout grid to fit within the main panel
+            % This prevents the grid from expanding beyond the panel boundaries
+            if isvalid(app.MainLayout)
+                % GridLayout should fill the entire panel but no more
+                app.MainLayout.Padding = [10 10 10 10];
+                app.MainLayout.RowSpacing = 10;
+            end
+            
+            % Use a short timer to double-check positions after MATLAB settles
+            t = timer('ExecutionMode', 'singleShot', 'StartDelay', 0.1, ...
+                'TimerFcn', @(~,~) finalPositionCheck(app));
+            start(t);
+        end
+        
+        function finalPositionCheck(app)
+            % Final check to ensure positions are correct
+            if isvalid(app.MainPanel)
+                app.MainPanel.Units = 'pixels';
+                app.MainPanel.Position = [0, 0, app.WINDOW_WIDTH, app.WINDOW_HEIGHT];
+            end
+            
+            if app.IsPlotExpanded && isvalid(app.MetricsPlotControls.Panel)
+                app.MetricsPlotControls.Panel.Units = 'pixels';
+                app.MetricsPlotControls.Panel.Position = [app.WINDOW_WIDTH + 10, 10, app.PLOT_WIDTH, app.WINDOW_HEIGHT - 20];
+            end
+            
+            % Double-check that the main layout grid hasn't expanded
+            if isvalid(app.MainLayout)
+                % Ensure grid layout properties haven't changed
+                app.MainLayout.RowHeight = {'fit', 'fit', '1x', 'fit', 'fit'};
+                app.MainLayout.ColumnWidth = {'1x'};
+                app.MainLayout.Padding = [10 10 10 10];
+                app.MainLayout.RowSpacing = 10;
+            end
+        end
+        
         function stopTimer(app, timer)
             if ~isempty(timer) && isvalid(timer)
                 stop(timer);
@@ -1004,10 +1208,15 @@ classdef ZStageControlApp < matlab.apps.AppBase
                 end
             end
             
-            % Clean up metrics plot
-            if ~isempty(app.MetricsPlotFigure) && isvalid(app.MetricsPlotFigure)
-                delete(app.MetricsPlotFigure);
-                app.MetricsPlotFigure = [];
+            % Clear metrics plot lines
+            app.MetricsPlotLines = {};
+            
+            % Clean up panels
+            if ~isempty(app.MainPanel) && isvalid(app.MainPanel)
+                delete(app.MainPanel);
+            end
+            if ~isempty(app.MetricsPlotControls.Panel) && isvalid(app.MetricsPlotControls.Panel)
+                delete(app.MetricsPlotControls.Panel);
             end
         end
     end

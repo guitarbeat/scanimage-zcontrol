@@ -252,8 +252,8 @@ MetricTimer = timer(Period=1.0s)   % Metrics updates
 ### **File Structure**
 ```
 src/
-├── ZStageController.m     # Core controller (582 lines)
-├── ZStageControlApp.m     # GUI application (1104 lines)
+├── ZStageController.m     # Core controller (573 lines)
+├── ZStageControlApp.m     # GUI application (1223 lines)
 └── README.md             # Basic usage instructions
 ```
 

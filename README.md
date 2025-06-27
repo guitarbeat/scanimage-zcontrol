@@ -1,138 +1,244 @@
-# FocalSweep Z-Control Tool
+# Z-Stage Control for ScanImage
 
-A MATLAB tool for Z-focus control in ScanImage microscopy systems. Provides automated Z-scanning and focus optimization.
+A MATLAB tool for precise Z-stage positioning and focus optimization in ScanImage microscopy systems. Provides manual control, automated Z-scanning, and metrics-based focus optimization with a modern GUI interface.
 
 ## Key Features
 
-- Z-position control with up/down movement
-- Automatic Z-scanning with focus quality detection
-- Integration with ScanImage microscopy software
-- Live focus quality monitoring
-- Modern GUI with App Designer components 
+- **Manual Z-position control** with configurable step sizes (0.1-50 μm)
+- **Automated Z-scanning** with real-time focus quality metrics
+- **Position bookmarking system** for saving and returning to important positions
+- **Real-time metrics plotting** with normalized visualization
+- **ScanImage integration** via Motor Controls GUI interface
+- **Simulation mode** for testing without hardware
+- **Modern tabbed GUI** built with MATLAB App Designer
 
 ## Installation
 
 1. Clone or download this repository
-2. Add the `src` directory to your MATLAB path
-3. Run `fsweep` in the MATLAB command window
+2. Add the `src` directory to your MATLAB path:
+   ```matlab
+   addpath('path/to/scanimage-zcontrol/src')
+   ```
+3. Ensure ScanImage is running with Motor Controls window open (for hardware control)
 
 ## Requirements
 
-- MATLAB R2019b or newer (for full functionality)
-- ScanImage must be running with `hSI` available in the base workspace
-- Access to ScanImage Motor Controls
+- **MATLAB R2019b or newer** (for App Designer components)
+- **ScanImage** must be running with `hSI` available in base workspace
+- **Motor Controls window** must be open in ScanImage for hardware control
 
 ## Basic Usage
 
+### Launch the Application
+
 ```matlab
-% Launch with default settings
-fsweep
-
-% Launch with specific parameters
-fsweep('verbosity', 1)
-
-% Force creation of a new instance
-fsweep('forceNew', true)
-
-% Get a handle to the FocalSweep object
-fs = fsweep();
-
-% Show version information
-fsweep('version')
-
-% Close all instances
-fsweep('close')
+% Create and launch the Z-Stage Control application
+app = ZStageControlApp();
 ```
+
+### Manual Control
+- Use the **Manual Control** tab for direct positioning
+- Select step size from dropdown (0.1, 0.5, 1, 5, 10, 50 μm)
+- Click ▲/▼ buttons to move up/down by selected step
+- Click **ZERO** to reset current position to 0 μm
+
+### Automated Scanning
+- Switch to the **Auto Step** tab
+- Configure parameters:
+  - **Step Size**: Custom step size in microns
+  - **Steps**: Number of steps to execute
+  - **Delay**: Time between steps (seconds)
+  - **Direction**: Up (▲) or Down (▼)
+  - **Record Metrics**: Enable to collect focus data
+- Click **START** to begin automated sequence
+
+### Position Bookmarks
+- Use the **Bookmarks** tab to save important positions
+- Enter a label and click **MARK** to save current position
+- Select saved positions and click **GO TO** to return
+- Click **DELETE** to remove unwanted bookmarks
+
+### Focus Metrics
+- Real-time focus metrics displayed in main window
+- Choose metric type: Standard Deviation (best for focus), Mean, or Max
+- Metrics are plotted during automated scanning
+- Export metrics data for analysis
 
 ## ScanImage Integration
 
-FocalSweep automatically detects ScanImage's presence and connects to its UI components through the following process:
+The application automatically integrates with ScanImage through a robust connection system:
 
-1. **Detection**: 
-   - On startup, fsweep checks if the `hSI` variable exists in the MATLAB base workspace
-   - It verifies that `hSI` is a valid object with the expected methods
-   - If `hSI` is not found or not valid, fsweep automatically switches to simulation mode
+### Connection Process
+1. **Detection**: Checks for `hSI` variable in MATLAB base workspace
+2. **Motor Controls**: Locates Motor Controls window by Tag='MotorControls'
+3. **UI Elements**: Connects to position display (`etZPos`), step control (`Zstep`), and movement buttons (`Zdec`/`Zinc`)
+4. **Fallback**: Automatically switches to simulation mode if any component is missing
 
-2. **Motor Control Connection**:
-   - fsweep locates the ScanImage Motor Controls window by searching for figures with Tag='MotorControls'
-   - It finds specific UI elements within that window:
-     - `etZPos`: The field displaying current Z-position
-     - `Zstep`: The field controlling movement step size
-     - `Zdec` & `Zinc`: The buttons for Z-axis movement
-   - These elements are accessed via their Tag properties using MATLAB's `findall()` function
+### Hardware Control
+- All movements are executed through ScanImage's own GUI controls
+- Ensures proper synchronization with ScanImage's internal state
+- Avoids hardware conflicts by using existing motor interfaces
+- Position feedback comes directly from ScanImage hardware
 
-3. **Operation**:
-   - When you use fsweep's Z controls, it programmatically updates the `Zstep` field and triggers the `Zdec`/`Zinc` button callbacks
-   - This ensures that ScanImage's internal state stays synchronized with fsweep's commands
-   - Focus and Grab operations directly call the corresponding methods on the `hSI` object
+### Simulation Mode
+- Automatically activated when ScanImage is not available
+- Allows testing and development without hardware
+- Simulates realistic focus metrics for algorithm development
+- All operations logged but don't affect physical hardware
 
-4. **Fallback Safety**:
-   - If any required component is missing, fsweep automatically switches to simulation mode
-   - This allows testing and training without requiring ScanImage to be running
-   - All operations in simulation mode are logged but don't affect physical hardware
+## API Reference
 
-This design allows fsweep to act as a seamless extension of ScanImage, while maintaining the flexibility to run independently when needed.
+### ZStageController Class
 
-## Code Organization
+#### Core Methods
+```matlab
+% Position Control
+moveStage(microns)              % Move relative distance
+setPosition(position)           % Move to absolute position  
+resetPosition()                 % Reset position to zero
 
-The codebase is organized into several modules:
+% Automated Control
+startAutoStepping(stepSize, numSteps, delay, direction, recordMetrics)
+stopAutoStepping()             % Stop current sequence
 
-### Core Module
-- `AppConfig` - Centralized configuration settings
-- `CoreUtils` - Utility functions for error handling and validation
-- `FocalParameters` - Parameter management for Z-scanning
-- `FocalSweep` - Main controller class
-- `FocalSweepFactory` - Factory for creating instances
-- `Initializer` - Handles ScanImage initialization
-- `MotorGUI_ZControl` - Interface to ScanImage motor controls
+% Position Management
+markCurrentPosition(label)      % Save position with label
+goToMarkedPosition(index)      % Go to saved position
+deleteMarkedPosition(index)    % Remove saved position
 
-### GUI Module
-- `FocusGUI` - Main GUI controller
-- `GUIUtils` - GUI utility functions
-- `components.UIComponentFactory` - Factory for creating UI components
-- `interfaces.ControllerInterface` - Interface for controllers
-- `interfaces.ControllerAdapter` - Adapter for legacy controllers
+% Metrics
+updateMetric()                 % Calculate current metrics
+setMetricType(metricType)      % Change active metric type
+getAutoStepMetrics()           % Get collected scan data
+```
 
-### Scan Module
-- `ZScanner` - Handles Z-scanning and movement
+#### Properties
+```matlab
+% Position State
+CurrentPosition                % Current Z position (μm)
+MarkedPositions               % Saved positions structure
 
-## Recent Improvements
+% Metrics
+CurrentMetric                 % Current metric value
+CurrentMetricType            % Active metric ('Std Dev', 'Mean', 'Max')
+AllMetrics                   % All calculated metrics
 
-1. **Centralized Configuration**
-   - Created `AppConfig` for application-wide settings
-   - Consolidated color and style definitions
-   - Standardized default parameter values
+% Auto-stepping State  
+IsAutoRunning                % True during automated sequences
+RecordMetrics               % Enable metrics collection
+```
 
-2. **Enhanced Error Handling**
-   - Improved parameter validation
-   - Standardized error reporting
-   - Added robust error recovery
+### ZStageControlApp Class
 
-3. **Modernized GUI Components**
-   - Added compatibility with latest App Designer components
-   - Added fallback for older MATLAB versions
-   - Improved component styling and layout
+#### Usage
+```matlab
+% Create application
+app = ZStageControlApp();
 
-4. **Reduced Code Duplication**
-   - Created utility classes for common operations
-   - Standardized validation methods
-   - Unified error handling approach
+% Access controller
+controller = app.Controller;
 
-5. **Improved Architecture**
-   - Better separation of concerns
-   - More consistent interfaces
-   - Enhanced code organization
+% Cleanup when done
+delete(app);
+```
 
-## Feature Compatibility
+## Metrics Information
 
-| Feature | Required MATLAB Version |
-|---------|--------------------------|
-| Basic functionality | R2018b or newer |
-| RangeSlider | R2020b or newer |
-| StateButton | R2019b or newer |
-| ButtonGroup | R2019a or newer |
-| TreeView | R2020a or newer |
+### Available Metrics
+- **Standard Deviation**: Primary focus metric measuring image sharpness/contrast
+- **Mean**: Average pixel intensity for exposure monitoring  
+- **Max**: Peak pixel intensity for saturation detection
+
+### Focus Detection
+Standard Deviation is typically the best metric for focus optimization as it increases when image features are sharp and decreases when blurred.
+
+## File Organization
+
+```
+src/
+├── ZStageControlApp.m     # Main GUI application (1223 lines)
+└── ZStageController.m     # Core controller logic (573 lines)
+```
+
+## Configuration
+
+### Default Settings
+- **Step sizes**: 0.1, 0.5, 1, 5, 10, 50 μm (1 μm default)
+- **Auto-step defaults**: 10 steps of 10 μm with 0.5s delay
+- **Position refresh**: 0.5 seconds
+- **Metrics refresh**: 1.0 seconds
+- **Default metric**: Standard Deviation
+
+### Customization
+Modify constants in `ZStageController.m`:
+```matlab
+STEP_SIZES = [0.1, 0.5, 1, 5, 10, 50]  % Available step sizes
+DEFAULT_STEP_SIZE = 1.0                  % Default step
+METRIC_REFRESH_PERIOD = 1.0             % Metrics update rate
+```
+
+## Troubleshooting
+
+### Connection Issues
+- Ensure ScanImage is running with `hSI` in base workspace
+- Verify Motor Controls window is open (Window → Motor Controls)
+- Check for ScanImage UI component changes (restart ScanImage if needed)
+
+### Performance
+- Increase refresh periods for slower computers
+- Disable metrics recording for faster stepping
+- Use larger step sizes for quick positioning
+
+### Common Errors
+- **"Motor Controls window not found"**: Open Motor Controls in ScanImage
+- **"Missing UI elements"**: Restart ScanImage Motor Controls window
+- **Movement not working**: Check ScanImage is not busy/acquiring
+
+## Examples
+
+### Automated Focus Search
+```matlab
+app = ZStageControlApp();
+
+% Move to starting position
+app.Controller.setPosition(1000);  % 1000 μm
+
+% Run automated scan with metrics
+app.Controller.startAutoStepping(2, 50, 0.3, 1, true);  % 2μm steps, 50 steps, 0.3s delay, up, record metrics
+
+% Wait for completion, then find best focus
+metrics = app.Controller.getAutoStepMetrics();
+[~, bestIdx] = max(metrics.Values.Std_Dev);
+bestPosition = metrics.Positions(bestIdx);
+app.Controller.setPosition(bestPosition);
+```
+
+### Position Mapping
+```matlab
+app = ZStageControlApp();
+
+% Save multiple positions of interest
+app.Controller.setPosition(500);
+app.Controller.markCurrentPosition('Sample Surface');
+
+app.Controller.setPosition(750);  
+app.Controller.markCurrentPosition('Mid Section');
+
+app.Controller.setPosition(1000);
+app.Controller.markCurrentPosition('Deep Focus');
+
+% Return to saved position
+app.Controller.goToMarkedPosition(1);  % Go to first saved position
+```
 
 ## License
 
 See the LICENSE file for details.
+
+## Support
+
+For issues or customization requests:
+1. Check troubleshooting section above
+2. Verify ScanImage version compatibility
+3. Provide specific error messages and screenshots
+4. Include Motor Controls GUI configuration details

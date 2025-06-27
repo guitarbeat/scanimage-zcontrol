@@ -1,29 +1,59 @@
 classdef ZStageController < handle
     % ZStageController - Core Z-stage positioning and metrics functionality
-    % Handles ScanImage integration, position control, and metric calculations
+    % 
+    % This class provides comprehensive control over microscope Z-stage positioning,
+    % integrating with ScanImage software for hardware control and real-time
+    % focus metrics calculation. Supports both manual positioning and automated
+    % scanning sequences with data collection.
+    %
+    % Key Features:
+    %   - ScanImage Motor Controls integration with automatic fallback to simulation
+    %   - Real-time position tracking and metrics calculation  
+    %   - Automated stepping sequences with configurable parameters
+    %   - Position bookmarking system for saving important locations
+    %   - Event-driven architecture for loose coupling with UI components
+    %
+    % Usage:
+    %   controller = ZStageController();           % Create controller
+    %   controller.moveStage(10);                 % Move 10 μm up
+    %   controller.startAutoStepping(2, 20, 0.5, 1, true);  % Auto scan
+    %   controller.markCurrentPosition('Focus');   % Save position
+    %
+    % Events:
+    %   StatusChanged    - Fired when connection status changes
+    %   PositionChanged  - Fired when stage position updates
+    %   MetricChanged    - Fired when focus metrics are recalculated
+    %   AutoStepComplete - Fired when automated sequence finishes
+    %
+    % See also: ZStageControlApp, ScanImage Motor Controls
     
     %% Constants
     properties (Constant, Access = public)
-        % Step Size Options
+        % Step Size Options (microns)
+        % Predefined step sizes available in the UI dropdown
         STEP_SIZES = [0.1, 0.5, 1, 5, 10, 50]
         DEFAULT_STEP_SIZE = 1.0
         
         % Auto Step Defaults
-        DEFAULT_AUTO_STEP = 10
-        DEFAULT_AUTO_STEPS = 10
-        DEFAULT_AUTO_DELAY = 0.5
+        % Default parameters for automated stepping sequences
+        DEFAULT_AUTO_STEP = 10      % Default step size (μm)
+        DEFAULT_AUTO_STEPS = 10     % Default number of steps
+        DEFAULT_AUTO_DELAY = 0.5    % Default delay between steps (seconds)
         
-        % Timer Configuration
-        POSITION_REFRESH_PERIOD = 0.5
-        METRIC_REFRESH_PERIOD = 1.0
-        MOVEMENT_WAIT_TIME = 0.2
-        STATUS_RESET_DELAY = 5
+        % Timer Configuration (seconds)
+        % Refresh rates for different operations to balance responsiveness and performance
+        POSITION_REFRESH_PERIOD = 0.5   % How often to read position from hardware
+        METRIC_REFRESH_PERIOD = 1.0     % How often to calculate focus metrics
+        MOVEMENT_WAIT_TIME = 0.2        % Pause after movement commands
+        STATUS_RESET_DELAY = 5          % Time before status message resets
         
-        % Metric Options
+        % Metric Options  
+        % Available focus quality metrics, optimized based on practical testing
         METRIC_TYPES = {'Std Dev', 'Mean', 'Max'}
-        DEFAULT_METRIC = 'Std Dev'
+        DEFAULT_METRIC = 'Std Dev'      % Best performer for focus detection
         
         % Status Messages
+        % Standardized status text for consistent user feedback
         TEXT = struct(...
             'Ready', 'Ready', ...
             'Simulation', 'Simulation Mode', ...
@@ -38,25 +68,25 @@ classdef ZStageController < handle
     %% Public Properties
     properties (Access = public)
         % Position State
-        CurrentPosition (1,1) double = 0
-        MarkedPositions = struct('Labels', {{}}, 'Positions', [], 'Metrics', {{}})
+        CurrentPosition (1,1) double = 0        % Current Z position in microns
+        MarkedPositions = struct('Labels', {{}}, 'Positions', [], 'Metrics', {{}})  % Saved position bookmarks
         
         % Auto Step State
-        IsAutoRunning (1,1) logical = false
-        CurrentStep (1,1) double = 0
-        TotalSteps (1,1) double = 0
-        AutoDirection (1,1) double = 1  % 1 for up, -1 for down
-        RecordMetrics (1,1) logical = false
-        AutoStepMetrics = struct('Positions', [], 'Values', struct())
+        IsAutoRunning (1,1) logical = false     % True when automated sequence is active
+        CurrentStep (1,1) double = 0            % Current step number in sequence
+        TotalSteps (1,1) double = 0             % Total steps in current sequence
+        AutoDirection (1,1) double = 1          % 1 for up, -1 for down movement
+        RecordMetrics (1,1) logical = false     % Whether to collect metrics during auto-stepping
+        AutoStepMetrics = struct('Positions', [], 'Values', struct())  % Collected metrics data
         
         % Metric State
-        CurrentMetric (1,1) double = 0
-        AllMetrics struct = struct()
-        CurrentMetricType char = 'Focus Score'
+        CurrentMetric (1,1) double = 0          % Current value of selected metric
+        AllMetrics struct = struct()            % All calculated metrics for current position
+        CurrentMetricType char = 'Focus Score'  % Currently selected metric type
         
         % ScanImage Integration
-        SimulationMode (1,1) logical = true
-        StatusMessage char = ''
+        SimulationMode (1,1) logical = true     % True when running without ScanImage hardware
+        StatusMessage char = ''                 % Current status for display
     end
     
     %% Private Properties

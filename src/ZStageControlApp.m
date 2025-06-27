@@ -1,28 +1,87 @@
 classdef ZStageControlApp < matlab.apps.AppBase
-    % ZStageControlApp - Streamlined Z-stage positioning control interface
-    % Provides manual and automatic z control, and position bookmarking
+    % ZStageControlApp - Modern GUI for Z-stage positioning control
+    %
+    % This MATLAB App Designer application provides a comprehensive user interface
+    % for microscope Z-stage control, featuring tabbed interface design, real-time
+    % metrics display, automated scanning capabilities, and expandable plotting.
+    %
+    % Key Features:
+    %   - Tabbed interface (Manual Control, Auto Step, Bookmarks)
+    %   - Real-time position and focus metrics display
+    %   - Expandable metrics plotting with data export
+    %   - Position bookmarking system with labeled storage
+    %   - Automated stepping sequences with progress tracking
+    %   - Modern UI with responsive design and visual feedback
+    %
+    % Architecture:
+    %   - Follows Model-View-Controller pattern with ZStageController
+    %   - Event-driven updates for responsive user experience
+    %   - Fixed-width main window with horizontal plot expansion
+    %   - Timer-based refresh for position and metrics
+    %
+    % Usage:
+    %   app = ZStageControlApp();        % Launch the application
+    %   delete(app);                     % Clean shutdown when done
+    %
+    % UI Components:
+    %   Manual Control Tab:
+    %     - Step size dropdown (0.1 - 50 μm)
+    %     - Up/Down movement buttons
+    %     - Zero position reset
+    %
+    %   Auto Step Tab:
+    %     - Custom step size and count configuration
+    %     - Direction selection (up/down)
+    %     - Delay timing control
+    %     - Metrics recording toggle
+    %     - Start/Stop sequence control
+    %
+    %   Bookmarks Tab:
+    %     - Position labeling and storage
+    %     - Saved positions list with metrics
+    %     - Navigation and deletion controls
+    %
+    %   Metrics Display:
+    %     - Real-time focus quality indicator
+    %     - Metric type selection (Std Dev, Mean, Max)
+    %     - Manual refresh capability
+    %
+    %   Expandable Plot:
+    %     - Normalized metrics vs position visualization
+    %     - Multi-metric overlay with legend
+    %     - Data export and plot clearing controls
+    %
+    % Events Handled:
+    %   - Controller status, position, and metric changes
+    %   - Auto-stepping completion with plot expansion
+    %   - User interactions for all controls
+    %
+    % See also: ZStageController, matlab.apps.AppBase
     
     %% Constants
     properties (Constant, Access = private)
         % Window Configuration
-        WINDOW_WIDTH = 320
-        WINDOW_HEIGHT = 380  % Increased height to accommodate metric display
-        PLOT_WIDTH = 400     % Width of the plot area when expanded
+        % Fixed dimensions for consistent layout and professional appearance
+        WINDOW_WIDTH = 320      % Base window width (pixels)
+        WINDOW_HEIGHT = 380     % Window height to accommodate all controls
+        PLOT_WIDTH = 400        % Additional width when plot is expanded
         
         % UI Theme Colors
+        % Modern color scheme for professional appearance and good contrast
         COLORS = struct(...
-            'Background', [0.95 0.95 0.95], ...
-            'Primary', [0.2 0.6 0.9], ...
-            'Success', [0.2 0.7 0.3], ...
-            'Warning', [0.9 0.6 0.2], ...
-            'Danger', [0.9 0.3 0.3], ...
-            'Light', [0.98 0.98 0.98], ...
-            'TextMuted', [0.5 0.5 0.5])
+            'Background', [0.95 0.95 0.95], ...  % Light gray background
+            'Primary', [0.2 0.6 0.9], ...        % Blue for primary actions
+            'Success', [0.2 0.7 0.3], ...        % Green for success states
+            'Warning', [0.9 0.6 0.2], ...        % Orange for warnings
+            'Danger', [0.9 0.3 0.3], ...         % Red for errors/dangers
+            'Light', [0.98 0.98 0.98], ...       % Nearly white for highlights
+            'TextMuted', [0.5 0.5 0.5])          % Gray for secondary text
         
         % UI Text
+        % Centralized text constants for consistency and easy localization
         TEXT = struct(...
-            'WindowTitle', 'Z-Stage Control', ...
-            'Ready', 'Ready')
+            'WindowTitle', 'Z-Stage Control', ... % Main window title
+            'Ready', 'Ready')                     % Default status message
     end
     
     %% Public Properties - UI Components
@@ -99,6 +158,24 @@ classdef ZStageControlApp < matlab.apps.AppBase
     %% Constructor and Destructor
     methods (Access = public)
         function app = ZStageControlApp()
+            % ZStageControlApp Constructor
+            % 
+            % Creates and initializes the Z-Stage Control application with full
+            % GUI setup, controller integration, and timer-based updates.
+            %
+            % Initialization sequence:
+            %   1. Initialize component structures to prevent errors
+            %   2. Create all UI components and layout
+            %   3. Initialize ZStageController and event listeners
+            %   4. Start refresh timers for position and metrics
+            %   5. Register app with MATLAB App framework
+            %
+            % Returns:
+            %   app - ZStageControlApp instance ready for use
+            %
+            % Example:
+            %   app = ZStageControlApp();  % Launch the application
+            
             % Initialize component structures
             initializeComponentStructures(app);
             
@@ -117,6 +194,18 @@ classdef ZStageControlApp < matlab.apps.AppBase
         end
         
         function delete(app)
+            % ZStageControlApp Destructor
+            %
+            % Performs clean shutdown of the application including:
+            %   - Stopping all timers safely
+            %   - Cleaning up controller resources
+            %   - Closing UI figure
+            %
+            % Called automatically when app goes out of scope or is explicitly deleted.
+            %
+            % Example:
+            %   delete(app);  % Clean shutdown
+            
             cleanup(app);
             if isvalid(app.UIFigure)
                 delete(app.UIFigure);

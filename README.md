@@ -1,140 +1,244 @@
-# ScanImage Z-Control
+# Z-Stage Control for ScanImage
 
-A tool for automated Z-focus finding in microscopy applications using ScanImage.
+A MATLAB tool for precise Z-stage positioning and focus optimization in ScanImage microscopy systems. Provides manual control, automated Z-scanning, and metrics-based focus optimization with a modern GUI interface.
 
-## Overview
+## Key Features
 
-This software provides Z-focus control for microscopes running ScanImage, with automated focus finding based on image brightness. The system includes:
+- **Manual Z-position control** with configurable step sizes (0.1-50 μm)
+- **Automated Z-scanning** with real-time focus quality metrics
+- **Position bookmarking system** for saving and returning to important positions
+- **Real-time metrics plotting** with normalized visualization
+- **ScanImage integration** via Motor Controls GUI interface
+- **Simulation mode** for testing without hardware
+- **Modern tabbed GUI** built with MATLAB App Designer
 
-- Real-time brightness monitoring
-- Automated Z-scanning
-- Focus optimization
-- Interactive GUI
+## Installation
 
-## Recent Simplifications (MVP Version)
-
-The software has been simplified to a Minimum Viable Product (MVP) version to address stability issues. The following changes were made:
-
-1. **Removed channelSettings dependency** - The code no longer requires access to ScanImage's channel settings, which was causing errors.
-2. **Made display settings optional** - The software now gracefully handles missing display settings.
-3. **Added error resilience** - Added try-catch blocks around critical components to prevent crashes.
-4. **Improved GUI robustness** - The UI creation is now wrapped in try-catch to handle initialization failures.
-5. **Better status reporting** - Status updates now work even if UI components aren't fully initialized.
+1. Clone or download this repository
+2. Add the `src` directory to your MATLAB path:
+   ```matlab
+   addpath('path/to/scanimage-zcontrol/src')
+   ```
+3. Ensure ScanImage is running with Motor Controls window open (for hardware control)
 
 ## Requirements
 
-- MATLAB R2018b or later
-- ScanImage 2020 or later
-- Access to ScanImage motor controls
+- **MATLAB R2019b or newer** (for App Designer components)
+- **ScanImage** must be running with `hSI` available in base workspace
+- **Motor Controls window** must be open in ScanImage for hardware control
 
-## Usage
+## Basic Usage
+
+### Launch the Application
 
 ```matlab
-% Launch the Z-control tool
-fsweep
+% Create and launch the Z-Stage Control application
+app = ZStageControlApp();
+```
 
-% Launch with debug messages
-fsweep('verbosity', 2)
+### Manual Control
+- Use the **Manual Control** tab for direct positioning
+- Select step size from dropdown (0.1, 0.5, 1, 5, 10, 50 μm)
+- Click ▲/▼ buttons to move up/down by selected step
+- Click **ZERO** to reset current position to 0 μm
 
-% Close the tool
-fsweep('close')
+### Automated Scanning
+- Switch to the **Auto Step** tab
+- Configure parameters:
+  - **Step Size**: Custom step size in microns
+  - **Steps**: Number of steps to execute
+  - **Delay**: Time between steps (seconds)
+  - **Direction**: Up (▲) or Down (▼)
+  - **Record Metrics**: Enable to collect focus data
+- Click **START** to begin automated sequence
 
-% Display version information
-fsweep('version')
+### Position Bookmarks
+- Use the **Bookmarks** tab to save important positions
+- Enter a label and click **MARK** to save current position
+- Select saved positions and click **GO TO** to return
+- Click **DELETE** to remove unwanted bookmarks
+
+### Focus Metrics
+- Real-time focus metrics displayed in main window
+- Choose metric type: Standard Deviation (best for focus), Mean, or Max
+- Metrics are plotted during automated scanning
+- Export metrics data for analysis
+
+## ScanImage Integration
+
+The application automatically integrates with ScanImage through a robust connection system:
+
+### Connection Process
+1. **Detection**: Checks for `hSI` variable in MATLAB base workspace
+2. **Motor Controls**: Locates Motor Controls window by Tag='MotorControls'
+3. **UI Elements**: Connects to position display (`etZPos`), step control (`Zstep`), and movement buttons (`Zdec`/`Zinc`)
+4. **Fallback**: Automatically switches to simulation mode if any component is missing
+
+### Hardware Control
+- All movements are executed through ScanImage's own GUI controls
+- Ensures proper synchronization with ScanImage's internal state
+- Avoids hardware conflicts by using existing motor interfaces
+- Position feedback comes directly from ScanImage hardware
+
+### Simulation Mode
+- Automatically activated when ScanImage is not available
+- Allows testing and development without hardware
+- Simulates realistic focus metrics for algorithm development
+- All operations logged but don't affect physical hardware
+
+## API Reference
+
+### ZStageController Class
+
+#### Core Methods
+```matlab
+% Position Control
+moveStage(microns)              % Move relative distance
+setPosition(position)           % Move to absolute position  
+resetPosition()                 % Reset position to zero
+
+% Automated Control
+startAutoStepping(stepSize, numSteps, delay, direction, recordMetrics)
+stopAutoStepping()             % Stop current sequence
+
+% Position Management
+markCurrentPosition(label)      % Save position with label
+goToMarkedPosition(index)      % Go to saved position
+deleteMarkedPosition(index)    % Remove saved position
+
+% Metrics
+updateMetric()                 % Calculate current metrics
+setMetricType(metricType)      % Change active metric type
+getAutoStepMetrics()           % Get collected scan data
+```
+
+#### Properties
+```matlab
+% Position State
+CurrentPosition                % Current Z position (μm)
+MarkedPositions               % Saved positions structure
+
+% Metrics
+CurrentMetric                 % Current metric value
+CurrentMetricType            % Active metric ('Std Dev', 'Mean', 'Max')
+AllMetrics                   % All calculated metrics
+
+% Auto-stepping State  
+IsAutoRunning                % True during automated sequences
+RecordMetrics               % Enable metrics collection
+```
+
+### ZStageControlApp Class
+
+#### Usage
+```matlab
+% Create application
+app = ZStageControlApp();
+
+% Access controller
+controller = app.Controller;
+
+% Cleanup when done
+delete(app);
+```
+
+## Metrics Information
+
+### Available Metrics
+- **Standard Deviation**: Primary focus metric measuring image sharpness/contrast
+- **Mean**: Average pixel intensity for exposure monitoring  
+- **Max**: Peak pixel intensity for saturation detection
+
+### Focus Detection
+Standard Deviation is typically the best metric for focus optimization as it increases when image features are sharp and decreases when blurred.
+
+## File Organization
+
+```
+src/
+├── ZStageControlApp.m     # Main GUI application (1223 lines)
+└── ZStageController.m     # Core controller logic (573 lines)
+```
+
+## Configuration
+
+### Default Settings
+- **Step sizes**: 0.1, 0.5, 1, 5, 10, 50 μm (1 μm default)
+- **Auto-step defaults**: 10 steps of 10 μm with 0.5s delay
+- **Position refresh**: 0.5 seconds
+- **Metrics refresh**: 1.0 seconds
+- **Default metric**: Standard Deviation
+
+### Customization
+Modify constants in `ZStageController.m`:
+```matlab
+STEP_SIZES = [0.1, 0.5, 1, 5, 10, 50]  % Available step sizes
+DEFAULT_STEP_SIZE = 1.0                  % Default step
+METRIC_REFRESH_PERIOD = 1.0             % Metrics update rate
 ```
 
 ## Troubleshooting
 
-If you encounter issues:
+### Connection Issues
+- Ensure ScanImage is running with `hSI` in base workspace
+- Verify Motor Controls window is open (Window → Motor Controls)
+- Check for ScanImage UI component changes (restart ScanImage if needed)
 
-1. Make sure ScanImage is running with `hSI` in the base workspace
-2. Check if your ScanImage version is compatible
-3. Verify that motor controls are accessible
+### Performance
+- Increase refresh periods for slower computers
+- Disable metrics recording for faster stepping
+- Use larger step sizes for quick positioning
+
+### Common Errors
+- **"Motor Controls window not found"**: Open Motor Controls in ScanImage
+- **"Missing UI elements"**: Restart ScanImage Motor Controls window
+- **Movement not working**: Check ScanImage is not busy/acquiring
+
+## Examples
+
+### Automated Focus Search
+```matlab
+app = ZStageControlApp();
+
+% Move to starting position
+app.Controller.setPosition(1000);  % 1000 μm
+
+% Run automated scan with metrics
+app.Controller.startAutoStepping(2, 50, 0.3, 1, true);  % 2μm steps, 50 steps, 0.3s delay, up, record metrics
+
+% Wait for completion, then find best focus
+metrics = app.Controller.getAutoStepMetrics();
+[~, bestIdx] = max(metrics.Values.Std_Dev);
+bestPosition = metrics.Positions(bestIdx);
+app.Controller.setPosition(bestPosition);
+```
+
+### Position Mapping
+```matlab
+app = ZStageControlApp();
+
+% Save multiple positions of interest
+app.Controller.setPosition(500);
+app.Controller.markCurrentPosition('Sample Surface');
+
+app.Controller.setPosition(750);  
+app.Controller.markCurrentPosition('Mid Section');
+
+app.Controller.setPosition(1000);
+app.Controller.markCurrentPosition('Deep Focus');
+
+% Return to saved position
+app.Controller.goToMarkedPosition(1);  % Go to first saved position
+```
 
 ## License
 
-See LICENSE file for details.
+See the LICENSE file for details.
 
-## Structure
+## Support
 
-The application is organized into the following package structure:
-
-```
-src/
-  +core/              # Core functionality and classes
-    FocalParameters.m    # Parameter management for focusing
-    FocalSweep.m         # Main application class
-    FocalSweepFactory.m  # Factory for creating FocalSweep instances
-    Initializer.m        # System initialization logic
-    MotorGUI_ZControl.m  # Base class for Z-motor control
-
-  +gui/               # GUI components
-    FocusGUI.m           # Main GUI class
-    +components/         # Reusable UI components
-    +handlers/           # Event handling logic
-
-  +monitoring/        # Image monitoring functionality
-    BrightnessMonitor.m  # Real-time brightness monitoring
-
-  +scan/              # Z-scanning functionality
-    ZScanner.m           # Z-axis scanning control
-
-  fsweep.m            # Main launcher function
-```
-
-## Usage
-
-To launch the application, simply run:
-
-```matlab
-% In MATLAB command window
-fsweep
-```
-
-Or with custom parameters:
-
-```matlab
-% With parameters
-fsweep('verbosity', 2)          % Enable more verbose output
-fsweep('forceNew', true)        % Force creation of a new instance
-
-% Get the instance handle
-zController = fsweep();
-
-% Close any existing instances
-fsweep('close')
-```
-
-## Development
-
-For development, use the core package directly:
-
-```matlab
-% Create an instance directly
-zController = core.FocalSweep();
-
-% Use the factory
-zController = core.FocalSweepFactory.launch();
-```
-
-## Design Architecture
-
-The application follows a modular design with several key components:
-
-1. **Core System** - Provides the fundamental functionality
-   - `core.FocalSweep` - Main controller class
-   - `core.FocalParameters` - Parameter management
-   - `core.MotorGUI_ZControl` - Z-position motor interface
-
-2. **GUI System** - Handles the user interface
-   - `gui.FocusGUI` - Main GUI controller
-   - `gui.components.UIComponentFactory` - Creates UI elements with consistent styling
-   - `gui.handlers.UIEventHandlers` - Manages UI events and updates
-
-3. **Monitoring System** - Handles image monitoring
-   - `monitoring.BrightnessMonitor` - Monitors image brightness in real-time
-
-4. **Scanning System** - Controls Z-scanning operations
-   - `scan.ZScanner` - Manages automated Z-position scanning
-
-This modular architecture makes the system extensible and maintainable, with clear separation of concerns between components.
+For issues or customization requests:
+1. Check troubleshooting section above
+2. Verify ScanImage version compatibility
+3. Provide specific error messages and screenshots
+4. Include Motor Controls GUI configuration details

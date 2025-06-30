@@ -151,7 +151,8 @@ classdef bookmarksview < matlab.apps.AppBase
             app.MarkButton.Layout.Column = 2;
             
             % Apply styling using centralized system
-            foilview_styling.styleButton(app.MarkButton, 'Primary', 'MARK');
+            foilview_styling.styleButton(app.MarkButton, 'primary', 'base');
+            app.MarkButton.Text = 'Mark';
             
             % Instructions
             instructLabel = uilabel(app.MainLayout);
@@ -181,15 +182,15 @@ classdef bookmarksview < matlab.apps.AppBase
             app.GoToButton.Enable = 'off';
             app.GoToButton.Layout.Row = 1;
             app.GoToButton.Layout.Column = 1;
+            foilview_styling.styleButton(app.GoToButton, 'success', 'base');
+            app.GoToButton.Text = 'Go To';
             
             app.DeleteButton = uibutton(buttonLayout, 'push');
             app.DeleteButton.Enable = 'off';
             app.DeleteButton.Layout.Row = 1;
             app.DeleteButton.Layout.Column = 2;
-            
-            % Apply styling using centralized system
-            foilview_styling.styleButton(app.GoToButton, 'Success', 'GO TO');
-            foilview_styling.styleButton(app.DeleteButton, 'Danger', 'DELETE');
+            foilview_styling.styleButton(app.DeleteButton, 'danger', 'base');
+            app.DeleteButton.Text = 'Delete';
             
             % Status Label
             app.StatusLabel = uilabel(app.MainLayout);

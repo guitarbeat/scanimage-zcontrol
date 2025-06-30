@@ -10,11 +10,12 @@ classdef foilview_plot < handle
         MetricsPlotLines = {}
         IsPlotExpanded = false
         LastPlotUpdate = 0  % Track last update time for throttling
+        OriginalFigureWidth = []  % Store figure width before expansion
     end
     
     properties (Constant, Access = private)
         PLOT_WIDTH = 400  % Width of the plot panel when expanded
-        DEFAULT_COLORS = {'#0072BD', '#D95319', '#EDB120', '#7E2F8E', '#77AC30', '#4DBEEE', '#A2142F'}
+        DEFAULT_COLORS = {[0 0.447 0.741], [0.851 0.325 0.098], [0.929 0.694 0.125], [0.494 0.184 0.556], [0.466 0.674 0.188], [0.302 0.745 0.933], [0.635 0.078 0.184]}
         DEFAULT_MARKERS = {'o', 's', 'd', '^', 'v', '>', '<'}
     end
     
@@ -30,14 +31,11 @@ classdef foilview_plot < handle
         
         function success = initializeMetricsPlot(obj, axes)
             % Enhanced plot initialization using centralized utilities
-            success = foilview_utils.safeExecuteWithReturn(@() doInitialize(), 'initializeMetricsPlot', false);
-            
-            function success = doInitialize()
-                success = false;
-                
+            try
                 % Validate input
-                if ~foilview_utils.validateUIComponent(axes)
+                if isempty(axes) || ~isvalid(axes)
                     fprintf('Invalid axes provided to initializeMetricsPlot\n');
+                    success = false;
                     return;
                 end
                 
@@ -51,8 +49,11 @@ classdef foilview_plot < handle
                 % Initialize empty plot lines with different colors and markers
                 obj.MetricsPlotLines = cell(length(metricTypes), 1);
                 
+                % Create empty plot lines for each metric type
                 for i = 1:length(metricTypes)
                     metricType = metricTypes{i};
+                    
+                    % Create new line with empty data
                     colorIdx = mod(i-1, length(obj.DEFAULT_COLORS)) + 1;
                     markerIdx = mod(i-1, length(obj.DEFAULT_MARKERS)) + 1;
                     
@@ -60,20 +61,27 @@ classdef foilview_plot < handle
                         'Color', obj.DEFAULT_COLORS{colorIdx}, ...
                         'Marker', obj.DEFAULT_MARKERS{markerIdx}, ...
                         'LineStyle', '-', ...
-                        'LineWidth', 1.5, ...  % Use standard line width
-                        'MarkerSize', foilview_styling.MARKER_SIZE, ...
+                        'LineWidth', 1.5, ...
+                        'MarkerSize', 4, ...
                         'DisplayName', metricType);
                 end
                 
-                % Configure axes using centralized utility
-                foilview_utils.configureAxes(axes, 'Metrics vs Z Position');
+                % Set up basic axes properties
+                xlabel(axes, 'Z Position (μm)');
+                ylabel(axes, 'Normalized Metric Value');
+                title(axes, 'Metrics vs Z Position');
+                grid(axes, 'on');
                 
-                % Create legend using utility
-                foilview_utils.createLegend(axes);
+                % Create legend
+                legend(axes, 'Location', 'northeast');
                 
                 % Force initial draw
                 drawnow;
                 success = true;
+                
+            catch ME
+                fprintf('Error in initializeMetricsPlot: %s\n', ME.message);
+                success = false;
             end
         end
         
@@ -101,7 +109,7 @@ classdef foilview_plot < handle
                 ylim(axes, [0, 1]);
                 
                 % Configure axes using centralized utility
-                foilview_utils.configureAxes(axes, 'Metrics vs Z Position');
+                foilview_utils.setupPlotAxes(axes, 'Metrics vs Z Position');
                 
                 % Update display
                 drawnow;
@@ -249,9 +257,12 @@ classdef foilview_plot < handle
                 foilview_utils.setPlotTitle(axes, 'Normalized Metrics vs Z Position', true, ...
                     min(metrics.Positions), max(metrics.Positions));
                 
+                % Get fonts from the modern styling system
+                fonts = foilview_styling.getFonts();
+                
                 % Update y-axis label
                 ylabel(axes, 'Normalized Metric Value (relative to first)', ...
-                    'FontSize', foilview_styling.FONT_SIZE_NORMAL);
+                    'FontSize', fonts.SizeBase);
             end
         end
         
@@ -282,6 +293,9 @@ classdef foilview_plot < handle
                 currentWidth = figPos(3);
                 currentHeight = figPos(4);
                 
+                % Remember original width for collapse
+                obj.OriginalFigureWidth = currentWidth;
+                
                 % Expand figure width dynamically
                 newWidth = currentWidth + obj.PLOT_WIDTH + 20; % +20 for padding
                 uiFigure.Position = [figPos(1), figPos(2), newWidth, figPos(4)];
@@ -293,13 +307,9 @@ classdef foilview_plot < handle
                 plotPanel.Position = [plotPanelX, plotPanelY, obj.PLOT_WIDTH, plotPanelHeight];
                 plotPanel.Visible = 'on';
                 
-                % Update button appearance
-                foilview_styling.styleButton(expandButton, 'Warning', '📊 Hide Plot');
-                
                 obj.IsPlotExpanded = true;
                 
-                % Update window title
-                uiFigure.Name = sprintf('%s - Plot Expanded', foilview_ui.TEXT.WindowTitle);
+                % (Styling and title updated by foilview_updater)
                 success = true;
             end
         end
@@ -327,17 +337,17 @@ classdef foilview_plot < handle
                 % Get current figure position
                 figPos = uiFigure.Position;
                 
-                % Collapse figure width dynamically by removing plot width and padding
-                originalWidth = figPos(3) - obj.PLOT_WIDTH - 20;
-                uiFigure.Position = [figPos(1), figPos(2), originalWidth, figPos(4)];
-                
-                % Update button appearance
-                foilview_styling.styleButton(expandButton, 'Primary', '📊 Show Plot');
+                % Collapse figure width restoring original size if available
+                if ~isempty(obj.OriginalFigureWidth)
+                    newWidth = obj.OriginalFigureWidth;
+                else
+                    newWidth = figPos(3) - obj.PLOT_WIDTH - 20;
+                end
+                uiFigure.Position = [figPos(1), figPos(2), newWidth, figPos(4)];
                 
                 obj.IsPlotExpanded = false;
                 
-                % Update window title
-                uiFigure.Name = foilview_ui.TEXT.WindowTitle;
+                % (Styling and title updated by foilview_updater)
                 success = true;
             end
         end

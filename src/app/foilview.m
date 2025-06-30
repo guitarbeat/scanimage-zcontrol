@@ -78,8 +78,11 @@ classdef foilview < matlab.apps.AppBase
         ResizeMonitorTimer
         
         % Window sizing tracking
-        LastWindowSize = [0 0 0 0]  % Track previous window size for resize detection
+        LastWindowSize = [100 100 320 420]  % Track previous window size for resize detection
         IgnoreNextResize = false    % Flag to ignore programmatic resizes
+        
+        % Sync prevention flag
+        IsSyncingStepSize = false
     end
     
     %% Constructor and Destructor
@@ -194,6 +197,10 @@ classdef foilview < matlab.apps.AppBase
             app.MetricTimer = foilview_utils.createTimer('fixedRate', ...
                 app.Controller.METRIC_REFRESH_PERIOD, ...
                 @(~,~) app.Controller.updateMetric());
+            
+            % Pass timer reference to controller for coordination
+            app.Controller.setMetricTimer(app.MetricTimer);
+            
             start(app.MetricTimer);
         end
         
@@ -286,8 +293,8 @@ classdef foilview < matlab.apps.AppBase
             app.UIFigure.CloseRequestFcn = createCallbackFcn(app, @app.onWindowClose, true);
             
             % Manual control callbacks
-            app.ManualControls.StepSizeDropdown.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onStepSizeChanged, true);
+            app.ManualControls.StepSizeField.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onManualStepSizeChanged, true);
             app.ManualControls.UpButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onUpButtonPushed, true);
             app.ManualControls.DownButton.ButtonPushedFcn = ...
@@ -300,8 +307,7 @@ classdef foilview < matlab.apps.AppBase
                 createCallbackFcn(app, @app.onStepDownButtonPushed, true);
             
             % Auto step callbacks
-            app.AutoControls.StepField.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onAutoStepSizeChanged, true);
+            app.AutoControls.StepField.ValueChangedFcn = createCallbackFcn(app, @app.onAutoStepSizeChanged, true);
             app.AutoControls.StepsField.ValueChangedFcn = ...
                 createCallbackFcn(app, @app.onAutoStepsChanged, true);
             app.AutoControls.DelayField.ValueChangedFcn = ...
@@ -310,8 +316,6 @@ classdef foilview < matlab.apps.AppBase
                 createCallbackFcn(app, @app.onAutoDirectionToggled, true);
             app.AutoControls.StartStopButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onStartStopButtonPushed, true);
-            
-
             
             % Metric callbacks
             app.MetricDisplay.TypeDropdown.ValueChangedFcn = ...
@@ -344,7 +348,11 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function onControllerPositionChanged(app)
+            % Update position label
             foilview_updater.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller);
+            % Refresh expand button styling and window title
+            foilview_updater.updatePlotExpansionState(app.MetricsPlotControls, app.PlotManager.getIsPlotExpanded());
+            foilview_updater.updateWindowTitle(app);
         end
         
         function onControllerMetricChanged(app)
@@ -383,39 +391,48 @@ classdef foilview < matlab.apps.AppBase
             foilview_logic.resetPosition(app.Controller);
         end
         
-        function onStepSizeChanged(app, varargin)
-            if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
-                event = varargin{1};
-                foilview_logic.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, true);
-            end
-        end
-        
         function onStepUpButtonPushed(app, varargin)
-            % Cycle to next larger step size
-            currentIndex = app.ManualControls.CurrentStepIndex;
-            if currentIndex < length(app.ManualControls.StepSizes)
-                newIndex = currentIndex + 1;
-                newStepSize = app.ManualControls.StepSizes(newIndex);
-                app.updateStepSizeDisplay(newIndex, newStepSize);
+            % Cycle to next preset step size
+            sizes = app.ManualControls.StepSizes;
+            idx = app.ManualControls.CurrentStepIndex;
+            if idx < numel(sizes)
+                idx = idx + 1;
             end
+            newVal = sizes(idx);
+            app.ManualControls.CurrentStepIndex = idx;
+            app.ManualControls.StepSizeField.Value = newVal;
         end
         
         function onStepDownButtonPushed(app, varargin)
-            % Cycle to next smaller step size
-            currentIndex = app.ManualControls.CurrentStepIndex;
-            if currentIndex > 1
-                newIndex = currentIndex - 1;
-                newStepSize = app.ManualControls.StepSizes(newIndex);
-                app.updateStepSizeDisplay(newIndex, newStepSize);
+            % Cycle to previous preset step size
+            sizes = app.ManualControls.StepSizes;
+            idx = app.ManualControls.CurrentStepIndex;
+            if idx > 1
+                idx = idx - 1;
             end
+            newVal = sizes(idx);
+            app.ManualControls.CurrentStepIndex = idx;
+            app.ManualControls.StepSizeField.Value = newVal;
         end
         
-        % Auto Step Events
-        function onAutoStepSizeChanged(app, varargin)
+        function onManualStepSizeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
-                foilview_logic.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, false);
-                app.updateAutoStepStatus();
+                
+                % Only sync if not already syncing to prevent infinite loops
+                if ~app.IsSyncingStepSize
+                    app.IsSyncingStepSize = true;
+                    try
+                        foilview_logic.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, true);
+                    catch
+                        % Ignore errors during sync
+                    end
+                    % Update preset index based on new manual value
+                    sizes = app.ManualControls.StepSizes;
+                    [~, idx] = min(abs(sizes - event.Value));
+                    app.ManualControls.CurrentStepIndex = idx;
+                    app.IsSyncingStepSize = false;
+                end
             end
         end
         
@@ -446,8 +463,6 @@ classdef foilview < matlab.apps.AppBase
             app.updateAutoStepStatus();
             app.updateDirectionButtons();
         end
-        
-
         
         % System Events
         function onRefreshButtonPushed(app, varargin)
@@ -516,10 +531,9 @@ classdef foilview < matlab.apps.AppBase
             foilview_logic.updateMetric(app.Controller);
         end
         
-
-        
         % Plot Control Events
         function onExpandButtonPushed(app, varargin)
+            % Toggle GUI expansion/collapse
             if app.PlotManager.getIsPlotExpanded()
                 app.PlotManager.collapseGUI(app.UIFigure, app.MainPanel, ...
                     app.MetricsPlotControls.Panel, app.MetricsPlotControls.ExpandButton, app);
@@ -527,6 +541,9 @@ classdef foilview < matlab.apps.AppBase
                 app.PlotManager.expandGUI(app.UIFigure, app.MainPanel, ...
                     app.MetricsPlotControls.Panel, app.MetricsPlotControls.ExpandButton, app);
             end
+            % Immediately refresh expand button styling and window title
+            foilview_updater.updatePlotExpansionState(app.MetricsPlotControls, app.PlotManager.getIsPlotExpanded());
+            foilview_updater.updateWindowTitle(app);
         end
         
         function onClearPlotButtonPushed(app, varargin)
@@ -536,27 +553,28 @@ classdef foilview < matlab.apps.AppBase
         function onExportPlotButtonPushed(app, varargin)
             app.PlotManager.exportPlotData(app.UIFigure, app.Controller);
         end
+        
+        % Auto Step Events
+        function onAutoStepSizeChanged(app, varargin)
+            if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
+                event = varargin{1};
+                % Prevent recursive syncing
+                if ~app.IsSyncingStepSize
+                    app.IsSyncingStepSize = true;
+                    try
+                        foilview_logic.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, false);
+                    catch
+                        % Ignore errors during sync
+                    end
+                    app.IsSyncingStepSize = false;
+                end
+                app.updateAutoStepStatus();
+            end
+        end
     end
     
     %% Helper Methods
     methods (Access = private)
-        function updateStepSizeDisplay(app, newIndex, newStepSize)
-            % Update step size display and sync controls
-            app.ManualControls.CurrentStepIndex = newIndex;
-            
-            % Update display label
-            app.ManualControls.StepSizeDisplay.Text = sprintf('%.1fμm', newStepSize);
-            
-            % Update hidden dropdown for compatibility
-            formattedValue = foilview_utils.formatPosition(newStepSize);
-            if ismember(formattedValue, app.ManualControls.StepSizeDropdown.Items)
-                app.ManualControls.StepSizeDropdown.Value = formattedValue;
-            end
-            
-            % Sync with auto controls
-            app.AutoControls.StepField.Value = newStepSize;
-        end
-        
         function updateAutoStepStatus(app)
             % Update the smart status display
             stepSize = app.AutoControls.StepField.Value;
@@ -577,15 +595,15 @@ classdef foilview < matlab.apps.AppBase
             
             % Create status message
             if app.Controller.IsAutoRunning
-                statusText = sprintf('Sweeping %.1f μm %s...', totalDistance, directionText);
+                statusText = sprintf('Sweeping %d×%.1f μm (%.1f µm total) %s...', numSteps, stepSize, totalDistance, directionText);
             else
                 totalTime = numSteps * delay;
                 if totalTime < 60
-                    statusText = sprintf('Ready: %.1f μm %s (%.1fs)', totalDistance, directionText, totalTime);
+                    statusText = sprintf('Ready: %d×%.1f μm (%.1f µm total) %s (%.1fs)', numSteps, stepSize, totalDistance, directionText, totalTime);
                 else
                     minutes = floor(totalTime / 60);
                     seconds = mod(totalTime, 60);
-                    statusText = sprintf('Ready: %.1f μm %s (%dm %.0fs)', totalDistance, directionText, minutes, seconds);
+                    statusText = sprintf('Ready: %d×%.1f μm (%.1f µm total) %s (%dm %.0fs)', numSteps, stepSize, totalDistance, directionText, minutes, seconds);
                 end
             end
             
@@ -602,15 +620,19 @@ classdef foilview < matlab.apps.AppBase
             % Style start/stop button based on state and direction
             if direction > 0
                 if app.Controller.IsAutoRunning
-                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Danger', 'STOP ▲');
+                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'danger', 'base');
+                    app.AutoControls.StartStopButton.Text = 'STOP ▲';
                 else
-                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Success', 'START ▲');
+                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'success', 'base');
+                    app.AutoControls.StartStopButton.Text = 'START ▲';
                 end
             else
                 if app.Controller.IsAutoRunning
-                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Danger', 'STOP ▼');
+                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'danger', 'base');
+                    app.AutoControls.StartStopButton.Text = 'STOP ▼';
                 else
-                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Success', 'START ▼');
+                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'success', 'base');
+                    app.AutoControls.StartStopButton.Text = 'START ▼';
                 end
             end
         end
@@ -631,11 +653,11 @@ classdef foilview < matlab.apps.AppBase
                              strcmp(app.StageViewApp.UIFigure.Visible, 'on');
             
             % Update Bookmarks button using centralized styling
-            foilview_styling.styleWindowIndicatorButton(app.StatusControls.BookmarksButton, ...
+            foilview_styling.styleWindowIndicator(app.StatusControls.BookmarksButton, ...
                 bookmarksActive, '📌', '📌●', '📌');
             
             % Update Stage View button using centralized styling
-            foilview_styling.styleWindowIndicatorButton(app.StatusControls.StageViewButton, ...
+            foilview_styling.styleWindowIndicator(app.StatusControls.StageViewButton, ...
                 stageViewActive, '📹', '📹●', '📹');
         end
         

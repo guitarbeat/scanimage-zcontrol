@@ -58,7 +58,11 @@ classdef foilview_ui < handle
             uiFigure.Units = 'pixels';
             uiFigure.Position = [100 100 obj.DEFAULT_WINDOW_WIDTH obj.DEFAULT_WINDOW_HEIGHT];
             uiFigure.Name = obj.TEXT.WindowTitle;
-            uiFigure.Color = foilview_styling.BACKGROUND_COLOR;
+            
+            % Get colors from the modern styling system
+            colors = foilview_styling.getColors();
+            uiFigure.Color = colors.Background;
+            
             % Note: CloseRequestFcn will be set by main app
             uiFigure.Resize = 'on';  % Enable resizing
             uiFigure.AutoResizeChildren = 'on';  % Enable auto-resize
@@ -71,16 +75,16 @@ classdef foilview_ui < handle
             mainPanel.Units = 'normalized';  % Use normalized units for flexibility
             mainPanel.Position = [0, 0, 1, 1];  % Fill entire figure
             mainPanel.BorderType = 'none';
-            mainPanel.BackgroundColor = foilview_styling.BACKGROUND_COLOR;
+            mainPanel.BackgroundColor = colors.Background;
             mainPanel.AutoResizeChildren = 'on';  % Enable auto-resize for children
             
             % Create main layout that adapts to panel size
             mainLayout = uigridlayout(mainPanel, [6, 1]);
             mainLayout.RowHeight = {'fit', '1x', 'fit', 'fit', 'fit', 'fit'};  % Position display can expand
-            mainLayout.ColumnWidth = {'1x'};
-            mainLayout.Padding = [8 8 8 8];
-            mainLayout.RowSpacing = 6;
-            mainLayout.Scrollable = 'on';  % Enable scrolling for very small windows
+            mainLayout.ColumnWidth = {'1x'};  % Responsive column for manual resizing
+            mainLayout.Padding = repmat(foilview_styling.SPACE_2,1,4);  % 4×8px padding
+            mainLayout.RowSpacing = foilview_styling.SPACE_2;           % 8px spacing
+            mainLayout.Scrollable = 'off';  % Disable scrolling to allow full-width expansion
         end
         
         function metricDisplay = createMetricDisplay(obj, mainLayout)
@@ -88,6 +92,9 @@ classdef foilview_ui < handle
             metricPanel = uigridlayout(mainLayout, [1, 3]);
             metricPanel.ColumnWidth = {'fit', '1x', 'fit'};
             metricPanel.Layout.Row = 1;
+            
+            % Get colors from the modern styling system
+            colors = foilview_styling.getColors();
             
             metricDisplay = struct();
             
@@ -103,7 +110,7 @@ classdef foilview_ui < handle
             metricDisplay.Value.FontSize = 12;
             metricDisplay.Value.FontWeight = 'bold';
             metricDisplay.Value.HorizontalAlignment = 'center';
-            metricDisplay.Value.BackgroundColor = foilview_styling.LIGHT_COLOR;
+            metricDisplay.Value.BackgroundColor = colors.Light;
             
             % Refresh button
             metricDisplay.RefreshButton = uibutton(metricPanel, 'push');
@@ -115,8 +122,11 @@ classdef foilview_ui < handle
             % Create position display panel
             positionPanel = uigridlayout(mainLayout, [2, 1]);
             positionPanel.RowHeight = {'fit', 'fit'};
-            positionPanel.RowSpacing = 5;
+            positionPanel.RowSpacing = foilview_styling.SPACE_1;  % 4px spacing
             positionPanel.Layout.Row = 2;
+            
+            % Get colors from the modern styling system
+            colors = foilview_styling.getColors();
             
             positionDisplay = struct();
             
@@ -127,14 +137,14 @@ classdef foilview_ui < handle
             positionDisplay.Label.FontWeight = 'bold';
             positionDisplay.Label.FontName = 'Courier New';
             positionDisplay.Label.HorizontalAlignment = 'center';
-            positionDisplay.Label.BackgroundColor = foilview_styling.LIGHT_COLOR;
+            positionDisplay.Label.BackgroundColor = colors.Light;
             
             % Status label
             positionDisplay.Status = uilabel(positionPanel);
             positionDisplay.Status.Text = obj.TEXT.Ready;
             positionDisplay.Status.FontSize = 9;
             positionDisplay.Status.HorizontalAlignment = 'center';
-            positionDisplay.Status.FontColor = foilview_styling.TEXT_MUTED_COLOR;
+            positionDisplay.Status.FontColor = colors.TextMuted;
         end
         
         function expandButton = createExpandButton(obj, mainLayout, app)
@@ -144,15 +154,18 @@ classdef foilview_ui < handle
             expandButton.Text = '📊 Show Plot';
             expandButton.FontSize = 10;
             expandButton.FontWeight = 'bold';
-            expandButton.BackgroundColor = foilview_styling.PRIMARY_COLOR;
-            expandButton.FontColor = [1 1 1];
-            % Note: ButtonPushedFcn will be set by main app
+            
+            % Use modern styling system
+            foilview_styling.styleButton(expandButton, 'primary', 'base');
         end
         
         function statusControls = createStatusBar(obj, mainLayout)
             statusBar = uigridlayout(mainLayout, [1, 4]);
             statusBar.ColumnWidth = {'1x', 'fit', 'fit', 'fit'};
             statusBar.Layout.Row = 6;
+            
+            % Get colors from the modern styling system
+            colors = foilview_styling.getColors();
             
             statusControls = struct();
             
@@ -167,8 +180,9 @@ classdef foilview_ui < handle
             statusControls.BookmarksButton.FontSize = 11;
             statusControls.BookmarksButton.FontWeight = 'bold';
             statusControls.BookmarksButton.Tooltip = 'Toggle Bookmarks Window (Open/Close)';
-            statusControls.BookmarksButton.BackgroundColor = foilview_styling.PRIMARY_COLOR;
-            statusControls.BookmarksButton.FontColor = [1 1 1];
+            
+            % Use modern styling system
+            foilview_styling.styleButton(statusControls.BookmarksButton, 'primary', 'sm');
             
             % Stage View button
             statusControls.StageViewButton = uibutton(statusBar, 'push');
@@ -176,8 +190,9 @@ classdef foilview_ui < handle
             statusControls.StageViewButton.FontSize = 11;
             statusControls.StageViewButton.FontWeight = 'bold';
             statusControls.StageViewButton.Tooltip = 'Toggle Stage View Camera Window (Open/Close)';
-            statusControls.StageViewButton.BackgroundColor = foilview_styling.PRIMARY_COLOR;
-            statusControls.StageViewButton.FontColor = [1 1 1];
+            
+            % Use modern styling system
+            foilview_styling.styleButton(statusControls.StageViewButton, 'primary', 'sm');
             
             % Refresh button
             statusControls.RefreshButton = uibutton(statusBar, 'push');
@@ -193,14 +208,19 @@ classdef foilview_ui < handle
             manualPanel.FontSize = 9;
             manualPanel.FontWeight = 'bold';
             manualPanel.Layout.Row = 3;
+            manualPanel.AutoResizeChildren = 'on';  % Enable grid reflow on panel resize
             
             grid = uigridlayout(manualPanel, [1, 6]);
             
             % Configure grid layout - responsive horizontal layout
             grid.RowHeight = {'fit'};
-            grid.ColumnWidth = {'1x', '1x', '2x', '1x', '1x', '2x'};  % Responsive columns
-            grid.Padding = [6 4 6 4];
-            grid.ColumnSpacing = 4;
+            grid.ColumnWidth = {'1x', '1x', '1x', '1x', '1x', '1x'};  % All columns share equal width to fill container
+            grid.Padding = [foilview_styling.SPACE_2, foilview_styling.SPACE_1, foilview_styling.SPACE_2, foilview_styling.SPACE_1];
+            grid.ColumnSpacing = foilview_styling.SPACE_1;
+            grid.RowSpacing = foilview_styling.SPACE_1;
+            
+            % Get colors from the modern styling system
+            colors = foilview_styling.getColors();
             
             manualControls = struct();
             
@@ -210,47 +230,43 @@ classdef foilview_ui < handle
             manualControls.UpButton = obj.createStyledButton(grid, ...
                 'success', '▲', [], [1, 1]);
             
-            % Step size decrease button
+            % Step size decrease button - now provides quick preset values
             manualControls.StepDownButton = uibutton(grid, 'push');
             manualControls.StepDownButton.Text = '◄';
             manualControls.StepDownButton.FontSize = 11;
             manualControls.StepDownButton.FontWeight = 'bold';
             manualControls.StepDownButton.Layout.Row = 1;
             manualControls.StepDownButton.Layout.Column = 2;
-            manualControls.StepDownButton.Tooltip = 'Decrease step size';
-            manualControls.StepDownButton.BackgroundColor = foilview_styling.TEXT_MUTED_COLOR;
+            manualControls.StepDownButton.Tooltip = 'Quick preset: 0.5 μm';
+            manualControls.StepDownButton.BackgroundColor = colors.TextMuted;
             manualControls.StepDownButton.FontColor = [1 1 1];
             
-            % Step size display - make it clearly a display, not a button
+            % Step size display - now editable for custom values
             stepSizePanel = uipanel(grid);
             stepSizePanel.Layout.Row = 1;
             stepSizePanel.Layout.Column = 3;
             stepSizePanel.BorderType = 'line';
-            stepSizePanel.BackgroundColor = foilview_styling.LIGHT_COLOR;
+            stepSizePanel.BackgroundColor = colors.Light;
             stepSizePanel.BorderWidth = 1;
             stepSizePanel.HighlightColor = [0.8 0.8 0.8];
             
             stepSizeGrid = uigridlayout(stepSizePanel, [1, 1]);
             stepSizeGrid.Padding = [4 2 4 2];  % Slightly larger padding that will scale
             
-            manualControls.StepSizeDisplay = uilabel(stepSizeGrid);
-            manualControls.StepSizeDisplay.Text = '1.0μm';
-            manualControls.StepSizeDisplay.FontSize = 9;
-            manualControls.StepSizeDisplay.FontWeight = 'bold';
-            manualControls.StepSizeDisplay.FontColor = [0.2 0.2 0.2];
-            manualControls.StepSizeDisplay.HorizontalAlignment = 'center';
-            manualControls.StepSizeDisplay.Layout.Row = 1;
-            manualControls.StepSizeDisplay.Layout.Column = 1;
+            manualControls.StepSizeField = obj.createStepSizeField(stepSizeGrid, ...
+                foilview_controller.DEFAULT_STEP_SIZE, 9, [1, 1], ...
+                'Manual step size (μm) - synced with Auto Step');
+            manualControls.StepSizeField.FontColor = [0.2 0.2 0.2];
             
-            % Step size increase button
+            % Step size increase button - now provides quick preset values
             manualControls.StepUpButton = uibutton(grid, 'push');
             manualControls.StepUpButton.Text = '►';
             manualControls.StepUpButton.FontSize = 11;
             manualControls.StepUpButton.FontWeight = 'bold';
             manualControls.StepUpButton.Layout.Row = 1;
             manualControls.StepUpButton.Layout.Column = 4;
-            manualControls.StepUpButton.Tooltip = 'Increase step size';
-            manualControls.StepUpButton.BackgroundColor = foilview_styling.TEXT_MUTED_COLOR;
+            manualControls.StepUpButton.Tooltip = 'Quick preset: 5.0 μm';
+            manualControls.StepUpButton.BackgroundColor = colors.TextMuted;
             manualControls.StepUpButton.FontColor = [1 1 1];
             
             % Down button
@@ -261,16 +277,14 @@ classdef foilview_ui < handle
             manualControls.ZeroButton = obj.createStyledButton(grid, ...
                 'primary', 'ZERO', [], [1, 6]);
             
-            % Hidden dropdown for compatibility (controlled by step up/down buttons)
-            manualControls.StepSizeDropdown = uidropdown(grid);
-            manualControls.StepSizeDropdown.Items = foilview_utils.formatStepSizeItems(foilview_controller.STEP_SIZES);
-            manualControls.StepSizeDropdown.Value = foilview_utils.formatPosition(foilview_controller.DEFAULT_STEP_SIZE);
-            manualControls.StepSizeDropdown.Visible = 'off'; % Hidden, controlled programmatically
-            % Note: ValueChangedFcn will be set by main app
-            
-            % Store step sizes for cycling
+            % Store step sizes for cycling (set this first)
             manualControls.StepSizes = foilview_controller.STEP_SIZES;
+            % Use the same default as auto controls for consistency
             manualControls.CurrentStepIndex = find(manualControls.StepSizes == foilview_controller.DEFAULT_STEP_SIZE, 1);
+            
+            % Update display to match the selected step size
+            selectedStepSize = manualControls.StepSizes(manualControls.CurrentStepIndex);
+            manualControls.StepSizeField.Value = selectedStepSize;
         end
         
         function autoControls = createAutoStepContainer(obj, mainLayout, app)
@@ -280,16 +294,17 @@ classdef foilview_ui < handle
             autoPanel.FontSize = 9;
             autoPanel.FontWeight = 'bold';
             autoPanel.Layout.Row = 4;
+            autoPanel.AutoResizeChildren = 'on';  % Enable grid reflow on panel resize
             
             % Simplified 2-row layout
             grid = uigridlayout(autoPanel, [2, 4]);
             
             % Configure grid layout - responsive and flexible
             grid.RowHeight = {'fit', 'fit'};
-            grid.ColumnWidth = {'2x', '1x', '1x', '1x'};  % Responsive columns that scale
-            grid.Padding = [8 6 8 8];
-            grid.RowSpacing = 6;
-            grid.ColumnSpacing = 8;
+            grid.ColumnWidth = {'1x', '1x', '1x', '1x'};  % All columns share equal width to fill container
+            grid.Padding = repmat(foilview_styling.SPACE_2,1,4);
+            grid.RowSpacing = foilview_styling.SPACE_2;
+            grid.ColumnSpacing = foilview_styling.SPACE_2;
             
             autoControls = struct();
             
@@ -300,12 +315,9 @@ classdef foilview_ui < handle
                 'success', 'START ▲', [], [1, 1]);
             
             % Step size field (larger, readable)
-            autoControls.StepField = uieditfield(grid, 'numeric');
-            autoControls.StepField.Value = foilview_controller.DEFAULT_AUTO_STEP;
-            autoControls.StepField.FontSize = 10;
-            autoControls.StepField.Layout.Row = 1;
-            autoControls.StepField.Layout.Column = 2;
-            autoControls.StepField.Tooltip = 'Step size (μm)';
+            autoControls.StepField = obj.createStepSizeField(grid, ...
+                foilview_controller.DEFAULT_STEP_SIZE, 10, [1, 2], ...
+                'Step size (μm) - synced with Manual Control');
             
             % Steps field (larger, readable)
             autoControls.StepsField = uieditfield(grid, 'numeric');
@@ -323,11 +335,11 @@ classdef foilview_ui < handle
             autoControls.DelayField.Layout.Column = 4;
             autoControls.DelayField.Tooltip = 'Delay between steps (seconds)';
             
-            % Direction toggle button - hidden, controlled by start button
+            % Direction toggle button - now visible for easy direction control
             autoControls.DirectionButton = obj.createStyledButton(grid, ...
-                'success', '▲', [], [2, 4]);
+                'success', '▲ UP', [], [2, 4]);
             autoControls.DirectionButton.Tooltip = 'Toggle direction (Up/Down)';
-            autoControls.DirectionButton.Visible = 'off';
+            autoControls.DirectionButton.Visible = 'on';  % Make it visible for easy access
             
             % Row 2: Simplified status display with better formatting
             statusGrid = uigridlayout(grid, [1, 3]);
@@ -378,9 +390,9 @@ classdef foilview_ui < handle
             grid = uigridlayout(metricsPlotControls.Panel, [2, 2]);
             grid.RowHeight = {'1x', 'fit'};
             grid.ColumnWidth = {'1x', 'fit'};
-            grid.Padding = [10 10 10 10];
-            grid.RowSpacing = 10;
-            grid.ColumnSpacing = 10;
+            grid.Padding = repmat(foilview_styling.SPACE_2,1,4);  % 4×8px padding
+            grid.RowSpacing = foilview_styling.SPACE_2;            % 8px spacing
+            grid.ColumnSpacing = foilview_styling.SPACE_2;         % 8px spacing
             
             % Create axes for the plot
             metricsPlotControls.Axes = uiaxes(grid);
@@ -406,21 +418,34 @@ classdef foilview_ui < handle
         function button = createStyledButton(obj, parent, style, text, callback, position)
             button = uibutton(parent, 'push');
             button.Layout.Row = position(1);
-            
             if length(position) > 1
                 button.Layout.Column = position(2);
             end
-            
-            % Note: ButtonPushedFcn will be set by main app if callback provided
             if ~isempty(callback)
                 button.ButtonPushedFcn = callback;
             end
-            
-            % Apply style using centralized styling system
-            foilview_styling.styleButton(button, style, text);
+            % Style the button (do not set text in styleButton)
+            foilview_styling.styleButton(button, style, 'base');
+            % Always set the label after styling
+            if nargin >= 4 && ~isempty(text)
+                button.Text = text;
+            end
         end
         
-
+        function stepField = createStepSizeField(obj, parent, defaultValue, fontSize, position, tooltip)
+            % Shared helper to create a numeric step size field with standard styling
+            stepField = uieditfield(parent, 'numeric');
+            stepField.Value = defaultValue;
+            stepField.FontSize = fontSize;
+            stepField.FontWeight = 'bold';
+            stepField.HorizontalAlignment = 'center';
+            stepField.Tooltip = tooltip;
+            stepField.Limits = [foilview_controller.MIN_STEP_SIZE, foilview_controller.MAX_STEP_SIZE];
+            stepField.Layout.Row = position(1);
+            if length(position) > 1
+                stepField.Layout.Column = position(2);
+            end
+        end
     end
     
     methods (Static)

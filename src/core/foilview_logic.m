@@ -186,18 +186,15 @@ classdef foilview_logic < handle
                     return;
                 end
                 
-                % Get step size from dropdown
-                selectedItem = manualControls.StepSizeDropdown.Value;
-                stepSizes = foilview_controller.STEP_SIZES;
+                % Get step size from editable field
+                stepSize = manualControls.StepSizeField.Value;
                 
-                % Find matching step size
-                idx = find(strcmp(selectedItem, manualControls.StepSizeDropdown.Items));
-                if isempty(idx)
-                    fprintf('Invalid step size selection\n');
+                % Validate step size
+                if ~isnumeric(stepSize) || stepSize <= 0
+                    fprintf('Invalid step size: must be a positive number\n');
                     return;
                 end
                 
-                stepSize = stepSizes(idx);
                 controller.moveStage(direction * stepSize);
                 success = true;
             end
@@ -233,7 +230,7 @@ classdef foilview_logic < handle
                     return;
                 end
                 
-                if ~ismember(metricType, {'Std Dev', 'Mean', 'Max'})
+                if ~ismember(metricType, controller.METRIC_TYPES)
                     fprintf('Invalid metric type: %s\n', metricType);
                     return;
                 end
@@ -255,20 +252,24 @@ classdef foilview_logic < handle
             
             function doSync()
                 if isFromManual
-                    % Manual dropdown changed, update auto field
-                    stepValue = foilview_utils.extractStepSizeFromString(sourceValue);
+                    % Manual step size changed (via editable field), update auto field
+                    if isnumeric(sourceValue)
+                        % Direct numeric value from editable field
+                        stepValue = sourceValue;
+                    else
+                        % String value from dropdown (legacy support)
+                        stepValue = foilview_utils.extractStepSizeFromString(sourceValue);
+                    end
+                    
                     if ~isnan(stepValue) && stepValue > 0
                         autoControls.StepField.Value = stepValue;
                     end
                 else
-                    % Auto field changed, update manual dropdown
+                    % Auto field changed, update manual controls to match exactly
                     newStepSize = sourceValue;
                     if isnumeric(newStepSize) && newStepSize > 0
-                        [~, idx] = min(abs(foilview_controller.STEP_SIZES - newStepSize));
-                        targetValue = foilview_utils.formatPosition(foilview_controller.STEP_SIZES(idx));
-                        if ismember(targetValue, manualControls.StepSizeDropdown.Items)
-                            manualControls.StepSizeDropdown.Value = targetValue;
-                        end
+                        % Update manual field to match exactly (no rounding to predefined values)
+                        manualControls.StepSizeField.Value = newStepSize;
                     end
                 end
             end
@@ -286,11 +287,11 @@ classdef foilview_logic < handle
                 
                 controller.AutoDirection = direction;
                 
-                % Update direction button styling
+                % Update direction button styling using modern styling system
                 if controller.AutoDirection == 1  % Up
-                    foilview_styling.styleButton(autoControls.DirectionButton, 'Success', '▲ UP');
+                    foilview_styling.styleButton(autoControls.DirectionButton, 'success', 'base');
                 else  % Down
-                    foilview_styling.styleButton(autoControls.DirectionButton, 'Warning', '▼ DOWN');
+                    foilview_styling.styleButton(autoControls.DirectionButton, 'warning', 'base');
                 end
             end
         end

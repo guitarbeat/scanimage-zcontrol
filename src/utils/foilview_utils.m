@@ -118,10 +118,6 @@ classdef foilview_utils < handle
             end
         end
         
-        function items = formatStepSizeItems(stepSizes)
-            % Format step sizes for dropdown items
-            items = arrayfun(@(x) foilview_utils.formatPosition(x), stepSizes, 'UniformOutput', false);
-        end
         
         function str = formatPositionRange(minPos, maxPos)
             % Format position range for plot titles
@@ -218,25 +214,28 @@ classdef foilview_utils < handle
         end
         
         %% Enhanced Plot Utilities
-        function configureAxes(axes, titleText, xlabelText, ylabelText)
-            % Centralized axis configuration with optional labels
+        function setupPlotAxes(axes, titleText, xlabelText, ylabelText)
+            % Centralized plot axes setup with consistent styling
             if ~foilview_utils.validateUIComponent(axes)
                 return;
             end
+            
+            % Get fonts from the modern styling system
+            fonts = foilview_styling.getFonts();
             
             set(axes, 'Box', 'on', 'TickDir', 'out', ...
                 'LineWidth', 1.5);  % Use standard line width
             
             if nargin >= 3 && ~isempty(xlabelText)
-                xlabel(axes, xlabelText, 'FontSize', foilview_styling.FONT_SIZE_MEDIUM);
+                xlabel(axes, xlabelText, 'FontSize', fonts.SizeBase);
             else
-                xlabel(axes, 'Z Position (μm)', 'FontSize', foilview_styling.FONT_SIZE_MEDIUM);
+                xlabel(axes, 'Z Position (μm)', 'FontSize', fonts.SizeBase);
             end
             
             if nargin >= 4 && ~isempty(ylabelText)
-                ylabel(axes, ylabelText, 'FontSize', foilview_styling.FONT_SIZE_MEDIUM);
+                ylabel(axes, ylabelText, 'FontSize', fonts.SizeBase);
             else
-                ylabel(axes, 'Normalized Metric Value', 'FontSize', foilview_styling.FONT_SIZE_MEDIUM);
+                ylabel(axes, 'Normalized Metric Value', 'FontSize', fonts.SizeBase);
             end
             
             if nargin >= 2 && ~isempty(titleText)
@@ -250,22 +249,19 @@ classdef foilview_utils < handle
                 return;
             end
             
+            % Get fonts from the modern styling system
+            fonts = foilview_styling.getFonts();
+            
             if nargin > 3 && showRange && ~isempty(minPos) && ~isempty(maxPos)
                 fullTitle = sprintf('%s (%s)', titleText, foilview_utils.formatPositionRange(minPos, maxPos));
             else
                 fullTitle = titleText;
             end
             
-            title(axes, fullTitle, 'FontSize', foilview_styling.FONT_SIZE_MEDIUM, ...
-                'FontWeight', foilview_styling.FONT_WEIGHT_BOLD);
+            title(axes, fullTitle, 'FontSize', fonts.SizeBase, ...
+                'FontWeight', fonts.WeightBold);
         end
         
-        function legendObj = createLegend(axes, location)
-            % Centralized legend creation
-            if nargin < 2, location = 'northeast'; end
-            legendObj = legend(axes, 'Location', location, 'Interpreter', 'none', ...
-                           'FontSize', foilview_styling.FONT_SIZE_SMALL, 'Box', 'on');
-        end
         
         %% Enhanced Validation Utilities
         function valid = validateNumericRange(value, minVal, maxVal, name)
@@ -353,27 +349,6 @@ classdef foilview_utils < handle
             result = str2double(extractBefore(str, ' μm'));
         end
         
-        function truncated = truncateString(str, maxLength)
-            % Truncate string with ellipsis
-            if length(str) <= maxLength
-                truncated = str;
-            else
-                truncated = [str(1:maxLength-3) '...'];
-            end
-        end
-        
-        function formatted = formatBookmarkItem(label, xPos, yPos, zPos, metricValue, metricType, maxLabelLength)
-            % Format bookmark list items consistently with XYZ coordinates
-            if nargin < 7, maxLabelLength = 12; end
-            
-            formatted = sprintf('%-*s X:%.1f Y:%.1f Z:%.1f   %.1f %s', ...
-                maxLabelLength, ...
-                foilview_utils.truncateString(label, maxLabelLength), ...
-                xPos, yPos, zPos, ...
-                metricValue, ...
-                metricType);
-        end
-        
         %% Enhanced Performance Utilities
         function shouldUpdate = shouldThrottleUpdate(lastUpdateTime, interval)
             % Check if enough time has passed for throttled updates
@@ -382,18 +357,6 @@ classdef foilview_utils < handle
             shouldUpdate = (currentTime - lastUpdateTime) >= interval;
         end
         
-        function limitedData = limitDataForPerformance(data, maxPoints)
-            % Limit data points for performance
-            if nargin < 2, maxPoints = foilview_utils.DEFAULT_MAX_DATA_POINTS; end
-            
-            if length(data) <= maxPoints
-                limitedData = data;
-            else
-                % Keep evenly spaced points
-                indices = round(linspace(1, length(data), maxPoints));
-                limitedData = data(indices);
-            end
-        end
         
         function [limitedPositions, limitedValues] = limitMetricsData(positions, valuesStruct, maxPoints)
             % Limit both positions and metrics data consistently
@@ -443,16 +406,5 @@ classdef foilview_utils < handle
         end
         
         %% Configuration Utilities
-        function config = getDefaultUIConfig()
-            % Get default UI configuration to eliminate duplication
-            config = struct(...
-                'FontSize', foilview_styling.FONT_SIZE_NORMAL, ...
-                'FontWeight', foilview_styling.FONT_WEIGHT_NORMAL, ...
-                'LineWidth', 1.5, ...
-                'MarkerSize', foilview_styling.MARKER_SIZE, ...
-                'UpdateThrottle', foilview_utils.DEFAULT_UPDATE_THROTTLE, ...
-                'PlotThrottle', foilview_utils.DEFAULT_PLOT_THROTTLE, ...
-                'MaxDataPoints', foilview_utils.DEFAULT_MAX_DATA_POINTS);
-        end
     end
 end 

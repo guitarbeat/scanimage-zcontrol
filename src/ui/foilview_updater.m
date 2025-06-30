@@ -29,7 +29,9 @@ classdef foilview_updater < handle
                     @() foilview_updater.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller),
                     @() foilview_updater.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller),
                     @() foilview_updater.updateControlStates(app.ManualControls, app.AutoControls, app.Controller),
-                    @() foilview_updater.updateMetricDisplay(app.MetricDisplay, app.Controller)
+                    @() foilview_updater.updateMetricDisplay(app.MetricDisplay, app.Controller),
+                    @() foilview_updater.updatePlotExpansionState(app.MetricsPlotControls, app.PlotManager.getIsPlotExpanded()),
+                    @() foilview_updater.updateWindowTitle(app)
                 };
                 
                 success = foilview_utils.batchUIUpdate(updateFunctions);
@@ -51,11 +53,6 @@ classdef foilview_updater < handle
                 % Format position using utility
                 positionStr = foilview_utils.formatPosition(controller.CurrentPosition, true);
                 positionDisplay.Label.Text = positionStr;
-                
-                % Update window title with position
-                baseTitle = foilview_ui.TEXT.WindowTitle;
-                newTitle = sprintf('%s (%s)', baseTitle, foilview_utils.formatPosition(controller.CurrentPosition));
-                uiFigure.Name = newTitle;
                 
                 success = true;
             end
@@ -100,8 +97,6 @@ classdef foilview_updater < handle
                 success = true;
             end
         end
-        
-
         
         function success = updateControlStates(manualControls, autoControls, controller)
             % Enhanced control state management using centralized utilities
@@ -174,9 +169,11 @@ classdef foilview_updater < handle
                 end
                 
                 if isRunning
-                    foilview_styling.styleButton(autoControls.StartStopButton, 'Danger', 'STOP');
+                    foilview_styling.styleButton(autoControls.StartStopButton, 'danger', 'base');
+                    autoControls.StartStopButton.Text = 'STOP';
                 else
-                    foilview_styling.styleButton(autoControls.StartStopButton, 'Success', 'START');
+                    foilview_styling.styleButton(autoControls.StartStopButton, 'success', 'base');
+                    autoControls.StartStopButton.Text = 'START';
                 end
                 
                 success = true;
@@ -197,9 +194,11 @@ classdef foilview_updater < handle
                 
                 % Update toggle button appearance and text based on direction
                 if direction == 1  % Up
-                    foilview_styling.styleButton(autoControls.DirectionButton, 'Success', '▲ UP');
+                    foilview_styling.styleButton(autoControls.DirectionButton, 'success', 'base');
+                    autoControls.DirectionButton.Text = '▲ UP';
                 else  % Down
-                    foilview_styling.styleButton(autoControls.DirectionButton, 'Warning', '▼ DOWN');
+                    foilview_styling.styleButton(autoControls.DirectionButton, 'warning', 'base');
+                    autoControls.DirectionButton.Text = '▼ DOWN';
                 end
                 
                 success = true;
@@ -218,14 +217,17 @@ classdef foilview_updater < handle
                     return;
                 end
                 
+                % Get colors from the modern styling system
+                colors = foilview_styling.getColors();
+                
                 % Use centralized metric formatting
                 metricValue = controller.CurrentMetric;
                 displayText = foilview_utils.formatMetricValue(metricValue);
                 
                 % Set text and color
                 if isnan(metricValue)
-                    textColor = foilview_styling.TEXT_MUTED_COLOR;
-                    bgColor = foilview_styling.LIGHT_COLOR;
+                    textColor = colors.TextMuted;
+                    bgColor = colors.Light;
                 else
                     textColor = [0 0 0];  % Black
                     % Add visual feedback for high metric values (potential focus)
@@ -235,7 +237,7 @@ classdef foilview_updater < handle
                         greenComponent = 0.9 + 0.1 * intensity;  % Slightly green tint for high values
                         bgColor = [0.95 greenComponent 0.95];
                     else
-                        bgColor = foilview_styling.LIGHT_COLOR;
+                        bgColor = colors.Light;
                     end
                 end
                 
@@ -260,11 +262,35 @@ classdef foilview_updater < handle
                 end
                 
                 if isExpanded
-                    foilview_styling.styleButton(plotControls.ExpandButton, 'Warning', '📊 Hide Plot');
+                    foilview_styling.styleButton(plotControls.ExpandButton, 'warning', 'base');
+                    plotControls.ExpandButton.Text = '📊 Hide Plot';
                 else
-                    foilview_styling.styleButton(plotControls.ExpandButton, 'Primary', '📊 Show Plot');
+                    foilview_styling.styleButton(plotControls.ExpandButton, 'primary', 'base');
+                    plotControls.ExpandButton.Text = '📊 Show Plot';
                 end
                 
+                success = true;
+            end
+        end
+        
+        function success = updateWindowTitle(app)
+            % Update window title with position and plot-expanded suffix
+            success = foilview_utils.safeExecuteWithReturn(@() doUpdate(), 'updateWindowTitle', false);
+            function success = doUpdate()
+                success = false;
+                if isempty(app) || ~isvalid(app.UIFigure)
+                    return;
+                end
+                % Base title
+                baseTitle = foilview_ui.TEXT.WindowTitle;
+                % Add expanded suffix if needed
+                if app.PlotManager.getIsPlotExpanded()
+                    baseTitle = sprintf('%s - Plot Expanded', baseTitle);
+                end
+                % Position string
+                posStr = foilview_utils.formatPosition(app.Controller.CurrentPosition, true);
+                % Set name
+                app.UIFigure.Name = sprintf('%s (%s)', baseTitle, posStr);
                 success = true;
             end
         end

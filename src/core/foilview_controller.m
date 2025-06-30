@@ -36,13 +36,13 @@ classdef foilview_controller < handle
         MAX_STEP_SIZE = 1000
         
         % Auto Step Configuration
-        DEFAULT_AUTO_STEP = 10      % Default step size (μm)
         DEFAULT_AUTO_STEPS = 10     % Default number of steps
         DEFAULT_AUTO_DELAY = 0.5    % Default delay between steps (seconds)
         MIN_AUTO_STEPS = 1
         MAX_AUTO_STEPS = 1000
         MIN_AUTO_DELAY = 0.1
         MAX_AUTO_DELAY = 10.0
+        MAX_AUTO_STEP_DATA_POINTS = 1000  % Maximum data points to prevent memory leaks
         
         % Timer Configuration (seconds)
         POSITION_REFRESH_PERIOD = 0.5   % Position reading frequency
@@ -88,7 +88,10 @@ classdef foilview_controller < handle
         TotalSteps (1,1) double = 0             % Total steps in current sequence
         AutoDirection (1,1) double = 1          % 1 for up, -1 for down movement
         RecordMetrics (1,1) logical = false     % Whether to collect metrics during auto-stepping
-        AutoStepMetrics = struct('Positions', [], 'Values', struct())  % Collected metrics data
+        AutoStepMetrics = struct('Positions', [], 'Values', struct(), 'Statistics', struct())  % Collected metrics data with statistics
+        LastRecordedPosition (1,1) double = NaN % Last position where metrics were recorded
+        PositionStabilityCount (1,1) double = 0 % Number of measurements at current position
+        MaxMeasurementsPerPosition (1,1) double = 5  % Maximum measurements per position for statistics
         
         % Metric State
         CurrentMetric (1,1) double = 0          % Current value of selected metric
@@ -120,6 +123,7 @@ classdef foilview_controller < handle
         
         % Timers
         AutoTimer
+        MetricTimer                 % Reference to the metric timer for coordination
         
         % Callbacks
         StatusUpdateCallback
@@ -264,6 +268,12 @@ classdef foilview_controller < handle
                 end
                 
                 obj.notifyPositionChanged();
+                
+                % Record metrics when position changes during auto-stepping
+                if obj.IsAutoRunning && obj.RecordMetrics
+                    obj.recordMetricsAtPosition();
+                end
+                
                 fprintf('Stage moved %.1f μm to position %.1f μm\n', microns, obj.CurrentPosition);
             end
         end
@@ -483,7 +493,8 @@ classdef foilview_controller < handle
                         switch metricType
                             case 'Std Dev'
                                 % Simulate focus-like behavior: peak at certain positions
-                                obj.AllMetrics.(fieldName) = 50 - abs(mod(obj.CurrentPosition, 100) - 50);
+                                % Use abs() to handle negative positions properly
+                                obj.AllMetrics.(fieldName) = 50 - abs(mod(abs(obj.CurrentPosition), 100) - 50);
                             case 'Mean'
                                 obj.AllMetrics.(fieldName) = 100 - mod(abs(obj.CurrentPosition), 100);
                             case 'Max'
@@ -516,10 +527,8 @@ classdef foilview_controller < handle
                 
                 obj.notifyMetricChanged();
                 
-                % If recording metrics during auto-stepping
-                if obj.IsAutoRunning && obj.RecordMetrics
-                    obj.recordCurrentMetric();
-                end
+                % Note: Metrics are now recorded when position changes during auto-stepping
+                % via recordMetricsAtPosition() method, not here
             end
         end
         
@@ -543,7 +552,14 @@ classdef foilview_controller < handle
             
             % Reset metrics collection if enabled
             if obj.RecordMetrics
-                obj.AutoStepMetrics = struct('Positions', [], 'Values', struct());
+                obj.AutoStepMetrics = struct('Positions', [], 'Values', struct(), 'Statistics', struct());
+                obj.LastRecordedPosition = NaN;  % Reset for new sequence
+                obj.PositionStabilityCount = 0;  % Reset stability count
+            end
+            
+            % Pause metric timer during auto-stepping to prevent race conditions
+            if ~isempty(obj.MetricTimer) && isvalid(obj.MetricTimer)
+                stop(obj.MetricTimer);
             end
             
             obj.AutoTimer = foilview_utils.createTimer('fixedRate', delay, ...
@@ -562,6 +578,12 @@ classdef foilview_controller < handle
                 foilview_utils.safeStopTimer(obj.AutoTimer);
                 obj.AutoTimer = [];
                 obj.IsAutoRunning = false;
+                
+                % Resume metric timer after auto-stepping completes
+                if ~isempty(obj.MetricTimer) && isvalid(obj.MetricTimer)
+                    start(obj.MetricTimer);
+                end
+                
                 obj.notifyStatusChanged();
                 
                 fprintf('Auto-stepping completed at position %.1f μm\n', obj.CurrentPosition);
@@ -625,12 +647,267 @@ classdef foilview_controller < handle
         end
         
         function metrics = getAutoStepMetrics(obj)
-            % Return the collected auto step metrics
+            % Return the collected auto step metrics with statistical data
             if obj.RecordMetrics && ~isempty(obj.AutoStepMetrics.Positions)
-                % Return a copy of the metrics
+                % Return a copy of the metrics including statistics
                 metrics = obj.AutoStepMetrics;
+                
+                % Add metadata about the recording
+                metrics.Metadata = struct(...
+                    'TotalPositions', length(obj.AutoStepMetrics.Positions), ...
+                    'MaxMeasurementsPerPosition', obj.MaxMeasurementsPerPosition, ...
+                    'PositionTolerance', obj.POSITION_TOLERANCE, ...
+                    'HasStatistics', isfield(obj.AutoStepMetrics, 'Statistics') && ...
+                                   ~isempty(fieldnames(obj.AutoStepMetrics.Statistics)));
             else
-                metrics = struct('Positions', [], 'Values', struct());
+                metrics = struct('Positions', [], 'Values', struct(), 'Statistics', struct(), 'Metadata', struct());
+            end
+        end
+        
+        function setMetricTimer(obj, timerObj)
+            % Set reference to the metric timer for coordination
+            obj.MetricTimer = timerObj;
+        end
+        
+        function recordMetricsAtPosition(obj)
+            % Record metrics at current position with statistical analysis
+            % This method is called when position changes during auto-stepping
+            
+            % Check if position has changed significantly
+            if ~isnan(obj.LastRecordedPosition) && ...
+               abs(obj.CurrentPosition - obj.LastRecordedPosition) < obj.POSITION_TOLERANCE
+                % Position hasn't changed significantly, increment stability count
+                obj.PositionStabilityCount = obj.PositionStabilityCount + 1;
+                
+                % If we have enough measurements at this position, calculate statistics
+                if obj.PositionStabilityCount >= obj.MaxMeasurementsPerPosition
+                    obj.calculatePositionStatistics();
+                    obj.PositionStabilityCount = 0;  % Reset for next position
+                end
+                return;
+            end
+            
+            % Position has changed, start new position recording
+            obj.PositionStabilityCount = 1;
+            obj.LastRecordedPosition = obj.CurrentPosition;
+            
+            % Check if we need to limit data size to prevent memory leaks
+            if length(obj.AutoStepMetrics.Positions) >= obj.MAX_AUTO_STEP_DATA_POINTS
+                % Remove oldest data points (keep the most recent 80%)
+                keepCount = round(obj.MAX_AUTO_STEP_DATA_POINTS * 0.8);
+                obj.AutoStepMetrics.Positions = obj.AutoStepMetrics.Positions(end-keepCount+1:end);
+                
+                % Remove corresponding metric data
+                for i = 1:length(obj.METRIC_TYPES)
+                    metricType = obj.METRIC_TYPES{i};
+                    fieldName = strrep(metricType, ' ', '_');
+                    if isfield(obj.AutoStepMetrics.Values, fieldName)
+                        obj.AutoStepMetrics.Values.(fieldName) = ...
+                            obj.AutoStepMetrics.Values.(fieldName)(end-keepCount+1:end);
+                    end
+                    if isfield(obj.AutoStepMetrics.Statistics, fieldName)
+                        obj.AutoStepMetrics.Statistics.(fieldName) = ...
+                            obj.AutoStepMetrics.Statistics.(fieldName)(end-keepCount+1:end);
+                    end
+                end
+            end
+            
+            % Add current position to the auto step metrics
+            obj.AutoStepMetrics.Positions(end+1) = obj.CurrentPosition;
+            
+            % Record all metrics
+            for i = 1:length(obj.METRIC_TYPES)
+                metricType = obj.METRIC_TYPES{i};
+                fieldName = strrep(metricType, ' ', '_');
+                if ~isfield(obj.AutoStepMetrics.Values, fieldName)
+                    obj.AutoStepMetrics.Values.(fieldName) = [];
+                end
+                obj.AutoStepMetrics.Values.(fieldName)(end+1) = obj.AllMetrics.(fieldName);
+                
+                % Initialize statistics structure if needed
+                if ~isfield(obj.AutoStepMetrics.Statistics, fieldName)
+                    obj.AutoStepMetrics.Statistics.(fieldName) = struct('Mean', [], 'StdDev', [], 'Count', []);
+                end
+                
+                % Check if this is a new maximum for this metric
+                currentValue = obj.AllMetrics.(fieldName);
+                if ~isnan(currentValue)
+                    % Get existing values for this metric
+                    values = obj.AutoStepMetrics.Values.(fieldName);
+                    values = values(~isnan(values));  % Remove any NaN values
+                    
+                    % If this is the first value or a new maximum
+                    if isempty(values) || currentValue > max(values)
+                        % Create a bookmark for this maximum
+                        obj.createMaxBookmark(metricType, currentValue);
+                    end
+                end
+            end
+            
+            fprintf('Recorded metrics at position %.1f μm (measurement %d)\n', ...
+                obj.CurrentPosition, obj.PositionStabilityCount);
+        end
+        
+        function calculatePositionStatistics(obj)
+            % Calculate statistical data for the current position based on multiple measurements
+            % This method is called when we have enough measurements at a position
+            
+            if obj.PositionStabilityCount < obj.MaxMeasurementsPerPosition
+                return;  % Not enough measurements yet
+            end
+            
+            % Get the last N measurements for each metric type
+            for i = 1:length(obj.METRIC_TYPES)
+                metricType = obj.METRIC_TYPES{i};
+                fieldName = strrep(metricType, ' ', '_');
+                
+                if isfield(obj.AutoStepMetrics.Values, fieldName)
+                    % Get the last N measurements for this position
+                    recentValues = obj.AutoStepMetrics.Values.(fieldName)(end-obj.MaxMeasurementsPerPosition+1:end);
+                    validValues = recentValues(~isnan(recentValues));
+                    
+                    if length(validValues) >= 2  % Need at least 2 values for statistics
+                        % Calculate statistics
+                        meanValue = mean(validValues);
+                        stdValue = std(validValues);
+                        
+                        % Store statistics
+                        if ~isfield(obj.AutoStepMetrics.Statistics, fieldName)
+                            obj.AutoStepMetrics.Statistics.(fieldName) = struct('Mean', [], 'StdDev', [], 'Count', []);
+                        end
+                        
+                        obj.AutoStepMetrics.Statistics.(fieldName).Mean(end+1) = meanValue;
+                        obj.AutoStepMetrics.Statistics.(fieldName).StdDev(end+1) = stdValue;
+                        obj.AutoStepMetrics.Statistics.(fieldName).Count(end+1) = length(validValues);
+                        
+                        fprintf('Position %.1f μm - %s: Mean=%.2f, StdDev=%.2f (n=%d)\n', ...
+                            obj.CurrentPosition, metricType, meanValue, stdValue, length(validValues));
+                        
+                        % Create bookmark for statistically significant maximum
+                        if meanValue > 0
+                            % Check if this is a new statistical maximum
+                            allMeans = obj.AutoStepMetrics.Statistics.(fieldName).Mean;
+                            if isempty(allMeans) || meanValue > max(allMeans)
+                                obj.createStatisticalMaxBookmark(metricType, meanValue, stdValue, length(validValues));
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        function createStatisticalMaxBookmark(obj, metricType, meanValue, stdValue, count)
+            % Create a bookmark for a statistically significant maximum value
+            % Format: "Stat Max [Metric Type] (mean±std, n=count)"
+            label = sprintf('Stat Max %s (%.1f±%.1f, n=%d)', metricType, meanValue, stdValue, count);
+            
+            % Remove any existing statistical bookmark with the same metric type
+            existingIdx = cellfun(@(x) startsWith(x, ['Stat Max ' metricType]), obj.MarkedPositions.Labels);
+            if any(existingIdx)
+                obj.MarkedPositions.Labels(existingIdx) = [];
+                obj.MarkedPositions.XPositions(existingIdx) = [];
+                obj.MarkedPositions.YPositions(existingIdx) = [];
+                obj.MarkedPositions.ZPositions(existingIdx) = [];
+                obj.MarkedPositions.Metrics(existingIdx) = [];
+            end
+            
+            % Add new bookmark with current XYZ positions and statistical data
+            obj.MarkedPositions.Labels{end+1} = label;
+            obj.MarkedPositions.XPositions(end+1) = obj.CurrentXPosition;
+            obj.MarkedPositions.YPositions(end+1) = obj.CurrentYPosition;
+            obj.MarkedPositions.ZPositions(end+1) = obj.CurrentPosition;
+            obj.MarkedPositions.Metrics{end+1} = struct(...
+                'Type', [metricType ' (Statistical)'], ...
+                'Value', meanValue, ...
+                'StdDev', stdValue, ...
+                'Count', count);
+            
+            % Log the statistical bookmark creation
+            fprintf('Created statistical bookmark for maximum %s: %.1f±%.1f (n=%d) at X:%.1f, Y:%.1f, Z:%.1f μm\n', ...
+                metricType, meanValue, stdValue, count, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition);
+        end
+        
+        function recordMultipleMeasurements(obj, numMeasurements)
+            % Manually record multiple measurements at current position for statistical analysis
+            % This is useful when manually staying at a position to get better statistics
+            
+            if nargin < 2
+                numMeasurements = obj.MaxMeasurementsPerPosition;
+            end
+            
+            if ~obj.RecordMetrics
+                fprintf('Metric recording is not enabled\n');
+                return;
+            end
+            
+            fprintf('Recording %d measurements at position %.1f μm...\n', numMeasurements, obj.CurrentPosition);
+            
+            % Temporarily set the max measurements to the requested number
+            originalMax = obj.MaxMeasurementsPerPosition;
+            obj.MaxMeasurementsPerPosition = numMeasurements;
+            
+            % Reset position stability count to start fresh
+            obj.PositionStabilityCount = 0;
+            obj.LastRecordedPosition = NaN;
+            
+            % Record measurements
+            for i = 1:numMeasurements
+                % Update metrics first
+                obj.updateMetric();
+                
+                % Record at position (this will handle the counting and statistics)
+                obj.recordMetricsAtPosition();
+                
+                % Small delay between measurements
+                pause(0.1);
+            end
+            
+            % Restore original max measurements
+            obj.MaxMeasurementsPerPosition = originalMax;
+            
+            fprintf('Completed %d measurements at position %.1f μm\n', numMeasurements, obj.CurrentPosition);
+        end
+        
+        function stats = getPositionStatistics(obj, position, metricType)
+            % Get statistical summary for a specific position and metric type
+            % Returns struct with Mean, StdDev, Count, and all individual measurements
+            
+            if nargin < 3
+                metricType = obj.CurrentMetricType;
+            end
+            
+            stats = struct('Mean', NaN, 'StdDev', NaN, 'Count', 0, 'Measurements', []);
+            
+            if isempty(obj.AutoStepMetrics.Positions)
+                return;
+            end
+            
+            % Find measurements at the specified position (within tolerance)
+            positionIndices = find(abs(obj.AutoStepMetrics.Positions - position) < obj.POSITION_TOLERANCE);
+            
+            if isempty(positionIndices)
+                return;
+            end
+            
+            % Get the metric field name
+            fieldName = strrep(metricType, ' ', '_');
+            
+            if ~isfield(obj.AutoStepMetrics.Values, fieldName)
+                return;
+            end
+            
+            % Get all measurements at this position
+            measurements = obj.AutoStepMetrics.Values.(fieldName)(positionIndices);
+            validMeasurements = measurements(~isnan(measurements));
+            
+            if length(validMeasurements) >= 1
+                stats.Mean = mean(validMeasurements);
+                stats.Count = length(validMeasurements);
+                stats.Measurements = validMeasurements;
+                
+                if length(validMeasurements) >= 2
+                    stats.StdDev = std(validMeasurements);
+                end
             end
         end
     end
@@ -647,11 +924,6 @@ classdef foilview_controller < handle
             should = ~obj.SimulationMode && ...
                      ~obj.IsAutoRunning && ...
                      foilview_utils.validateUIComponent(obj.etZPos);
-        end
-        
-        function handleConnectionLoss(obj)
-            obj.SimulationMode = true;
-            obj.setSimulationMode(true, obj.TEXT.LostConnection);
         end
         
         function executeAutoStep(obj, stepSize)
@@ -727,35 +999,6 @@ classdef foilview_controller < handle
             end
         end
         
-        function recordCurrentMetric(obj)
-            % Add current position to the auto step metrics
-            obj.AutoStepMetrics.Positions(end+1) = obj.CurrentPosition;
-            
-            % Record all metrics
-            for i = 1:length(obj.METRIC_TYPES)
-                metricType = obj.METRIC_TYPES{i};
-                fieldName = strrep(metricType, ' ', '_');
-                if ~isfield(obj.AutoStepMetrics.Values, fieldName)
-                    obj.AutoStepMetrics.Values.(fieldName) = [];
-                end
-                obj.AutoStepMetrics.Values.(fieldName)(end+1) = obj.AllMetrics.(fieldName);
-                
-                % Check if this is a new maximum for this metric
-                currentValue = obj.AllMetrics.(fieldName);
-                if ~isnan(currentValue)
-                    % Get existing values for this metric
-                    values = obj.AutoStepMetrics.Values.(fieldName);
-                    values = values(~isnan(values));  % Remove any NaN values
-                    
-                    % If this is the first value or a new maximum
-                    if isempty(values) || currentValue == max(values)
-                        % Create a bookmark for this maximum
-                        obj.createMaxBookmark(metricType, currentValue);
-                    end
-                end
-            end
-        end
-        
         function createMaxBookmark(obj, metricType, value)
             % Create a bookmark for a maximum value
             % Format: "Max [Metric Type] (value)"
@@ -798,6 +1041,9 @@ classdef foilview_controller < handle
             % Clean up any timers using centralized utility
             foilview_utils.safeStopTimer(obj.AutoTimer);
             obj.AutoTimer = [];
+            
+            % Clear metric timer reference (don't delete it, just clear reference)
+            obj.MetricTimer = [];
         end
         
         % Event notification methods
@@ -835,12 +1081,6 @@ classdef foilview_controller < handle
         function success = validatePosition(obj, position)
             % Use centralized validation utilities
             success = foilview_utils.validateNumericRange(position, obj.MIN_POSITION, obj.MAX_POSITION, 'Position');
-        end
-        
-        function handleMovementError(obj, e, microns)
-            obj.SimulationMode = true;
-            obj.setSimulationMode(true, ['Error: ' e.message]);
-            fprintf('Movement error: %.1f μm\n', microns);
         end
         
         function initializeMetrics(obj)

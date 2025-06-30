@@ -6,24 +6,14 @@ classdef foilview_ui < handle
     % the UI creation logic from the main application logic.
     
     properties (Constant, Access = public)
-        % Legacy constants - use foilview_styling for new code
+        % Window dimensions - now using foilview_styling constants
         MIN_WINDOW_WIDTH = 280   % Minimum window width (pixels)
         MIN_WINDOW_HEIGHT = 380  % Minimum window height (pixels)
         DEFAULT_WINDOW_WIDTH = 320      % Default window width (pixels)
         DEFAULT_WINDOW_HEIGHT = 420     % Default window height (pixels)
         PLOT_WIDTH = 400        % Additional width when plot is expanded
         
-        % Legacy colors - use foilview_styling.getColors() for new code
-        COLORS = struct(...
-            'Background', [0.95 0.95 0.95], ...  % Light gray background
-            'Primary', [0.2 0.6 0.9], ...        % Blue for primary actions
-            'Success', [0.2 0.7 0.3], ...        % Green for success states
-            'Warning', [0.9 0.6 0.2], ...        % Orange for warnings
-            'Danger', [0.9 0.3 0.3], ...         % Red for errors/dangers
-            'Light', [0.98 0.98 0.98], ...       % Nearly white for highlights
-            'TextMuted', [0.5 0.5 0.5])          % Gray for secondary text
-        
-        % Legacy text constants - use foilview_styling for new code
+        % Text constants
         TEXT = struct(...
             'WindowTitle', 'FoilView - Z-Stage Control', ... % Main window title
             'Ready', 'Ready')                     % Default status message
@@ -68,7 +58,7 @@ classdef foilview_ui < handle
             uiFigure.Units = 'pixels';
             uiFigure.Position = [100 100 obj.DEFAULT_WINDOW_WIDTH obj.DEFAULT_WINDOW_HEIGHT];
             uiFigure.Name = obj.TEXT.WindowTitle;
-            uiFigure.Color = obj.COLORS.Background;
+            uiFigure.Color = foilview_styling.BACKGROUND_COLOR;
             % Note: CloseRequestFcn will be set by main app
             uiFigure.Resize = 'on';  % Enable resizing
             uiFigure.AutoResizeChildren = 'on';  % Enable auto-resize
@@ -81,7 +71,7 @@ classdef foilview_ui < handle
             mainPanel.Units = 'normalized';  % Use normalized units for flexibility
             mainPanel.Position = [0, 0, 1, 1];  % Fill entire figure
             mainPanel.BorderType = 'none';
-            mainPanel.BackgroundColor = obj.COLORS.Background;
+            mainPanel.BackgroundColor = foilview_styling.BACKGROUND_COLOR;
             mainPanel.AutoResizeChildren = 'on';  % Enable auto-resize for children
             
             % Create main layout that adapts to panel size
@@ -113,7 +103,7 @@ classdef foilview_ui < handle
             metricDisplay.Value.FontSize = 12;
             metricDisplay.Value.FontWeight = 'bold';
             metricDisplay.Value.HorizontalAlignment = 'center';
-            metricDisplay.Value.BackgroundColor = obj.COLORS.Light;
+            metricDisplay.Value.BackgroundColor = foilview_styling.LIGHT_COLOR;
             
             % Refresh button
             metricDisplay.RefreshButton = uibutton(metricPanel, 'push');
@@ -137,14 +127,14 @@ classdef foilview_ui < handle
             positionDisplay.Label.FontWeight = 'bold';
             positionDisplay.Label.FontName = 'Courier New';
             positionDisplay.Label.HorizontalAlignment = 'center';
-            positionDisplay.Label.BackgroundColor = obj.COLORS.Light;
+            positionDisplay.Label.BackgroundColor = foilview_styling.LIGHT_COLOR;
             
             % Status label
             positionDisplay.Status = uilabel(positionPanel);
             positionDisplay.Status.Text = obj.TEXT.Ready;
             positionDisplay.Status.FontSize = 9;
             positionDisplay.Status.HorizontalAlignment = 'center';
-            positionDisplay.Status.FontColor = obj.COLORS.TextMuted;
+            positionDisplay.Status.FontColor = foilview_styling.TEXT_MUTED_COLOR;
         end
         
         function expandButton = createExpandButton(obj, mainLayout, app)
@@ -154,7 +144,7 @@ classdef foilview_ui < handle
             expandButton.Text = '📊 Show Plot';
             expandButton.FontSize = 10;
             expandButton.FontWeight = 'bold';
-            expandButton.BackgroundColor = obj.COLORS.Primary;
+            expandButton.BackgroundColor = foilview_styling.PRIMARY_COLOR;
             expandButton.FontColor = [1 1 1];
             % Note: ButtonPushedFcn will be set by main app
         end
@@ -177,7 +167,7 @@ classdef foilview_ui < handle
             statusControls.BookmarksButton.FontSize = 11;
             statusControls.BookmarksButton.FontWeight = 'bold';
             statusControls.BookmarksButton.Tooltip = 'Toggle Bookmarks Window (Open/Close)';
-            statusControls.BookmarksButton.BackgroundColor = obj.COLORS.Primary;
+            statusControls.BookmarksButton.BackgroundColor = foilview_styling.PRIMARY_COLOR;
             statusControls.BookmarksButton.FontColor = [1 1 1];
             
             % Stage View button
@@ -186,7 +176,7 @@ classdef foilview_ui < handle
             statusControls.StageViewButton.FontSize = 11;
             statusControls.StageViewButton.FontWeight = 'bold';
             statusControls.StageViewButton.Tooltip = 'Toggle Stage View Camera Window (Open/Close)';
-            statusControls.StageViewButton.BackgroundColor = obj.COLORS.Primary;
+            statusControls.StageViewButton.BackgroundColor = foilview_styling.PRIMARY_COLOR;
             statusControls.StageViewButton.FontColor = [1 1 1];
             
             % Refresh button
@@ -228,7 +218,7 @@ classdef foilview_ui < handle
             manualControls.StepDownButton.Layout.Row = 1;
             manualControls.StepDownButton.Layout.Column = 2;
             manualControls.StepDownButton.Tooltip = 'Decrease step size';
-            manualControls.StepDownButton.BackgroundColor = obj.COLORS.TextMuted;
+            manualControls.StepDownButton.BackgroundColor = foilview_styling.TEXT_MUTED_COLOR;
             manualControls.StepDownButton.FontColor = [1 1 1];
             
             % Step size display - make it clearly a display, not a button
@@ -236,7 +226,7 @@ classdef foilview_ui < handle
             stepSizePanel.Layout.Row = 1;
             stepSizePanel.Layout.Column = 3;
             stepSizePanel.BorderType = 'line';
-            stepSizePanel.BackgroundColor = obj.COLORS.Light;
+            stepSizePanel.BackgroundColor = foilview_styling.LIGHT_COLOR;
             stepSizePanel.BorderWidth = 1;
             stepSizePanel.HighlightColor = [0.8 0.8 0.8];
             
@@ -260,7 +250,7 @@ classdef foilview_ui < handle
             manualControls.StepUpButton.Layout.Row = 1;
             manualControls.StepUpButton.Layout.Column = 4;
             manualControls.StepUpButton.Tooltip = 'Increase step size';
-            manualControls.StepUpButton.BackgroundColor = obj.COLORS.TextMuted;
+            manualControls.StepUpButton.BackgroundColor = foilview_styling.TEXT_MUTED_COLOR;
             manualControls.StepUpButton.FontColor = [1 1 1];
             
             % Down button

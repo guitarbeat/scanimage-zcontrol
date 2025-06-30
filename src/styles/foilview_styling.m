@@ -28,8 +28,16 @@ classdef foilview_styling < handle
         
         % Font sizes
         FONT_SIZE_SMALL = 9
+        FONT_SIZE_NORMAL = 10
         FONT_SIZE_MEDIUM = 10
         FONT_SIZE_LARGE = 11
+        
+        % Font weights
+        FONT_WEIGHT_NORMAL = 'normal'
+        FONT_WEIGHT_BOLD = 'bold'
+        
+        % Plot styling
+        MARKER_SIZE = 4
     end
     
     methods (Static)
@@ -55,8 +63,8 @@ classdef foilview_styling < handle
                 'SizeS', foilview_styling.FONT_SIZE_SMALL, ...
                 'SizeM', foilview_styling.FONT_SIZE_MEDIUM, ...
                 'SizeL', foilview_styling.FONT_SIZE_LARGE, ...
-                'WeightNormal', 'normal', ...
-                'WeightBold', 'bold');
+                'WeightNormal', foilview_styling.FONT_WEIGHT_NORMAL, ...
+                'WeightBold', foilview_styling.FONT_WEIGHT_BOLD);
         end
         
         %% Button Styling Methods

@@ -190,8 +190,9 @@ foilview_styling.applyTheme(components, 'dark');  % Future feature
 
 ## Legacy Support
 
-Old styling constants remain available for backward compatibility:
-- `foilview_ui.COLORS` - Legacy color constants
-- `foilview_utils.UI_STYLE` - Legacy font constants
+The following legacy constants have been **removed** and replaced with the centralized `foilview_styling` system:
 
-However, new code should use the centralized `foilview_styling` system. 
+- ~~`foilview_ui.COLORS`~~ - **REMOVED** - Use `foilview_styling.getColors()` or direct constants
+- ~~`foilview_utils.UI_STYLE`~~ - **REMOVED** - Use `foilview_styling` constants directly
+
+All code has been migrated to use the new centralized styling system. If you encounter any remaining legacy references, please update them to use `foilview_styling`. 

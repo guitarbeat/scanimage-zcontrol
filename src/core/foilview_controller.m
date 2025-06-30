@@ -93,7 +93,7 @@ classdef foilview_controller < handle
         % Metric State
         CurrentMetric (1,1) double = 0          % Current value of selected metric
         AllMetrics struct = struct()            % All calculated metrics for current position
-        CurrentMetricType char = 'Focus Score'  % Currently selected metric type
+        CurrentMetricType char = 'Std Dev'      % Currently selected metric type
         
         % ScanImage Integration
         SimulationMode (1,1) logical = true     % True when running without ScanImage hardware
@@ -141,6 +141,10 @@ classdef foilview_controller < handle
         function obj = foilview_controller()
             % Initialize the controller
             obj.CurrentMetricType = obj.DEFAULT_METRIC;
+            
+            % Initialize AllMetrics struct with all metric types
+            obj.initializeMetrics();
+            
             obj.connectToScanImage();
         end
         
@@ -837,6 +841,15 @@ classdef foilview_controller < handle
             obj.SimulationMode = true;
             obj.setSimulationMode(true, ['Error: ' e.message]);
             fprintf('Movement error: %.1f μm\n', microns);
+        end
+        
+        function initializeMetrics(obj)
+            % Initialize AllMetrics struct with all metric types
+            for i = 1:length(obj.METRIC_TYPES)
+                metricType = obj.METRIC_TYPES{i};
+                fieldName = strrep(metricType, ' ', '_');
+                obj.AllMetrics.(fieldName) = NaN;
+            end
         end
     end
 end 

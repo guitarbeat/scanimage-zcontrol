@@ -66,8 +66,8 @@ classdef foilview < matlab.apps.AppBase
         PlotManager                 foilview_plot
         
         % Additional Windows
-        StageViewApp                stageview
-        BookmarksViewApp            bookmarksview
+        StageViewApp                % Can be stageview object or empty
+        BookmarksViewApp            % Can be bookmarksview object or empty
     end
     
     %% Private Properties - Internal State
@@ -174,6 +174,9 @@ classdef foilview < matlab.apps.AppBase
             app.launchStageView();
             app.launchBookmarksView();
             
+            % Update window status buttons to show initial state
+            app.updateWindowStatusButtons();
+            
             % Start refresh timers
             app.startRefreshTimer();
             app.startMetricTimer();
@@ -223,6 +226,11 @@ classdef foilview < matlab.apps.AppBase
                 % Don't show error dialog during initialization to avoid blocking
                 app.StageViewApp = [];
             end
+            
+            % Update button status after attempting to launch
+            if isvalid(app.UIFigure) && ~isempty(app.StatusControls)
+                app.updateWindowStatusButtons();
+            end
         end
         
         function launchBookmarksView(app)
@@ -239,6 +247,11 @@ classdef foilview < matlab.apps.AppBase
                        'Failed to launch Bookmarks View: %s', ME.message);
                 % Don't show error dialog during initialization to avoid blocking
                 app.BookmarksViewApp = [];
+            end
+            
+            % Update button status after attempting to launch
+            if isvalid(app.UIFigure) && ~isempty(app.StatusControls)
+                app.updateWindowStatusButtons();
             end
         end
         
@@ -460,6 +473,8 @@ classdef foilview < matlab.apps.AppBase
                     app.positionBookmarksViewWindow();
                 end
             end
+            % Update button appearance to reflect current window status
+            app.updateWindowStatusButtons();
         end
         
         function onStageViewButtonPushed(app, varargin)
@@ -480,6 +495,8 @@ classdef foilview < matlab.apps.AppBase
                     app.positionStageViewWindow();
                 end
             end
+            % Update button appearance to reflect current window status
+            app.updateWindowStatusButtons();
         end
         
         function onWindowClose(app, varargin)
@@ -604,11 +621,52 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         
+        function updateWindowStatusButtons(app)
+            % Update the appearance of window control buttons to show if windows are active
+            
+            % Check Bookmarks window status
+            bookmarksActive = ~isempty(app.BookmarksViewApp) && ...
+                             isvalid(app.BookmarksViewApp) && ...
+                             isvalid(app.BookmarksViewApp.UIFigure) && ...
+                             strcmp(app.BookmarksViewApp.UIFigure.Visible, 'on');
+            
+            % Check Stage View window status  
+            stageViewActive = ~isempty(app.StageViewApp) && ...
+                             isvalid(app.StageViewApp) && ...
+                             isvalid(app.StageViewApp.UIFigure) && ...
+                             strcmp(app.StageViewApp.UIFigure.Visible, 'on');
+            
+            % Update Bookmarks button - use existing emoji with indicator
+            if bookmarksActive
+                app.StatusControls.BookmarksButton.Text = '📌●';
+                app.StatusControls.BookmarksButton.BackgroundColor = foilview_ui.COLORS.Success;
+                app.StatusControls.BookmarksButton.FontColor = [1 1 1]; % White text
+            else
+                app.StatusControls.BookmarksButton.Text = '📌';
+                app.StatusControls.BookmarksButton.BackgroundColor = foilview_ui.COLORS.Light;
+                app.StatusControls.BookmarksButton.FontColor = [0 0 0]; % Black text
+            end
+            
+            % Update Stage View button - use existing emoji with indicator
+            if stageViewActive
+                app.StatusControls.StageViewButton.Text = '📹●';
+                app.StatusControls.StageViewButton.BackgroundColor = foilview_ui.COLORS.Success;
+                app.StatusControls.StageViewButton.FontColor = [1 1 1]; % White text
+            else
+                app.StatusControls.StageViewButton.Text = '📹';
+                app.StatusControls.StageViewButton.BackgroundColor = foilview_ui.COLORS.Light;
+                app.StatusControls.StageViewButton.FontColor = [0 0 0]; % Black text
+            end
+        end
+        
         function monitorWindowResize(app)
             % Monitor window size changes and adjust UI elements accordingly
             if ~isvalid(app.UIFigure)
                 return;
             end
+            
+            % Update window status buttons to catch external window closures
+            app.updateWindowStatusButtons();
             
             currentSize = app.UIFigure.Position;
             

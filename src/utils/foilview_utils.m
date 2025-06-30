@@ -79,55 +79,8 @@ classdef foilview_utils < handle
         end
         
         %% Enhanced UI Styling Utilities
-        function applyButtonStyle(button, style, text)
-            % Centralized button styling to eliminate duplication
-            if ~foilview_utils.validateUIComponent(button)
-                return;
-            end
-            
-            % Get colors from foilview_ui if available
-            try
-                colors = foilview_ui.COLORS;
-            catch
-                % Fallback colors if foilview_ui not available
-                colors = struct(...
-                    'Primary', [0.2 0.6 0.9], ...
-                    'Success', [0.2 0.7 0.3], ...
-                    'Warning', [0.9 0.6 0.2], ...
-                    'Danger', [0.9 0.3 0.3], ...
-                    'Light', [0.98 0.98 0.98]);
-            end
-            
-            % Apply style with appropriate font colors
-            switch lower(style)
-                case 'primary'
-                    button.BackgroundColor = colors.Primary;
-                    button.FontColor = [1 1 1];  % White text
-                case 'success'
-                    button.BackgroundColor = colors.Success;
-                    button.FontColor = [1 1 1];  % White text
-                case 'warning'
-                    button.BackgroundColor = colors.Warning;
-                    button.FontColor = [1 1 1];  % White text
-                case 'danger'
-                    button.BackgroundColor = colors.Danger;
-                    button.FontColor = [1 1 1];  % White text
-                case 'light'
-                    button.BackgroundColor = colors.Light;
-                    button.FontColor = [0.2 0.2 0.2];  % Dark text for light background
-                otherwise
-                    button.BackgroundColor = colors.Primary;
-                    button.FontColor = [1 1 1];  % White text
-            end
-            
-            % Apply common styling
-            button.FontWeight = foilview_utils.UI_STYLE.FONT_WEIGHT_BOLD;
-            button.FontSize = foilview_utils.UI_STYLE.FONT_SIZE_NORMAL;
-            
-            if nargin >= 3 && ~isempty(text)
-                button.Text = text;
-            end
-        end
+        % NOTE: Button styling moved to foilview_styling.styleButton()
+        % This maintains backward compatibility for existing code.
         
         function setControlEnabled(control, enabled, fieldName)
             % Safely enable/disable a control with validation

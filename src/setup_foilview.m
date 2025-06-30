@@ -12,13 +12,14 @@ function setup_foilview()
     %   ├── app/         - Main application entry point
     %   ├── core/        - Core controllers and business logic
     %   ├── ui/          - User interface components and plotting
-    %   └── utils/       - Utilities and helper functions
+    %   ├── utils/       - Utilities and helper functions
+    %   └── styles/      - Centralized styling system
     
     % Get the directory where this script is located
     scriptDir = fileparts(mfilename('fullpath'));
     
     % Define subdirectories to add to path
-    subdirs = {'app', 'core', 'ui', 'utils'};
+    subdirs = {'app', 'core', 'ui', 'utils', 'styles'};
     
     % Add each subdirectory to the MATLAB path
     for i = 1:length(subdirs)
@@ -33,7 +34,8 @@ function setup_foilview()
     
     % Verify that all required classes can be found
     requiredClasses = {'foilview', 'foilview_controller', 'foilview_logic', ...
-                       'foilview_ui', 'foilview_updater', 'foilview_plot', 'foilview_utils'};
+                       'foilview_ui', 'foilview_updater', 'foilview_plot', 'foilview_utils', ...
+                       'foilview_styling'};
     
     fprintf('\nVerifying class availability:\n');
     allFound = true;

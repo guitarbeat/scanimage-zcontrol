@@ -596,27 +596,21 @@ classdef foilview < matlab.apps.AppBase
             % Update direction button and start button to show current direction
             direction = app.Controller.AutoDirection;
             
+            % Style direction button using centralized styling
+            foilview_styling.styleDirectionButton(app.AutoControls.DirectionButton, direction, app.Controller.IsAutoRunning);
+            
+            % Style start/stop button based on state and direction
             if direction > 0
-                % Upward direction
-                app.AutoControls.DirectionButton.Text = '▲';
-                app.AutoControls.DirectionButton.BackgroundColor = foilview_ui.COLORS.Success;
                 if app.Controller.IsAutoRunning
-                    app.AutoControls.StartStopButton.Text = 'STOP ▲';
-                    app.AutoControls.StartStopButton.BackgroundColor = foilview_ui.COLORS.Danger;
+                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Danger', 'STOP ▲');
                 else
-                    app.AutoControls.StartStopButton.Text = 'START ▲';
-                    app.AutoControls.StartStopButton.BackgroundColor = foilview_ui.COLORS.Success;
+                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Success', 'START ▲');
                 end
             else
-                % Downward direction
-                app.AutoControls.DirectionButton.Text = '▼';
-                app.AutoControls.DirectionButton.BackgroundColor = foilview_ui.COLORS.Warning;
                 if app.Controller.IsAutoRunning
-                    app.AutoControls.StartStopButton.Text = 'STOP ▼';
-                    app.AutoControls.StartStopButton.BackgroundColor = foilview_ui.COLORS.Danger;
+                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Danger', 'STOP ▼');
                 else
-                    app.AutoControls.StartStopButton.Text = 'START ▼';
-                    app.AutoControls.StartStopButton.BackgroundColor = foilview_ui.COLORS.Success;
+                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Success', 'START ▼');
                 end
             end
         end
@@ -636,27 +630,13 @@ classdef foilview < matlab.apps.AppBase
                              isvalid(app.StageViewApp.UIFigure) && ...
                              strcmp(app.StageViewApp.UIFigure.Visible, 'on');
             
-            % Update Bookmarks button - use existing emoji with indicator
-            if bookmarksActive
-                app.StatusControls.BookmarksButton.Text = '📌●';
-                app.StatusControls.BookmarksButton.BackgroundColor = foilview_ui.COLORS.Success;
-                app.StatusControls.BookmarksButton.FontColor = [1 1 1]; % White text
-            else
-                app.StatusControls.BookmarksButton.Text = '📌';
-                app.StatusControls.BookmarksButton.BackgroundColor = foilview_ui.COLORS.Light;
-                app.StatusControls.BookmarksButton.FontColor = [0 0 0]; % Black text
-            end
+            % Update Bookmarks button using centralized styling
+            foilview_styling.styleWindowIndicatorButton(app.StatusControls.BookmarksButton, ...
+                bookmarksActive, '📌', '📌●', '📌');
             
-            % Update Stage View button - use existing emoji with indicator
-            if stageViewActive
-                app.StatusControls.StageViewButton.Text = '📹●';
-                app.StatusControls.StageViewButton.BackgroundColor = foilview_ui.COLORS.Success;
-                app.StatusControls.StageViewButton.FontColor = [1 1 1]; % White text
-            else
-                app.StatusControls.StageViewButton.Text = '📹';
-                app.StatusControls.StageViewButton.BackgroundColor = foilview_ui.COLORS.Light;
-                app.StatusControls.StageViewButton.FontColor = [0 0 0]; % Black text
-            end
+            % Update Stage View button using centralized styling
+            foilview_styling.styleWindowIndicatorButton(app.StatusControls.StageViewButton, ...
+                stageViewActive, '📹', '📹●', '📹');
         end
         
         function monitorWindowResize(app)

@@ -293,8 +293,8 @@ classdef foilview_plot < handle
                 plotPanel.Position = [plotPanelX, plotPanelY, obj.PLOT_WIDTH, plotPanelHeight];
                 plotPanel.Visible = 'on';
                 
-                % Update button using centralized styling
-                foilview_utils.applyButtonStyle(expandButton, 'warning', '📊 Hide Plot');
+                % Update button appearance
+                foilview_styling.styleButton(expandButton, 'Warning', '📊 Hide Plot');
                 
                 obj.IsPlotExpanded = true;
                 
@@ -331,8 +331,8 @@ classdef foilview_plot < handle
                 originalWidth = figPos(3) - obj.PLOT_WIDTH - 20;
                 uiFigure.Position = [figPos(1), figPos(2), originalWidth, figPos(4)];
                 
-                % Update button using centralized styling
-                foilview_utils.applyButtonStyle(expandButton, 'primary', '📊 Show Plot');
+                % Update button appearance
+                foilview_styling.styleButton(expandButton, 'Primary', '📊 Show Plot');
                 
                 obj.IsPlotExpanded = false;
                 

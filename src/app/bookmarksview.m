@@ -146,14 +146,12 @@ classdef bookmarksview < matlab.apps.AppBase
             app.MarkField.Layout.Column = 1;
             
             app.MarkButton = uibutton(markLayout, 'push');
-            app.MarkButton.Text = 'MARK';
-            app.MarkButton.FontSize = 10;
-            app.MarkButton.FontWeight = 'bold';
-            app.MarkButton.BackgroundColor = [0.2 0.6 0.9];
-            app.MarkButton.FontColor = [1 1 1];
             app.MarkButton.Tooltip = 'Mark current XYZ position (auto-generates label if empty)';
             app.MarkButton.Layout.Row = 1;
             app.MarkButton.Layout.Column = 2;
+            
+            % Apply styling using centralized system
+            foilview_styling.styleButton(app.MarkButton, 'Primary', 'MARK');
             
             % Instructions
             instructLabel = uilabel(app.MainLayout);
@@ -180,24 +178,18 @@ classdef bookmarksview < matlab.apps.AppBase
             buttonLayout.ColumnSpacing = 10;
             
             app.GoToButton = uibutton(buttonLayout, 'push');
-            app.GoToButton.Text = 'GO TO';
-            app.GoToButton.FontSize = 10;
-            app.GoToButton.FontWeight = 'bold';
-            app.GoToButton.BackgroundColor = [0.2 0.7 0.3];
-            app.GoToButton.FontColor = [1 1 1];
             app.GoToButton.Enable = 'off';
             app.GoToButton.Layout.Row = 1;
             app.GoToButton.Layout.Column = 1;
             
             app.DeleteButton = uibutton(buttonLayout, 'push');
-            app.DeleteButton.Text = 'DELETE';
-            app.DeleteButton.FontSize = 10;
-            app.DeleteButton.FontWeight = 'bold';
-            app.DeleteButton.BackgroundColor = [0.9 0.3 0.3];
-            app.DeleteButton.FontColor = [1 1 1];
             app.DeleteButton.Enable = 'off';
             app.DeleteButton.Layout.Row = 1;
             app.DeleteButton.Layout.Column = 2;
+            
+            % Apply styling using centralized system
+            foilview_styling.styleButton(app.GoToButton, 'Success', 'GO TO');
+            foilview_styling.styleButton(app.DeleteButton, 'Danger', 'DELETE');
             
             % Status Label
             app.StatusLabel = uilabel(app.MainLayout);

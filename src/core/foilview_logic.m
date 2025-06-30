@@ -286,11 +286,11 @@ classdef foilview_logic < handle
                 
                 controller.AutoDirection = direction;
                 
-                % Update toggle button appearance and text
-                if direction == 1  % Up
-                    foilview_utils.applyButtonStyle(autoControls.DirectionButton, 'success', '▲ UP');
+                % Update direction button styling
+                if controller.AutoDirection == 1  % Up
+                    foilview_styling.styleButton(autoControls.DirectionButton, 'Success', '▲ UP');
                 else  % Down
-                    foilview_utils.applyButtonStyle(autoControls.DirectionButton, 'warning', '▼ DOWN');
+                    foilview_styling.styleButton(autoControls.DirectionButton, 'Warning', '▼ DOWN');
                 end
             end
         end

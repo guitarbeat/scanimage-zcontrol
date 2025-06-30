@@ -73,28 +73,28 @@ classdef foilview_updater < handle
                     return;
                 end
                 
-                % Get colors for consistent styling
-                colors = foilview_ui.COLORS;
+                % Use centralized styling system
+                colors = foilview_styling.getColors();
                 
                 % Update position status based on controller state
                 if controller.IsAutoRunning
                     progressText = sprintf('Auto-stepping: %d/%d', controller.CurrentStep, controller.TotalSteps);
                     positionDisplay.Status.Text = progressText;
-                    positionDisplay.Status.FontColor = colors.Primary;
+                    foilview_styling.styleLabel(positionDisplay.Status, 'primary');
                 else
-                    positionDisplay.Status.Text = foilview_ui.TEXT.Ready;
-                    positionDisplay.Status.FontColor = colors.TextMuted;
+                    positionDisplay.Status.Text = 'Ready';
+                    foilview_styling.styleLabel(positionDisplay.Status, 'muted');
                 end
                 
                 % Update connection status with appropriate styling
                 if controller.SimulationMode
                     statusText = sprintf('ScanImage: Simulation (%s)', controller.StatusMessage);
                     statusControls.Label.Text = statusText;
-                    statusControls.Label.FontColor = colors.Warning;
+                    foilview_styling.styleLabel(statusControls.Label, 'warning');
                 else
                     statusText = sprintf('ScanImage: %s', controller.StatusMessage);
                     statusControls.Label.Text = statusText;
-                    statusControls.Label.FontColor = colors.Success;
+                    foilview_styling.styleLabel(statusControls.Label, 'success');
                 end
                 
                 success = true;
@@ -174,9 +174,9 @@ classdef foilview_updater < handle
                 end
                 
                 if isRunning
-                    foilview_utils.applyButtonStyle(autoControls.StartStopButton, 'danger', 'STOP');
+                    foilview_styling.styleButton(autoControls.StartStopButton, 'Danger', 'STOP');
                 else
-                    foilview_utils.applyButtonStyle(autoControls.StartStopButton, 'success', 'START');
+                    foilview_styling.styleButton(autoControls.StartStopButton, 'Success', 'START');
                 end
                 
                 success = true;
@@ -197,9 +197,9 @@ classdef foilview_updater < handle
                 
                 % Update toggle button appearance and text based on direction
                 if direction == 1  % Up
-                    foilview_utils.applyButtonStyle(autoControls.DirectionButton, 'success', '▲ UP');
+                    foilview_styling.styleButton(autoControls.DirectionButton, 'Success', '▲ UP');
                 else  % Down
-                    foilview_utils.applyButtonStyle(autoControls.DirectionButton, 'warning', '▼ DOWN');
+                    foilview_styling.styleButton(autoControls.DirectionButton, 'Warning', '▼ DOWN');
                 end
                 
                 success = true;
@@ -224,8 +224,8 @@ classdef foilview_updater < handle
                 
                 % Set text and color
                 if isnan(metricValue)
-                    textColor = foilview_ui.COLORS.TextMuted;
-                    bgColor = foilview_ui.COLORS.Light;
+                    textColor = foilview_styling.TEXT_MUTED_COLOR;
+                    bgColor = foilview_styling.LIGHT_COLOR;
                 else
                     textColor = [0 0 0];  % Black
                     % Add visual feedback for high metric values (potential focus)
@@ -235,7 +235,7 @@ classdef foilview_updater < handle
                         greenComponent = 0.9 + 0.1 * intensity;  % Slightly green tint for high values
                         bgColor = [0.95 greenComponent 0.95];
                     else
-                        bgColor = foilview_ui.COLORS.Light;
+                        bgColor = foilview_styling.LIGHT_COLOR;
                     end
                 end
                 
@@ -260,9 +260,9 @@ classdef foilview_updater < handle
                 end
                 
                 if isExpanded
-                    foilview_utils.applyButtonStyle(plotControls.ExpandButton, 'warning', '📊 Hide Plot');
+                    foilview_styling.styleButton(plotControls.ExpandButton, 'Warning', '📊 Hide Plot');
                 else
-                    foilview_utils.applyButtonStyle(plotControls.ExpandButton, 'primary', '📊 Show Plot');
+                    foilview_styling.styleButton(plotControls.ExpandButton, 'Primary', '📊 Show Plot');
                 end
                 
                 success = true;

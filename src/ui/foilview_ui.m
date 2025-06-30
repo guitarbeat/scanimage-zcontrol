@@ -6,14 +6,14 @@ classdef foilview_ui < handle
     % the UI creation logic from the main application logic.
     
     properties (Constant, Access = public)
-        % Window Configuration
+        % Legacy constants - use foilview_styling for new code
         MIN_WINDOW_WIDTH = 280   % Minimum window width (pixels)
         MIN_WINDOW_HEIGHT = 380  % Minimum window height (pixels)
         DEFAULT_WINDOW_WIDTH = 320      % Default window width (pixels)
         DEFAULT_WINDOW_HEIGHT = 420     % Default window height (pixels)
         PLOT_WIDTH = 400        % Additional width when plot is expanded
         
-        % UI Theme Colors
+        % Legacy colors - use foilview_styling.getColors() for new code
         COLORS = struct(...
             'Background', [0.95 0.95 0.95], ...  % Light gray background
             'Primary', [0.2 0.6 0.9], ...        % Blue for primary actions
@@ -23,7 +23,7 @@ classdef foilview_ui < handle
             'Light', [0.98 0.98 0.98], ...       % Nearly white for highlights
             'TextMuted', [0.5 0.5 0.5])          % Gray for secondary text
         
-        % UI Text
+        % Legacy text constants - use foilview_styling for new code
         TEXT = struct(...
             'WindowTitle', 'FoilView - Z-Stage Control', ... % Main window title
             'Ready', 'Ready')                     % Default status message
@@ -415,7 +415,6 @@ classdef foilview_ui < handle
         
         function button = createStyledButton(obj, parent, style, text, callback, position)
             button = uibutton(parent, 'push');
-            button.Text = text;
             button.Layout.Row = position(1);
             
             if length(position) > 1
@@ -427,8 +426,8 @@ classdef foilview_ui < handle
                 button.ButtonPushedFcn = callback;
             end
             
-            % Apply style using centralized utility
-            foilview_utils.applyButtonStyle(button, style, text);
+            % Apply style using centralized styling system
+            foilview_styling.styleButton(button, style, text);
         end
         
 

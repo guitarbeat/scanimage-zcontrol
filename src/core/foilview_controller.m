@@ -87,6 +87,7 @@ classdef foilview_controller < handle
         CurrentStep (1,1) double = 0            % Current step number in sequence
         TotalSteps (1,1) double = 0             % Total steps in current sequence
         AutoDirection (1,1) double = 1          % 1 for up, -1 for down movement
+        CurrentStepSize (1,1) double = 1.0      % Current step size for auto-stepping
         RecordMetrics (1,1) logical = false     % Whether to collect metrics during auto-stepping
         AutoStepMetrics = struct('Positions', [], 'Values', struct(), 'Statistics', struct())  % Collected metrics data with statistics
         LastRecordedPosition (1,1) double = NaN % Last position where metrics were recorded
@@ -236,7 +237,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            success = foilview_utils.safeExecute(@() doMoveStage(), 'moveStage');
+            foilview_utils.safeExecute(@() doMoveStage(), 'moveStage');
             
             function doMoveStage()
                 if obj.SimulationMode
@@ -284,7 +285,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            success = foilview_utils.safeExecute(@() doMoveStageX(), 'moveStageX');
+            foilview_utils.safeExecute(@() doMoveStageX(), 'moveStageX');
             
             function doMoveStageX()
                 if obj.SimulationMode || isempty(obj.etXPos)
@@ -328,7 +329,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            success = foilview_utils.safeExecute(@() doMoveStageY(), 'moveStageY');
+            foilview_utils.safeExecute(@() doMoveStageY(), 'moveStageY');
             
             function doMoveStageY()
                 if obj.SimulationMode || isempty(obj.etYPos)
@@ -372,7 +373,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            success = foilview_utils.safeExecute(@() doSetPosition(), 'setPosition');
+            foilview_utils.safeExecute(@() doSetPosition(), 'setPosition');
             
             function doSetPosition()
                 if obj.SimulationMode
@@ -393,7 +394,7 @@ classdef foilview_controller < handle
         
         function setXYZPosition(obj, xPos, yPos, zPos)
             % Set X, Y, and Z positions simultaneously
-            success = foilview_utils.safeExecute(@() doSetXYZPosition(), 'setXYZPosition');
+            foilview_utils.safeExecute(@() doSetXYZPosition(), 'setXYZPosition');
             
             function doSetXYZPosition()
                 if obj.SimulationMode
@@ -548,6 +549,7 @@ classdef foilview_controller < handle
             obj.CurrentStep = 0;
             obj.TotalSteps = numSteps;
             obj.AutoDirection = direction;
+            obj.CurrentStepSize = stepSize;
             obj.RecordMetrics = recordMetrics;
             
             % Reset metrics collection if enabled
@@ -563,7 +565,7 @@ classdef foilview_controller < handle
             end
             
             obj.AutoTimer = foilview_utils.createTimer('fixedRate', delay, ...
-                @(~,~) obj.executeAutoStep(stepSize));
+                @(~,~) obj.executeAutoStep());
             
             start(obj.AutoTimer);
             obj.notifyStatusChanged();
@@ -926,7 +928,7 @@ classdef foilview_controller < handle
                      foilview_utils.validateUIComponent(obj.etZPos);
         end
         
-        function executeAutoStep(obj, stepSize)
+        function executeAutoStep(obj)
             foilview_utils.safeExecute(@() doExecuteStep(), 'executeAutoStep');
             
             function doExecuteStep()
@@ -936,8 +938,8 @@ classdef foilview_controller < handle
                 end
                 
                 obj.CurrentStep = obj.CurrentStep + 1;
-                % Apply direction at execution time
-                obj.moveStage(stepSize * obj.AutoDirection);
+                % Apply direction at execution time using stored step size
+                obj.moveStage(obj.CurrentStepSize * obj.AutoDirection);
                 
                 if obj.CurrentStep >= obj.TotalSteps
                     obj.stopAutoStepping();

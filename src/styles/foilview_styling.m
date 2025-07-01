@@ -86,20 +86,20 @@ classdef foilview_styling < handle
         FONT_FAMILY_MONO = 'Consolas'
         FONT_FAMILY_SERIF = 'Times New Roman'
         
-        %% Spacing Scale
+        %% Spacing Scale (Condensed)
         SPACE_0 = 0
-        SPACE_1 = 4
-        SPACE_2 = 8
-        SPACE_3 = 12
-        SPACE_4 = 16
-        SPACE_5 = 20
-        SPACE_6 = 24
-        SPACE_8 = 32
-        SPACE_10 = 40
-        SPACE_12 = 48
-        SPACE_16 = 64
-        SPACE_20 = 80
-        SPACE_24 = 96
+        SPACE_1 = 2
+        SPACE_2 = 4
+        SPACE_3 = 6
+        SPACE_4 = 8
+        SPACE_5 = 10
+        SPACE_6 = 12
+        SPACE_8 = 16
+        SPACE_10 = 20
+        SPACE_12 = 24
+        SPACE_16 = 32
+        SPACE_20 = 40
+        SPACE_24 = 48
         
         %% Border Radius
         BORDER_RADIUS_NONE = 0

@@ -44,7 +44,7 @@ function diagnose_scanimage_data(varargin)
 
     % Set up output
     if opts.Save
-        ts = datestr(now,'yyyymmdd_HHMMSS');
+        ts = string(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
         fname = sprintf('scanimage_diagnostic_%s.txt',ts);
         fid = fopen(fname,'w');
         out = @(varargin) fprintf(fid,varargin{:});
@@ -112,7 +112,7 @@ function printHeader(out)
     out('\n');
     out('╔══════════════════════════════════════════════════════════════╗\n');
     out('║           ScanImage Data Access Diagnostic Report            ║\n');
-    out('║                  Generated: %-28s  ║\n', datestr(now));
+    out('║                  Generated: %-28s  ║\n', string(datetime('now')));
     out('╚══════════════════════════════════════════════════════════════╝\n\n');
 end
 
@@ -299,7 +299,8 @@ function reportDataAccessResults(out, colorOut, res, opts)
     
     if res.hasPixelData
         colorOut('green','\n✅ Pixel data is accessible!\n');
-        out('Recommended method: %s\n', methodNames{find(strcmp(res.methods,res.bestMethod))});
+        methodIdx = strcmp(res.methods,res.bestMethod);
+        out('Recommended method: %s\n', methodNames{methodIdx});
     else
         colorOut('red','\n❌ No pixel data could be accessed\n');
         out('Possible causes:\n');
@@ -409,7 +410,7 @@ function reportRecommendations(out, colorOut, recs)
     out('\n');
 end
 
-function generateIntegrationCode(out, colorOut, dataRes, stat)
+function generateIntegrationCode(out, colorOut, dataRes, ~)
     out('┌─────────────────────────────────────────────────────────────┐\n');
     out('│ INTEGRATION CODE                                            │\n');
     out('└─────────────────────────────────────────────────────────────┘\n\n');
@@ -642,7 +643,7 @@ function [hSI, stat] = checkScanImageStatus()
 end
 
 %% Display Component Analysis
-function info = diagnoseDisplayComponent(hSI, verbose)
+function info = diagnoseDisplayComponent(hSI, ~)
     info = struct('available', false, ...
                  'class', '', ...
                  'totalProps', 0, ...

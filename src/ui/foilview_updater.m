@@ -3,300 +3,410 @@ classdef foilview_updater < handle
     %
     % This class manages all UI update operations including position display,
     % status updates, control state management, and bookmarks list updates.
-    % Enhanced with error handling and performance optimizations.
+    % Refactored for better maintainability, reduced complexity, and improved organization.
+    
+    properties (Constant, Access = private)
+        % Update throttling constants
+        DEFAULT_THROTTLE_INTERVAL = 0.05  % 50ms throttle
+        
+        % Update operation names for error reporting
+        UPDATE_OPERATIONS = struct(...
+            'All', 'updateAllUI', ...
+            'Position', 'updatePositionDisplay', ...
+            'Status', 'updateStatusDisplay', ...
+            'Controls', 'updateControlStates', ...
+            'Metrics', 'updateMetricDisplay', ...
+            'Plot', 'updatePlotExpansionState', ...
+            'Title', 'updateWindowTitle')
+    end
     
     methods (Static)
         function success = updateAllUI(app)
-            % Update all UI components with centralized error handling and throttling
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateAll(), 'updateAllUI', false);
-            
-            function success = doUpdateAll()
-                % Use persistent variable for throttling
-                persistent lastUpdateTime;
-                if isempty(lastUpdateTime)
-                    lastUpdateTime = 0;
-                end
-                
-                % Use throttling to prevent excessive updates
-                if ~foilview_utils.shouldThrottleUpdate(lastUpdateTime)
-                    success = true;  % Not an error, just throttled
-                    return;
-                end
-                lastUpdateTime = now * 24 * 3600;  % Update timestamp
-                
-                % Use batch update for better performance
-                updateFunctions = {
-                    @() foilview_updater.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller),
-                    @() foilview_updater.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller),
-                    @() foilview_updater.updateControlStates(app.ManualControls, app.AutoControls, app.Controller),
-                    @() foilview_updater.updateMetricDisplay(app.MetricDisplay, app.Controller),
-                    @() foilview_updater.updatePlotExpansionState(app.MetricsPlotControls, app.PlotManager.getIsPlotExpanded()),
-                    @() foilview_updater.updateWindowTitle(app)
-                };
-                
-                success = foilview_utils.batchUIUpdate(updateFunctions);
-            end
+            % Update all UI components with centralized coordination
+            success = foilview_updater.safeExecuteUpdate(@() foilview_updater.doUpdateAll(app), ...
+                foilview_updater.UPDATE_OPERATIONS.All);
         end
         
         function success = updatePositionDisplay(uiFigure, positionDisplay, controller)
-            % Enhanced position display update with validation
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdatePosition(), 'updatePositionDisplay', false);
-            
-            function success = doUpdatePosition()
-                success = false;
-                
-                % Validate inputs using centralized utilities
-                if ~foilview_utils.validateMultipleComponents(uiFigure, positionDisplay.Label) || isempty(controller)
-                    return;
-                end
-                
-                % Format position using utility
-                positionStr = foilview_utils.formatPosition(controller.CurrentPosition, true);
-                positionDisplay.Label.Text = positionStr;
-                
-                success = true;
-            end
+            % Update position display with enhanced validation
+            success = foilview_updater.safeExecuteUpdate(@() foilview_updater.doUpdatePosition(uiFigure, positionDisplay, controller), ...
+                foilview_updater.UPDATE_OPERATIONS.Position);
         end
         
         function success = updateStatusDisplay(positionDisplay, statusControls, controller)
-            % Enhanced status display update with state management
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateStatus(), 'updateStatusDisplay', false);
-            
-            function success = doUpdateStatus()
-                success = false;
-                
-                % Validate inputs
-                if ~foilview_utils.validateMultipleComponents(positionDisplay.Status, statusControls.Label) || isempty(controller)
-                    return;
-                end
-                
-                % Use centralized styling system
-                colors = foilview_styling.getColors();
-                
-                % Update position status based on controller state
-                if controller.IsAutoRunning
-                    progressText = sprintf('Auto-stepping: %d/%d', controller.CurrentStep, controller.TotalSteps);
-                    positionDisplay.Status.Text = progressText;
-                    foilview_styling.styleLabel(positionDisplay.Status, 'primary');
-                else
-                    positionDisplay.Status.Text = 'Ready';
-                    foilview_styling.styleLabel(positionDisplay.Status, 'muted');
-                end
-                
-                % Update connection status with appropriate styling
-                if controller.SimulationMode
-                    statusText = sprintf('ScanImage: Simulation (%s)', controller.StatusMessage);
-                    statusControls.Label.Text = statusText;
-                    foilview_styling.styleLabel(statusControls.Label, 'warning');
-                else
-                    statusText = sprintf('ScanImage: %s', controller.StatusMessage);
-                    statusControls.Label.Text = statusText;
-                    foilview_styling.styleLabel(statusControls.Label, 'success');
-                end
-                
-                success = true;
-            end
+            % Update status display with state management
+            success = foilview_updater.safeExecuteUpdate(@() foilview_updater.doUpdateStatus(positionDisplay, statusControls, controller), ...
+                foilview_updater.UPDATE_OPERATIONS.Status);
         end
         
         function success = updateControlStates(manualControls, autoControls, controller)
-            % Enhanced control state management using centralized utilities
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateControlStates(), 'updateControlStates', false);
-            
-            function success = doUpdateControlStates()
-                success = false;
-                
-                % Validate inputs
-                if isempty(controller)
-                    return;
-                end
-                
-                isRunning = controller.IsAutoRunning;
-                
-                % Always disable manual controls when auto stepping
-                foilview_updater.setControlsEnabled(manualControls, ~isRunning);
-                
-                % For auto controls, be more selective during auto stepping
-                if isRunning
-                    % Disable parameter controls that shouldn't change during auto stepping
-                    foilview_utils.setControlEnabled(autoControls, false, 'StepField');
-                    foilview_utils.setControlEnabled(autoControls, false, 'StepsField');
-                    foilview_utils.setControlEnabled(autoControls, false, 'DelayField');
-                    
-                    % Keep direction button and start/stop button enabled
-                    foilview_utils.setControlEnabled(autoControls, true, 'DirectionButton');
-                    foilview_utils.setControlEnabled(autoControls, true, 'StartStopButton');
-                    
-                    % Maintain direction button styling based on current direction
-                    foilview_updater.updateDirectionButtonStyling(autoControls, controller.AutoDirection);
-                else
-                    % Enable all auto controls when not running
-                    foilview_updater.setControlsEnabled(autoControls, true);
-                    
-                    % Restore direction button styling when not running
-                    foilview_updater.updateDirectionButtonStyling(autoControls, controller.AutoDirection);
-                end
-                
-                % Update start/stop button appearance
-                foilview_updater.updateAutoStepButton(autoControls, isRunning);
-                
-                success = true;
-            end
-        end
-        
-        function setControlsEnabled(controls, enabled)
-            % Enhanced control enabling/disabling using centralized utilities
-            foilview_utils.safeExecute(@() doSetControls(), 'setControlsEnabled');
-            
-            function doSetControls()
-                % Get all relevant control field names
-                controlFields = foilview_utils.getAllControlFields();
-                
-                % Enable/disable all controls efficiently
-                foilview_utils.setControlsEnabled(controls, enabled, controlFields);
-            end
-        end
-        
-        function success = updateAutoStepButton(autoControls, isRunning)
-            % Enhanced auto-step button update using centralized styling
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateButton(), 'updateAutoStepButton', false);
-            
-            function success = doUpdateButton()
-                success = false;
-                
-                % Validate input
-                if ~foilview_utils.validateControlStruct(autoControls, {'StartStopButton'})
-                    return;
-                end
-                
-                if isRunning
-                    foilview_styling.styleButton(autoControls.StartStopButton, 'danger', 'base');
-                    autoControls.StartStopButton.Text = 'STOP';
-                else
-                    foilview_styling.styleButton(autoControls.StartStopButton, 'success', 'base');
-                    autoControls.StartStopButton.Text = 'START';
-                end
-                
-                success = true;
-            end
-        end
-        
-        function success = updateDirectionButtonStyling(autoControls, direction)
-            % Update direction button styling based on current direction
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateDirection(), 'updateDirectionButtonStyling', false);
-            
-            function success = doUpdateDirection()
-                success = false;
-                
-                % Validate inputs
-                if ~foilview_utils.validateControlStruct(autoControls, {'DirectionButton'})
-                    return;
-                end
-                
-                % Update toggle button appearance and text based on direction
-                if direction == 1  % Up
-                    foilview_styling.styleButton(autoControls.DirectionButton, 'success', 'base');
-                    autoControls.DirectionButton.Text = '▲ UP';
-                else  % Down
-                    foilview_styling.styleButton(autoControls.DirectionButton, 'warning', 'base');
-                    autoControls.DirectionButton.Text = '▼ DOWN';
-                end
-                
-                success = true;
-            end
+            % Update control states with centralized logic
+            success = foilview_updater.safeExecuteUpdate(@() foilview_updater.doUpdateControls(manualControls, autoControls, controller), ...
+                foilview_updater.UPDATE_OPERATIONS.Controls);
         end
         
         function success = updateMetricDisplay(metricDisplay, controller)
-            % Enhanced metric display update using centralized formatting
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateMetric(), 'updateMetricDisplay', false);
-            
-            function success = doUpdateMetric()
-                success = false;
-                
-                % Validate inputs
-                if ~foilview_utils.validateControlStruct(metricDisplay, {'Value'}) || isempty(controller)
-                    return;
-                end
-                
-                % Get colors from the modern styling system
-                colors = foilview_styling.getColors();
-                
-                % Use centralized metric formatting
-                metricValue = controller.CurrentMetric;
-                displayText = foilview_utils.formatMetricValue(metricValue);
-                
-                % Set text and color
-                if isnan(metricValue)
-                    textColor = colors.TextMuted;
-                    bgColor = colors.Light;
-                else
-                    textColor = [0 0 0];  % Black
-                    % Add visual feedback for high metric values (potential focus)
-                    if metricValue > 0
-                        % Calculate relative intensity for background color
-                        intensity = min(1, metricValue / 100);  % Normalize to [0,1]
-                        greenComponent = 0.9 + 0.1 * intensity;  % Slightly green tint for high values
-                        bgColor = [0.95 greenComponent 0.95];
-                    else
-                        bgColor = colors.Light;
-                    end
-                end
-                
-                % Update display
-                metricDisplay.Value.Text = displayText;
-                metricDisplay.Value.FontColor = textColor;
-                metricDisplay.Value.BackgroundColor = bgColor;
-                
-                success = true;
-            end
+            % Update metric display with enhanced formatting
+            success = foilview_updater.safeExecuteUpdate(@() foilview_updater.doUpdateMetrics(metricDisplay, controller), ...
+                foilview_updater.UPDATE_OPERATIONS.Metrics);
         end
         
         function success = updatePlotExpansionState(plotControls, isExpanded)
-            % Update plot expansion button state using centralized styling
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateExpansion(), 'updatePlotExpansionState', false);
-            
-            function success = doUpdateExpansion()
-                success = false;
-                
-                if ~foilview_utils.validateControlStruct(plotControls, {'ExpandButton'})
-                    return;
-                end
-                
-                if isExpanded
-                    foilview_styling.styleButton(plotControls.ExpandButton, 'warning', 'base');
-                    plotControls.ExpandButton.Text = '📊 Hide Plot';
-                else
-                    foilview_styling.styleButton(plotControls.ExpandButton, 'primary', 'base');
-                    plotControls.ExpandButton.Text = '📊 Show Plot';
-                end
-                
-                success = true;
-            end
+            % Update plot expansion button state
+            success = foilview_updater.safeExecuteUpdate(@() foilview_updater.doUpdatePlotState(plotControls, isExpanded), ...
+                foilview_updater.UPDATE_OPERATIONS.Plot);
         end
         
         function success = updateWindowTitle(app)
-            % Update window title with position and plot-expanded suffix
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdate(), 'updateWindowTitle', false);
-            function success = doUpdate()
-                success = false;
-                if isempty(app) || ~isvalid(app.UIFigure)
-                    return;
-                end
-                % Base title
-                baseTitle = foilview_ui.TEXT.WindowTitle;
-                % Add expanded suffix if needed
-                if app.PlotManager.getIsPlotExpanded()
-                    baseTitle = sprintf('%s - Plot Expanded', baseTitle);
-                end
-                % Position string
-                posStr = foilview_utils.formatPosition(app.Controller.CurrentPosition, true);
-                % Set name
-                app.UIFigure.Name = sprintf('%s (%s)', baseTitle, posStr);
+            % Update window title with position and status information
+            success = foilview_updater.safeExecuteUpdate(@() foilview_updater.doUpdateTitle(app), ...
+                foilview_updater.UPDATE_OPERATIONS.Title);
+        end
+    end
+    
+    methods (Static, Access = private)
+        %% Core Update Implementation Methods
+        
+        function success = doUpdateAll(app)
+            % Coordinate all UI updates with throttling and batch processing
+            persistent lastUpdateTime;
+            if isempty(lastUpdateTime)
+                lastUpdateTime = 0;
+            end
+            
+            % Apply throttling to prevent excessive updates
+            if ~foilview_updater.shouldPerformUpdate(lastUpdateTime)
                 success = true;
+                return;
+            end
+            lastUpdateTime = now * 24 * 3600;
+            
+            % Execute batch updates for better performance
+            updateOperations = foilview_updater.createUpdateOperations(app);
+            success = foilview_updater.executeBatchUpdates(updateOperations);
+        end
+        
+        function success = doUpdatePosition(uiFigure, positionDisplay, controller)
+            % Core position display update implementation
+            success = false;
+            
+            if ~foilview_updater.validatePositionInputs(uiFigure, positionDisplay, controller)
+                return;
+            end
+            
+            positionStr = foilview_utils.formatPosition(controller.CurrentPosition, true);
+            positionDisplay.Label.Text = positionStr;
+            
+            success = true;
+        end
+        
+        function success = doUpdateStatus(positionDisplay, statusControls, controller)
+            % Core status display update implementation
+            success = false;
+            
+            if ~foilview_updater.validateStatusInputs(positionDisplay, statusControls, controller)
+                return;
+            end
+            
+            foilview_updater.updatePositionStatus(positionDisplay, controller);
+            foilview_updater.updateConnectionStatus(statusControls, controller);
+            
+            success = true;
+        end
+        
+        function success = doUpdateControls(manualControls, autoControls, controller)
+            % Core control state update implementation
+            success = false;
+            
+            if ~foilview_updater.validateControlInputs(controller)
+                return;
+            end
+            
+            isRunning = controller.IsAutoRunning;
+            
+            foilview_updater.updateManualControlStates(manualControls, isRunning);
+            foilview_updater.updateAutoControlStates(autoControls, controller, isRunning);
+            
+            success = true;
+        end
+        
+        function success = doUpdateMetrics(metricDisplay, controller)
+            % Core metric display update implementation
+            success = false;
+            
+            if ~foilview_updater.validateMetricInputs(metricDisplay, controller)
+                return;
+            end
+            
+            metricValue = controller.CurrentMetric;
+            foilview_updater.updateMetricValueDisplay(metricDisplay, metricValue);
+            
+            success = true;
+        end
+        
+        function success = doUpdatePlotState(plotControls, isExpanded)
+            % Core plot state update implementation
+            success = false;
+            
+            if ~foilview_updater.validatePlotInputs(plotControls)
+                return;
+            end
+            
+            foilview_updater.updatePlotExpansionButton(plotControls, isExpanded);
+            
+            success = true;
+        end
+        
+        function success = doUpdateTitle(app)
+            % Core window title update implementation
+            success = false;
+            
+            if ~foilview_updater.validateTitleInputs(app)
+                return;
+            end
+            
+            baseTitle = foilview_ui.TEXT.WindowTitle;
+            if app.PlotManager.getIsPlotExpanded()
+                baseTitle = sprintf('%s - Plot Expanded', baseTitle);
+            end
+            
+            posStr = foilview_utils.formatPosition(app.Controller.CurrentPosition, true);
+            app.UIFigure.Name = sprintf('%s (%s)', baseTitle, posStr);
+            
+            success = true;
+        end
+        
+        %% Specialized Update Methods
+        
+        function updatePositionStatus(positionDisplay, controller)
+            % Update position status based on controller state
+            if controller.IsAutoRunning
+                progressText = sprintf('Auto-stepping: %d/%d', controller.CurrentStep, controller.TotalSteps);
+                positionDisplay.Status.Text = progressText;
+                foilview_styling.styleLabel(positionDisplay.Status, 'primary');
+            else
+                positionDisplay.Status.Text = 'Ready';
+                foilview_styling.styleLabel(positionDisplay.Status, 'muted');
             end
         end
         
+        function updateConnectionStatus(statusControls, controller)
+            % Update connection status with appropriate styling
+            if controller.SimulationMode
+                statusText = sprintf('ScanImage: Simulation (%s)', controller.StatusMessage);
+                foilview_styling.styleLabel(statusControls.Label, 'warning');
+            else
+                statusText = sprintf('ScanImage: %s', controller.StatusMessage);
+                foilview_styling.styleLabel(statusControls.Label, 'success');
+            end
+            statusControls.Label.Text = statusText;
+        end
+        
+        function updateManualControlStates(manualControls, isRunning)
+            % Update manual control states based on auto-stepping status
+            foilview_updater.setControlGroupEnabled(manualControls, ~isRunning);
+        end
+        
+        function updateAutoControlStates(autoControls, controller, isRunning)
+            % Update auto control states with selective enabling/disabling
+            if isRunning
+                foilview_updater.disableAutoStepParameters(autoControls);
+                foilview_updater.enableAutoStepControls(autoControls);
+            else
+                foilview_updater.setControlGroupEnabled(autoControls, true);
+            end
+            
+            foilview_updater.updateDirectionButtonStyling(autoControls, controller.AutoDirection);
+            foilview_updater.updateAutoStepButton(autoControls, isRunning);
+        end
+        
+        function updateMetricValueDisplay(metricDisplay, metricValue)
+            % Update metric value display with visual feedback
+            colors = foilview_styling.getColors();
+            
+            displayText = foilview_utils.formatMetricValue(metricValue);
+            
+            if isnan(metricValue)
+                textColor = colors.TextMuted;
+                bgColor = colors.Light;
+            else
+                textColor = [0 0 0];
+                bgColor = foilview_updater.calculateMetricBackgroundColor(metricValue, colors);
+            end
+            
+            metricDisplay.Value.Text = displayText;
+            metricDisplay.Value.FontColor = textColor;
+            metricDisplay.Value.BackgroundColor = bgColor;
+        end
+        
+        function updatePlotExpansionButton(plotControls, isExpanded)
+            % Update plot expansion button appearance
+            if isExpanded
+                foilview_styling.styleButton(plotControls.ExpandButton, 'warning', 'base');
+                plotControls.ExpandButton.Text = '📊 Hide Plot';
+            else
+                foilview_styling.styleButton(plotControls.ExpandButton, 'primary', 'base');
+                plotControls.ExpandButton.Text = '📊 Show Plot';
+            end
+        end
+        
+        function updateAutoStepButton(autoControls, isRunning)
+            % Update auto-step button appearance based on state
+            if ~foilview_updater.validateControlStruct(autoControls, {'StartStopButton'})
+                return;
+            end
+            
+            if isRunning
+                foilview_styling.styleButton(autoControls.StartStopButton, 'danger', 'base');
+                autoControls.StartStopButton.Text = 'STOP';
+            else
+                foilview_styling.styleButton(autoControls.StartStopButton, 'success', 'base');
+                autoControls.StartStopButton.Text = 'START';
+            end
+        end
+        
+        function updateDirectionButtonStyling(autoControls, direction)
+            % Update direction button styling based on current direction
+            if ~foilview_updater.validateControlStruct(autoControls, {'DirectionButton'})
+                return;
+            end
+            
+            if direction == 1  % Up
+                foilview_styling.styleButton(autoControls.DirectionButton, 'success', 'base');
+                autoControls.DirectionButton.Text = '▲ UP';
+            else  % Down
+                foilview_styling.styleButton(autoControls.DirectionButton, 'warning', 'base');
+                autoControls.DirectionButton.Text = '▼ DOWN';
+            end
+        end
+        
+        %% Control State Management Methods
+        
+        function setControlGroupEnabled(controls, enabled)
+            % Enable/disable all controls in a group
+            controlFields = foilview_utils.getAllControlFields();
+            foilview_utils.setControlsEnabled(controls, enabled, controlFields);
+        end
+        
+        function disableAutoStepParameters(autoControls)
+            % Disable parameter controls during auto stepping
+            parameterFields = {'StepField', 'StepsField', 'DelayField'};
+            for i = 1:length(parameterFields)
+                foilview_utils.setControlEnabled(autoControls, false, parameterFields{i});
+            end
+        end
+        
+        function enableAutoStepControls(autoControls)
+            % Enable control buttons during auto stepping
+            controlFields = {'DirectionButton', 'StartStopButton'};
+            for i = 1:length(controlFields)
+                foilview_utils.setControlEnabled(autoControls, true, controlFields{i});
+            end
+        end
+        
+        %% Validation Methods
+        
+        function valid = validatePositionInputs(uiFigure, positionDisplay, controller)
+            % Validate inputs for position display update
+            valid = foilview_utils.validateMultipleComponents(uiFigure, positionDisplay.Label) && ...
+                    ~isempty(controller);
+        end
+        
+        function valid = validateStatusInputs(positionDisplay, statusControls, controller)
+            % Validate inputs for status display update
+            valid = foilview_utils.validateMultipleComponents(positionDisplay.Status, statusControls.Label) && ...
+                    ~isempty(controller);
+        end
+        
+        function valid = validateControlInputs(controller)
+            % Validate inputs for control state update
+            valid = ~isempty(controller);
+        end
+        
+        function valid = validateMetricInputs(metricDisplay, controller)
+            % Validate inputs for metric display update
+            valid = foilview_updater.validateControlStruct(metricDisplay, {'Value'}) && ...
+                    ~isempty(controller);
+        end
+        
+        function valid = validatePlotInputs(plotControls)
+            % Validate inputs for plot state update
+            valid = foilview_updater.validateControlStruct(plotControls, {'ExpandButton'});
+        end
+        
+        function valid = validateTitleInputs(app)
+            % Validate inputs for title update
+            valid = ~isempty(app) && isvalid(app.UIFigure);
+        end
+        
+        function valid = validateControlStruct(controlStruct, requiredFields)
+            % Validate that control structure has required fields
+            if ~isstruct(controlStruct) || isempty(requiredFields)
+                valid = false;
+                return;
+            end
+            
+            valid = true;
+            for i = 1:length(requiredFields)
+                if ~isfield(controlStruct, requiredFields{i}) || ...
+                   ~foilview_utils.validateUIComponent(controlStruct.(requiredFields{i}))
+                    valid = false;
+                    return;
+                end
+            end
+        end
+        
+        %% Utility and Helper Methods
+        
+        function should = shouldPerformUpdate(lastUpdateTime)
+            % Check if enough time has passed since last update
+            currentTime = now * 24 * 3600;
+            should = (currentTime - lastUpdateTime) >= foilview_updater.DEFAULT_THROTTLE_INTERVAL;
+        end
+        
+        function operations = createUpdateOperations(app)
+            % Create list of update operations for batch execution
+            operations = {
+                @() foilview_updater.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller),
+                @() foilview_updater.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller),
+                @() foilview_updater.updateControlStates(app.ManualControls, app.AutoControls, app.Controller),
+                @() foilview_updater.updateMetricDisplay(app.MetricDisplay, app.Controller),
+                @() foilview_updater.updatePlotExpansionState(app.MetricsPlotControls, app.PlotManager.getIsPlotExpanded()),
+                @() foilview_updater.updateWindowTitle(app)
+            };
+        end
+        
+        function success = executeBatchUpdates(updateOperations)
+            % Execute multiple update operations as a batch
+            success = foilview_utils.batchUIUpdate(updateOperations);
+        end
+        
+        function bgColor = calculateMetricBackgroundColor(metricValue, colors)
+            % Calculate background color based on metric value
+            if metricValue > 0
+                % Add visual feedback for high metric values (potential focus)
+                intensity = min(1, metricValue / 100);  % Normalize to [0,1]
+                greenComponent = 0.9 + 0.1 * intensity;  % Slightly green tint for high values
+                bgColor = [0.95 greenComponent 0.95];
+            else
+                bgColor = colors.Light;
+            end
+        end
+        
+        function success = safeExecuteUpdate(updateOperation, operationName)
+            % Centralized error handling for update operations
+            try
+                success = updateOperation();
+            catch ME
+                fprintf('Error in %s: %s\n', operationName, ME.message);
+                success = false;
+            end
+        end
+    end
+    
+    methods (Static)
         function success = batchUpdate(updateFunctions)
-            % Perform multiple UI updates in a batch using centralized utility
+            % Public method for performing multiple UI updates in a batch
             success = foilview_utils.batchUIUpdate(updateFunctions);
         end
     end

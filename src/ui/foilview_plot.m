@@ -15,11 +15,11 @@ classdef foilview_plot < handle
     
     properties (Constant, Access = private)
         % Plot configuration constants
-        PLOT_WIDTH = 400
-        PLOT_PADDING = 20
-        MIN_AXIS_RANGE = 0.001
-        AXIS_PADDING_PERCENT = 0.05
-        Y_AXIS_MIN_PADDING = 0.05
+        PLOT_WIDTH = foilview_constants.PLOT_WIDTH
+        PLOT_PADDING = 20 % If not in constants, keep here
+        MIN_AXIS_RANGE = foilview_constants.PLOT_MIN_AXIS_RANGE
+        AXIS_PADDING_PERCENT = foilview_constants.PLOT_AXIS_PADDING_PERCENT
+        Y_AXIS_MIN_PADDING = foilview_constants.PLOT_Y_AXIS_MIN_PADDING
         
         % Visual styling constants
         DEFAULT_COLORS = {[0 0.447 0.741], [0.851 0.325 0.098], [0.929 0.694 0.125], ...
@@ -31,8 +31,8 @@ classdef foilview_plot < handle
         METRIC_TYPES = {'Std Dev', 'Mean', 'Max'}
         
         % Plot properties
-        LINE_WIDTH = 1.5
-        MARKER_SIZE = 4
+        LINE_WIDTH = foilview_constants.PLOT_LINE_WIDTH
+        MARKER_SIZE = foilview_constants.PLOT_MARKER_SIZE
     end
     
     methods

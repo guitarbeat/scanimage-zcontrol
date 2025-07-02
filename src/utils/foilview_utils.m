@@ -20,12 +20,7 @@ classdef foilview_utils < handle
         DROPDOWN_FIELDS = {'StepSizeDropdown', 'TypeDropdown'}
         
         % Performance constants
-        DEFAULT_UPDATE_THROTTLE = 0.05  % 50ms minimum between updates
-        DEFAULT_PLOT_THROTTLE = 0.1     % 100ms minimum between plot updates
         DEFAULT_MAX_DATA_POINTS = 1000
-        
-        % Validation constants
-        POSITION_PRECISION_THRESHOLD = 0.1  % When to use high precision formatting
     end
     
     methods (Static)
@@ -108,10 +103,10 @@ classdef foilview_utils < handle
         function str = formatPosition(position, highPrecision)
             % Centralized position formatting with automatic precision detection
             if nargin < 2
-                highPrecision = abs(position) < foilview_utils.POSITION_PRECISION_THRESHOLD;
+                highPrecision = abs(position) < foilview_constants.POSITION_PRECISION_THRESHOLD;
             end
             
-            if highPrecision && abs(position) < foilview_utils.POSITION_PRECISION_THRESHOLD
+            if highPrecision && abs(position) < foilview_constants.POSITION_PRECISION_THRESHOLD
                 str = sprintf('%.2f μm', position);
             else
                 str = sprintf('%.1f μm', position);

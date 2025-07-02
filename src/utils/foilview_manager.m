@@ -170,7 +170,7 @@ classdef foilview_manager < handle
         end
     end
     
-    methods
+    methods (Access = public)
         %% Constructor
         function obj = foilview_manager(parentApp)
             % Constructor

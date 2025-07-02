@@ -7,7 +7,7 @@ classdef foilview_updater < handle
     
     properties (Constant, Access = private)
         % Update throttling constants
-        DEFAULT_THROTTLE_INTERVAL = 0.05  % 50ms throttle
+        DEFAULT_THROTTLE_INTERVAL = foilview_constants.DEFAULT_UPDATE_THROTTLE  % 50ms throttle
         
         % Update operation names for error reporting
         UPDATE_OPERATIONS = struct(...
@@ -386,8 +386,8 @@ classdef foilview_updater < handle
             if metricValue > 0
                 % Add visual feedback for high metric values (potential focus)
                 intensity = min(1, metricValue / 100);  % Normalize to [0,1]
-                greenComponent = 0.9 + 0.1 * intensity;  % Slightly green tint for high values
-                bgColor = [0.95 greenComponent 0.95];
+                greenComponent = foilview_constants.STATUS_GREEN_BASE + foilview_constants.STATUS_GREEN_INTENSITY * intensity;  % Slightly green tint for high values
+                bgColor = [foilview_constants.STATUS_BG_RED greenComponent foilview_constants.STATUS_BG_BLUE];
             else
                 bgColor = colors.Light;
             end

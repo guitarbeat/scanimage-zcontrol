@@ -6,49 +6,7 @@ classdef foilview_ui < handle
     % better maintainability, reduced complexity, and improved organization.
     
     properties (Constant, Access = public)
-        % Window dimension constants
-        MIN_WINDOW_WIDTH = 260
-        MIN_WINDOW_HEIGHT = 320
-        DEFAULT_WINDOW_WIDTH = 280
-        DEFAULT_WINDOW_HEIGHT = 360
-        PLOT_WIDTH = 400
-        
-        % Layout configuration constants
-        MAIN_LAYOUT_ROWS = 7
-        MAIN_LAYOUT_ROW_HEIGHTS = {'fit', 'fit', 'fit', 'fit', '1x', 'fit', 'fit'}
-        
-        % Control layout constants
-        MANUAL_CONTROL_COLUMNS = 6
-        AUTO_CONTROL_ROWS = 2
-        AUTO_CONTROL_COLUMNS = 4
-        
-        % Font size constants
-        BASE_FONT_SIZE = 8
-        LARGE_FONT_SIZE = 10
-        POSITION_FONT_SIZE = 22
-        FIELD_FONT_SIZE = 9
-        
-        % Logo configuration
-        LOGO_HEIGHT = 50  % Height in pixels for the logo
-        
-        % Text constants
-        TEXT = struct(...
-            'WindowTitle', 'FoilView - Z-Stage Control', ...
-            'Ready', 'Ready', ...
-            'ManualControlTitle', 'Manual Control', ...
-            'AutoStepTitle', 'Auto Step', ...
-            'MetricsPlotTitle', 'Metrics Plot')
-        
-        % Control symbols and labels
-        SYMBOLS = struct(...
-            'Up', '▲', ...
-            'Down', '▼', ...
-            'Left', '◄', ...
-            'Right', '►', ...
-            'Refresh', '↻', ...
-            'Plot', '📊', ...
-            'Bookmarks', '📌', ...
-            'StageView', '📹')
+        % All constants are now in foilview_constants
     end
     
     methods (Static)
@@ -56,6 +14,101 @@ classdef foilview_ui < handle
             % Create all UI components with improved organization
             creator = foilview_ui();
             components = creator.buildCompleteInterface(app);
+        end
+        
+        function adjustPlotPosition(uiFigure, plotPanel, plotWidth)
+            % Utility method for dynamic plot positioning
+            if ~isvalid(uiFigure) || ~isvalid(plotPanel)
+                return;
+            end
+            figPos = uiFigure.Position;
+            currentHeight = figPos(4);
+            expandedWidth = figPos(3);
+            mainWindowWidth = expandedWidth - plotWidth - 20;
+            plotPanelX = mainWindowWidth + 10;
+            plotPanelY = 10;
+            plotPanelHeight = currentHeight - 20;
+            plotPanel.Position = [plotPanelX, plotPanelY, plotWidth, plotPanelHeight];
+        end
+        
+        function adjustFontSizes(components, windowSize)
+            % Dynamic font size adjustment based on window size
+            if nargin < 2 || isempty(windowSize)
+                return;
+            end
+            widthScale = windowSize(3) / foilview_constants.DEFAULT_WINDOW_WIDTH;
+            heightScale = windowSize(4) / foilview_constants.DEFAULT_WINDOW_HEIGHT;
+            overallScale = min(max(sqrt(widthScale * heightScale), foilview_constants.MIN_FONT_SCALE), foilview_constants.MAX_FONT_SCALE);
+            foilview_ui.adjustPositionDisplayFont(components, overallScale);
+            foilview_ui.adjustControlFonts(components, overallScale);
+        end
+        
+        function adjustPositionDisplayFont(components, scale)
+            % Adjust position display font specifically
+            if isfield(components, 'PositionDisplay') && isfield(components.PositionDisplay, 'Label')
+                baseFontSize = foilview_constants.POSITION_FONT_SIZE;
+                newFontSize = max(round(baseFontSize * scale), 18);
+                try
+                    components.PositionDisplay.Label.FontSize = newFontSize;
+                catch
+                    % Ignore font adjustment errors
+                end
+            end
+        end
+        
+        function adjustControlFonts(components, scale)
+            % Adjust control fonts across all control groups
+            if scale == 1.0
+                return;
+            end
+            try
+                controlGroups = {'AutoControls', 'ManualControls', 'MetricDisplay', 'StatusControls'};
+                for i = 1:length(controlGroups)
+                    if isfield(components, controlGroups{i})
+                        foilview_ui.adjustControlGroupFonts(components.(controlGroups{i}), scale);
+                    end
+                end
+            catch
+                % Ignore errors during font adjustment
+            end
+        end
+        
+        function adjustControlGroupFonts(controlStruct, scale)
+            % Helper to adjust fonts in a specific control group
+            if ~isstruct(controlStruct)
+                return;
+            end
+            fields = fieldnames(controlStruct);
+            for i = 1:length(fields)
+                try
+                    obj = controlStruct.(fields{i});
+                    if isvalid(obj) && isprop(obj, 'FontSize')
+                        currentSize = obj.FontSize;
+                        newSize = max(round(currentSize * scale), 8);
+                        newSize = min(newSize, 16);
+                        obj.FontSize = newSize;
+                    end
+                catch
+                    continue;
+                end
+            end
+        end
+        
+        function enforceMinSize(uiFigure, minWidth, minHeight)
+            % Helper to enforce minimum window size
+            pos = uiFigure.Position;
+            changed = false;
+            if pos(3) < minWidth
+                pos(3) = minWidth;
+                changed = true;
+            end
+            if pos(4) < minHeight
+                pos(4) = minHeight;
+                changed = true;
+            end
+            if changed
+                uiFigure.Position = pos;
+            end
         end
     end
     
@@ -100,13 +153,13 @@ classdef foilview_ui < handle
             % Create and configure main figure
             uiFigure = uifigure('Visible', 'off');
             uiFigure.Units = 'pixels';
-            uiFigure.Position = [100 100 obj.DEFAULT_WINDOW_WIDTH obj.DEFAULT_WINDOW_HEIGHT];
-            uiFigure.Name = obj.TEXT.WindowTitle;
+            uiFigure.Position = [100 100 foilview_constants.DEFAULT_WINDOW_WIDTH foilview_constants.DEFAULT_WINDOW_HEIGHT];
+            uiFigure.Name = foilview_constants.WINDOW_TITLE;
             uiFigure.Resize = 'on';
             uiFigure.AutoResizeChildren = 'off';
             uiFigure.WindowState = 'normal';
             % Enforce minimum window size on resize
-            uiFigure.SizeChangedFcn = @(src, event) foilview_ui.enforceMinSize(src, obj.MIN_WINDOW_WIDTH, obj.MIN_WINDOW_HEIGHT);
+            uiFigure.SizeChangedFcn = @(src, event) foilview_ui.enforceMinSize(src, foilview_constants.MIN_WINDOW_WIDTH, foilview_constants.MIN_WINDOW_HEIGHT);
             % Apply styling
             colors = foilview_styling.getColors();
             uiFigure.Color = colors.Background;
@@ -127,8 +180,8 @@ classdef foilview_ui < handle
         
         function mainLayout = createMainLayout(obj, mainPanel)
             % Create compact responsive main layout grid
-            mainLayout = uigridlayout(mainPanel, [obj.MAIN_LAYOUT_ROWS, 1]);
-            mainLayout.RowHeight = obj.MAIN_LAYOUT_ROW_HEIGHTS;
+            mainLayout = uigridlayout(mainPanel, [foilview_constants.MAIN_LAYOUT_ROWS, 1]);
+            mainLayout.RowHeight = foilview_constants.MAIN_LAYOUT_ROW_HEIGHTS;
             mainLayout.ColumnWidth = {'1x'};
             
             % Configure minimal spacing for compactness
@@ -174,8 +227,8 @@ classdef foilview_ui < handle
         
         function manualControls = createManualControls(obj, mainLayout)
             % Create manual control panel with improved organization
-            manualPanel = obj.createTitledPanel(mainLayout, obj.TEXT.ManualControlTitle, 4);
-            grid = obj.createControlGrid(manualPanel, [1, obj.MANUAL_CONTROL_COLUMNS]);
+            manualPanel = obj.createTitledPanel(mainLayout, foilview_constants.MANUAL_CONTROL_TITLE, 4);
+            grid = obj.createControlGrid(manualPanel, [1, foilview_constants.MANUAL_CONTROL_COLUMNS]);
             
             manualControls = obj.buildManualControlComponents(grid);
             obj.configureManualControlBehavior(manualControls);
@@ -183,8 +236,8 @@ classdef foilview_ui < handle
         
         function autoControls = createAutoControls(obj, mainLayout)
             % Create auto control panel with simplified layout
-            autoPanel = obj.createTitledPanel(mainLayout, obj.TEXT.AutoStepTitle, 5);
-            grid = obj.createControlGrid(autoPanel, [obj.AUTO_CONTROL_ROWS, obj.AUTO_CONTROL_COLUMNS]);
+            autoPanel = obj.createTitledPanel(mainLayout, foilview_constants.AUTO_STEP_TITLE, 5);
+            grid = obj.createControlGrid(autoPanel, [foilview_constants.AUTO_CONTROL_ROWS, foilview_constants.AUTO_CONTROL_COLUMNS]);
             
             autoControls = obj.buildAutoControlComponents(grid);
         end
@@ -195,9 +248,9 @@ classdef foilview_ui < handle
             
             statusControls = struct();
             statusControls.Label = obj.createStatusLabel(statusBar);
-            statusControls.BookmarksButton = obj.createUtilityButton(statusBar, obj.SYMBOLS.Bookmarks, 'Toggle Bookmarks Window (Open/Close)');
-            statusControls.StageViewButton = obj.createUtilityButton(statusBar, obj.SYMBOLS.StageView, 'Toggle Stage View Camera Window (Open/Close)');
-            statusControls.RefreshButton = obj.createUtilityButton(statusBar, obj.SYMBOLS.Refresh, 'Refresh');
+            statusControls.BookmarksButton = obj.createUtilityButton(statusBar, foilview_constants.SYMBOL_BOOKMARKS, 'Toggle Bookmarks Window (Open/Close)');
+            statusControls.StageViewButton = obj.createUtilityButton(statusBar, foilview_constants.SYMBOL_STAGE_VIEW, 'Toggle Stage View Camera Window (Open/Close)');
+            statusControls.RefreshButton = obj.createUtilityButton(statusBar, foilview_constants.SYMBOL_REFRESH, 'Refresh');
         end
         
         function plotControls = createPlotComponents(obj, uiFigure, mainLayout)
@@ -224,7 +277,7 @@ classdef foilview_ui < handle
             % Create a compact titled panel for controls
             panel = uipanel(parent);
             panel.Title = title;
-            panel.FontSize = obj.BASE_FONT_SIZE - 1;  % Slightly smaller for compactness
+            panel.FontSize = foilview_constants.BASE_FONT_SIZE - 1;  % Slightly smaller for compactness
             panel.FontWeight = 'bold';
             panel.Layout.Row = row;
             panel.AutoResizeChildren = 'on';
@@ -235,9 +288,9 @@ classdef foilview_ui < handle
             grid = uigridlayout(parent, gridSize);
             
             % Configure responsive layout
-            if gridSize(2) == obj.MANUAL_CONTROL_COLUMNS
+            if gridSize(2) == foilview_constants.MANUAL_CONTROL_COLUMNS
                 grid.ColumnWidth = repmat({'1x'}, 1, gridSize(2));
-            elseif gridSize(2) == obj.AUTO_CONTROL_COLUMNS
+            elseif gridSize(2) == foilview_constants.AUTO_CONTROL_COLUMNS
                 grid.RowHeight = {'fit', 'fit'};
                 grid.ColumnWidth = repmat({'1x'}, 1, gridSize(2));
             end
@@ -255,14 +308,14 @@ classdef foilview_ui < handle
             dropdown = uidropdown(parent);
             dropdown.Items = {'Std Dev', 'Mean', 'Max'};
             dropdown.Value = 'Std Dev';
-            dropdown.FontSize = obj.BASE_FONT_SIZE;
+            dropdown.FontSize = foilview_constants.BASE_FONT_SIZE;
         end
         
         function label = createMetricValueLabel(obj, parent)
             % Create metric value display label
             label = uilabel(parent);
             label.Text = 'N/A';
-            label.FontSize = obj.LARGE_FONT_SIZE;
+            label.FontSize = foilview_constants.LARGE_FONT_SIZE;
             label.FontWeight = 'bold';
             label.HorizontalAlignment = 'center';
             
@@ -273,15 +326,15 @@ classdef foilview_ui < handle
         function button = createMetricRefreshButton(obj, parent)
             % Create metric refresh button
             button = uibutton(parent, 'push');
-            button.Text = obj.SYMBOLS.Refresh;
-            button.FontSize = obj.BASE_FONT_SIZE;
+            button.Text = foilview_constants.SYMBOL_REFRESH;
+            button.FontSize = foilview_constants.BASE_FONT_SIZE;
         end
         
         function label = createPositionLabel(obj, parent)
             % Create main position display label with no background
             label = uilabel(parent);
-            label.Text = '0.0 μm';
-            label.FontSize = obj.POSITION_FONT_SIZE;
+            label.Text = foilview_constants.DEFAULT_POSITION_TEXT;
+            label.FontSize = foilview_constants.POSITION_FONT_SIZE;
             label.FontWeight = 'bold';
             label.FontName = 'Courier New';
             label.HorizontalAlignment = 'center';
@@ -291,8 +344,8 @@ classdef foilview_ui < handle
         function label = createStatusLabel(obj, parent)
             % Create status label (versatile for different contexts)
             label = uilabel(parent);
-            label.Text = obj.TEXT.Ready;
-            label.FontSize = obj.BASE_FONT_SIZE;
+            label.Text = foilview_constants.READY_TEXT;
+            label.FontSize = foilview_constants.BASE_FONT_SIZE;
             label.HorizontalAlignment = 'center';
             
             colors = foilview_styling.getColors();
@@ -303,8 +356,8 @@ classdef foilview_ui < handle
             % Create plot expand/collapse button
             button = uibutton(parent, 'push');
             button.Layout.Row = 6;
-            button.Text = sprintf('%s Show Plot', obj.SYMBOLS.Plot);
-            button.FontSize = obj.FIELD_FONT_SIZE;
+            button.Text = sprintf('%s Show Plot', foilview_constants.SYMBOL_PLOT);
+            button.FontSize = foilview_constants.FIELD_FONT_SIZE;
             button.FontWeight = 'bold';
             
             foilview_styling.styleButton(button, 'primary', 'base');
@@ -314,7 +367,7 @@ classdef foilview_ui < handle
             % Create standardized utility buttons
             button = uibutton(parent, 'push');
             button.Text = symbol;
-            button.FontSize = obj.BASE_FONT_SIZE;
+            button.FontSize = foilview_constants.BASE_FONT_SIZE;
             button.FontWeight = 'bold';
             button.Tooltip = tooltip;
             
@@ -341,7 +394,7 @@ classdef foilview_ui < handle
                         % Create HTML to display the SVG with constrained height
                         htmlContent = sprintf(['<div style="display: flex; justify-content: center; align-items: center; height: %dpx; overflow: hidden;">' ...
                                              '<div style="height: %dpx; width: auto;">%s</div></div>'], ...
-                                             obj.LOGO_HEIGHT, obj.LOGO_HEIGHT, svgContent);
+                                             foilview_constants.LOGO_HEIGHT, foilview_constants.LOGO_HEIGHT, svgContent);
                         
                         logoImage.HTMLSource = htmlContent;
                     else
@@ -365,7 +418,7 @@ classdef foilview_ui < handle
             logoFallback.FontSize = 12;
             logoFallback.FontWeight = 'bold';
             logoFallback.HorizontalAlignment = 'center';
-            logoFallback.FontColor = [0.2 0.2 0.6];  % Professional blue color
+            logoFallback.FontColor = foilview_constants.LOGO_FALLBACK_COLOR;  % Professional blue color
         end
         
         %% Complex Component Builders
@@ -375,8 +428,8 @@ classdef foilview_ui < handle
             manualControls = struct();
             
             % Create directional buttons
-            manualControls.UpButton = obj.createDirectionalButton(grid, obj.SYMBOLS.Up, 'success', [1, 1]);
-            manualControls.DownButton = obj.createDirectionalButton(grid, obj.SYMBOLS.Down, 'warning', [1, 5]);
+            manualControls.UpButton = obj.createDirectionalButton(grid, foilview_constants.SYMBOL_UP, 'success', [1, 1]);
+            manualControls.DownButton = obj.createDirectionalButton(grid, foilview_constants.SYMBOL_DOWN, 'warning', [1, 5]);
             
             % Create step size controls
             [manualControls.StepDownButton, manualControls.StepSizeField, manualControls.StepUpButton] = ...
@@ -390,13 +443,13 @@ classdef foilview_ui < handle
             % Create the step size control group
             
             % Step decrease button
-            stepDownBtn = obj.createStepButton(grid, obj.SYMBOLS.Left, [1, 2], 'Quick preset: 0.5 μm');
+            stepDownBtn = obj.createStepButton(grid, foilview_constants.SYMBOL_LEFT, [1, 2], sprintf('Quick preset: %.1f μm', foilview_constants.QUICK_STEP_DOWN_SIZE));
             
             % Step size field in panel
             stepField = obj.createStepSizeFieldInPanel(grid, [1, 3]);
             
             % Step increase button
-            stepUpBtn = obj.createStepButton(grid, obj.SYMBOLS.Right, [1, 4], 'Quick preset: 5.0 μm');
+            stepUpBtn = obj.createStepButton(grid, foilview_constants.SYMBOL_RIGHT, [1, 4], sprintf('Quick preset: %.1f μm', foilview_constants.QUICK_STEP_UP_SIZE));
         end
         
         function field = createStepSizeFieldInPanel(obj, grid, position)
@@ -409,15 +462,15 @@ classdef foilview_ui < handle
             stepSizePanel.BorderType = 'line';
             stepSizePanel.BackgroundColor = colors.Light;
             stepSizePanel.BorderWidth = 1;
-            stepSizePanel.HighlightColor = [0.8 0.8 0.8];
+            stepSizePanel.HighlightColor = foilview_constants.STEP_PANEL_HIGHLIGHT_COLOR;
             
             stepSizeGrid = uigridlayout(stepSizePanel, [1, 1]);
             stepSizeGrid.Padding = [4 2 4 2];
             
             field = obj.createStepSizeField(stepSizeGrid, ...
-                foilview_controller.DEFAULT_STEP_SIZE, obj.BASE_FONT_SIZE, [1, 1], ...
+                foilview_controller.DEFAULT_STEP_SIZE, foilview_constants.BASE_FONT_SIZE, [1, 1], ...
                 'Manual step size (μm) - synced with Auto Step');
-            field.FontColor = [0.2 0.2 0.2];
+            field.FontColor = foilview_constants.STEP_FIELD_FONT_COLOR;
         end
         
         function autoControls = buildAutoControlComponents(obj, grid)
@@ -585,110 +638,6 @@ classdef foilview_ui < handle
             stepField.Layout.Row = position(1);
             if length(position) > 1
                 stepField.Layout.Column = position(2);
-            end
-        end
-    end
-    
-    methods (Static)
-        function adjustPlotPosition(uiFigure, plotPanel, plotWidth)
-            % Utility method for dynamic plot positioning
-            if ~isvalid(uiFigure) || ~isvalid(plotPanel)
-                return;
-            end
-            
-            figPos = uiFigure.Position;
-            currentHeight = figPos(4);
-            expandedWidth = figPos(3);
-            mainWindowWidth = expandedWidth - plotWidth - 20;
-            
-            plotPanelX = mainWindowWidth + 10;
-            plotPanelY = 10;
-            plotPanelHeight = currentHeight - 20;
-            
-            plotPanel.Position = [plotPanelX, plotPanelY, plotWidth, plotPanelHeight];
-        end
-        
-        function adjustFontSizes(components, windowSize)
-            % Dynamic font size adjustment based on window size
-            if nargin < 2 || isempty(windowSize)
-                return;
-            end
-            
-            widthScale = windowSize(3) / foilview_ui.DEFAULT_WINDOW_WIDTH;
-            heightScale = windowSize(4) / foilview_ui.DEFAULT_WINDOW_HEIGHT;
-            overallScale = min(max(sqrt(widthScale * heightScale), 0.7), 1.5);
-            
-            foilview_ui.adjustPositionDisplayFont(components, overallScale);
-            foilview_ui.adjustControlFonts(components, overallScale);
-        end
-        
-        function adjustPositionDisplayFont(components, scale)
-            % Adjust position display font specifically
-            if isfield(components, 'PositionDisplay') && isfield(components.PositionDisplay, 'Label')
-                baseFontSize = foilview_ui.POSITION_FONT_SIZE;
-                newFontSize = max(round(baseFontSize * scale), 18);
-                try
-                    components.PositionDisplay.Label.FontSize = newFontSize;
-                catch
-                    % Ignore font adjustment errors
-                end
-            end
-        end
-        
-        function adjustControlFonts(components, scale)
-            % Adjust control fonts across all control groups
-            if scale == 1.0
-                return;
-            end
-            
-            try
-                controlGroups = {'AutoControls', 'ManualControls', 'MetricDisplay', 'StatusControls'};
-                for i = 1:length(controlGroups)
-                    if isfield(components, controlGroups{i})
-                        foilview_ui.adjustControlGroupFonts(components.(controlGroups{i}), scale);
-                    end
-                end
-            catch
-                % Ignore errors during font adjustment
-            end
-        end
-        
-        function adjustControlGroupFonts(controlStruct, scale)
-            % Helper to adjust fonts in a specific control group
-            if ~isstruct(controlStruct)
-                return;
-            end
-            
-            fields = fieldnames(controlStruct);
-            for i = 1:length(fields)
-                try
-                    obj = controlStruct.(fields{i});
-                    if isvalid(obj) && isprop(obj, 'FontSize')
-                        currentSize = obj.FontSize;
-                        newSize = max(round(currentSize * scale), 8);
-                        newSize = min(newSize, 16);
-                        obj.FontSize = newSize;
-                    end
-                catch
-                    continue;
-                end
-            end
-        end
-        
-        function enforceMinSize(uiFigure, minWidth, minHeight)
-            % Helper to enforce minimum window size
-            pos = uiFigure.Position;
-            changed = false;
-            if pos(3) < minWidth
-                pos(3) = minWidth;
-                changed = true;
-            end
-            if pos(4) < minHeight
-                pos(4) = minHeight;
-                changed = true;
-            end
-            if changed
-                uiFigure.Position = pos;
             end
         end
     end

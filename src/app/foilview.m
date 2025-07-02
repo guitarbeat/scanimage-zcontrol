@@ -38,6 +38,9 @@ classdef foilview < matlab.apps.AppBase
     
     %% Private Properties - UI Component Groups
     properties (Access = public)
+        % Logo Display
+        LogoDisplay
+        
         % Position Display
         PositionDisplay
         
@@ -64,7 +67,7 @@ classdef foilview < matlab.apps.AppBase
         
         % Helper Classes
         PlotManager                 foilview_plot
-        WindowManager               foilview_window_manager
+        WindowManager               foilview_manager
     end
     
     %% Private Properties - Internal State
@@ -105,10 +108,10 @@ classdef foilview < matlab.apps.AppBase
             app.copyComponentsFromStruct(components);
             
             % Set up callbacks
-            foilview_callback_manager.setupAllCallbacks(app);
+            foilview_manager.setupAllCallbacks(app);
             
             % Initialize application
-            foilview_initialization_manager.initializeApplication(app);
+            foilview_manager.initializeApplication(app);
             
             % Register app
             registerApp(app, app.UIFigure);
@@ -283,11 +286,6 @@ classdef foilview < matlab.apps.AppBase
             app.WindowManager.toggleStageView();
         end
         
-        function onWindowClose(app, varargin)
-            app.cleanup();
-            delete(app);
-        end
-        
         % Metric Events
         function onMetricTypeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
@@ -344,36 +342,7 @@ classdef foilview < matlab.apps.AppBase
     
     %% Helper Methods
     methods (Access = private)
-        function updateAutoStepStatus(app)
-            % Update the smart status display using centralized formatting
-            stepSize = app.AutoControls.StepField.Value;
-            numSteps = app.AutoControls.StepsField.Value;
-            delay = app.AutoControls.DelayField.Value;
-            direction = app.Controller.AutoDirection;
-            isRunning = app.Controller.IsAutoRunning;
-            
-            statusText = foilview_constants.formatAutoStepStatus(isRunning, stepSize, numSteps, direction, delay);
-            app.AutoControls.StatusDisplay.Text = statusText;
-        end
-        
-        function updateDirectionButtons(app)
-            % Update direction button and start button to show current direction
-            direction = app.Controller.AutoDirection;
-            isRunning = app.Controller.IsAutoRunning;
-            
-            % Style direction button using centralized styling
-            foilview_styling.styleDirectionButton(app.AutoControls.DirectionButton, direction, isRunning);
-            
-            % Style start/stop button based on state and direction using constants
-            buttonText = foilview_constants.getStartStopButtonText(isRunning, direction);
-            app.AutoControls.StartStopButton.Text = buttonText;
-            
-            if isRunning
-                foilview_styling.styleButton(app.AutoControls.StartStopButton, 'danger', 'base');
-            else
-                foilview_styling.styleButton(app.AutoControls.StartStopButton, 'success', 'base');
-            end
-        end
+
         
         function monitorWindowResize(app)
             % Monitor window size changes and adjust UI elements accordingly
@@ -481,6 +450,44 @@ classdef foilview < matlab.apps.AppBase
             if ~isempty(app.MetricsPlotControls) && foilview_utils.validateUIComponent(app.MetricsPlotControls.Panel)
                 delete(app.MetricsPlotControls.Panel);
             end
+        end
+    end
+    
+    methods (Access = public, Hidden)
+        function updateAutoStepStatus(app)
+            % Update the smart status display using centralized formatting
+            stepSize = app.AutoControls.StepField.Value;
+            numSteps = app.AutoControls.StepsField.Value;
+            delay = app.AutoControls.DelayField.Value;
+            direction = app.Controller.AutoDirection;
+            isRunning = app.Controller.IsAutoRunning;
+            
+            statusText = foilview_constants.formatAutoStepStatus(isRunning, stepSize, numSteps, direction, delay);
+            app.AutoControls.StatusDisplay.Text = statusText;
+        end
+        
+        function updateDirectionButtons(app)
+            % Update direction button and start button to show current direction
+            direction = app.Controller.AutoDirection;
+            isRunning = app.Controller.IsAutoRunning;
+            
+            % Style direction button using centralized styling
+            foilview_styling.styleDirectionButton(app.AutoControls.DirectionButton, direction, isRunning);
+            
+            % Style start/stop button based on state and direction using constants
+            buttonText = foilview_constants.getStartStopButtonText(isRunning, direction);
+            app.AutoControls.StartStopButton.Text = buttonText;
+            
+            if isRunning
+                foilview_styling.styleButton(app.AutoControls.StartStopButton, 'danger', 'base');
+            else
+                foilview_styling.styleButton(app.AutoControls.StartStopButton, 'success', 'base');
+            end
+        end
+        
+        function onWindowClose(app, varargin)
+            app.cleanup();
+            delete(app);
         end
     end
 end 

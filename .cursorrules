@@ -1,0 +1,125 @@
+# MATLAB Code Quality and Refactoring Rules
+
+## Core Principles
+
+### 1. Fix at the Cause, Not the Symptom
+- **Root Cause Analysis**: Always identify why an error occurs, not just how to work around it
+- **Systematic Approach**: When refactoring, trace all dependencies before making changes
+- **Prevention Over Cure**: Set up automated checks to catch issues early
+
+### 2. Constants Management
+- **CRITICAL**: Keep ALL constants in `foilview_constants` class
+- **NEVER** use magic numbers - everything goes through constants
+- **Centralized Configuration**: Single source of truth for all configuration values
+
+### 3. Method Visibility Rules
+- **RULE**: "Nothing outside a class may reach a private member"
+- **When moving code**: Immediately promote methods to `public` or `public, Hidden`
+- **Use `public, Hidden`** for internal methods that need external access but shouldn't appear in help
+
+## MATLAB-Specific Best Practices
+
+### Static Methods
+- **Only one `methods (Static)` block per class** - MATLAB only recognizes the first
+- **Place critical static methods at the top** of the block for visibility
+- **Never duplicate static/instance methods** with the same name
+- **After editing static methods**: Use `clear classes` to refresh MATLAB's method tables
+
+### UI Component/Property Alignment
+- **Every UI struct field must have a corresponding app property**
+- **Example**: If `foilview_ui` creates `LogoDisplay`, `foilview` must have `LogoDisplay` property
+- **Dynamic assignment validation**: Always verify properties exist before `app.(field) = ...`
+
+### App Designer Compatibility
+- **`createCallbackFcn` is App Designer-specific** - always provide fallback:
+```matlab
+try
+    component.(property) = createCallbackFcn(app, functionHandle, true);
+catch
+    component.(property) = functionHandle;  % Fallback
+end
+```
+
+## Refactoring Workflow
+
+### Before Refactoring
+1. **Search for all callers** of methods being moved
+2. **Identify visibility requirements** - which callers need access
+3. **Plan method promotion** to `public` or `public, Hidden`
+
+### During Refactoring
+1. **Move methods** to appropriate classes
+2. **Promote visibility** immediately for external callers
+3. **Update all references** and import statements
+4. **Remove duplicate definitions** - only one method per name
+
+### After Refactoring
+1. **Run `clear classes`** to refresh MATLAB's method tables
+2. **Test instantiation** of all affected classes
+3. **Verify no broken dependencies**
+4. **Update documentation** to reflect new structure
+
+## File Consolidation Strategy
+
+### Utility Classes (Target: 3 files)
+- `foilview_constants.m` - ALL constants and configuration
+- `foilview_utils.m` - General utility functions  
+- `foilview_manager.m` - Consolidated management (callbacks, initialization, windows)
+
+### Consolidation Rules
+- **Group by responsibility** - related functionality together
+- **Minimize cross-dependencies** between utility classes
+- **Maintain single responsibility** principle
+
+## Quality Gates
+
+### Pre-commit Checklist
+- [ ] All `checkcode` warnings resolved
+- [ ] No duplicate method definitions
+- [ ] All constants in `foilview_constants`
+- [ ] No private member access violations
+- [ ] UI struct/app property alignment verified
+- [ ] Static methods properly organized
+
+### Automated Verification
+```bash
+# Run before commits
+matlab -batch "clear classes; setup_foilview"
+matlab -batch "checkcode('src', '-cyc', '-id')"
+```
+
+## Common Pitfalls & Solutions
+
+### Method Visibility Errors
+**Error**: `Cannot access method 'methodName' in class 'ClassName'`
+**Cause**: Private method called from outside class
+**Solution**: Promote to `public` or `public, Hidden`
+
+### Static Method Not Found
+**Error**: `Class has no Static method named 'methodName'`
+**Cause**: Multiple `methods (Static)` blocks or wrong placement
+**Solution**: Single block, critical methods at top
+
+### Property Assignment Errors
+**Error**: `Unrecognized property 'PropertyName' for class 'ClassName'`
+**Cause**: UI struct field missing corresponding app property
+**Solution**: Add matching property to app class
+
+### Class Cache Issues
+**Symptom**: Methods not recognized after edits
+**Solution**: Use `clear classes` to refresh MATLAB's method tables
+
+## Lessons from Recent Bug Squashing
+
+### Critical Insights
+1. **UI Property Alignment**: Every UI struct field → app property (LogoDisplay example)
+2. **Static Method Organization**: One block, top placement, no duplicates
+3. **Method Visibility**: External callers require `public` or `public, Hidden`
+4. **Class Cache Management**: `clear classes` after method visibility changes
+5. **Systematic Refactoring**: Trace all dependencies before moving code
+
+### Success Metrics
+- **40% file reduction** achieved (5 → 3 utility files)
+- **Zero breaking changes** after proper method promotion
+- **Automated verification** through enhanced setup script
+- **Comprehensive error handling** with fallbacks for App Designer features 

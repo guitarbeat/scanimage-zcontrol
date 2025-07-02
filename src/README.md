@@ -22,15 +22,17 @@ src/
 │   └── foilview_plot.m       # Metrics plotting functionality
 │
 └── utils/               # Utilities & Helper Functions
-    └── foilview_utils.m      # Common utilities and error handling
+    ├── foilview_constants.m  # Centralized constants and configuration
+    ├── foilview_utils.m      # Common utilities and error handling
+    └── foilview_manager.m    # Consolidated management (callbacks, initialization, windows)
 ```
 
 ## Quick Start
 
-1. **Setup the environment:**
+1. **Setup and verify the environment:**
    ```matlab
    cd('path/to/scanimage-zcontrol/src')
-   setup_foilview()
+   setup_foilview()  % This also verifies the refactoring was successful
    ```
 
 2. **Launch the application:**
@@ -59,7 +61,9 @@ src/
 
 ### Utilities
 
-- **`foilview_utils`** - Centralized utilities for error handling, validation, formatting, and common operations
+- **`foilview_constants`** - Centralized constants and configuration values
+- **`foilview_utils`** - Common utility functions for error handling, validation, and formatting  
+- **`foilview_manager`** - Consolidated management for callbacks, initialization, and window management
 
 ## Key Features
 
@@ -85,6 +89,15 @@ The codebase follows these design principles:
 3. **Event-driven Architecture** - Loose coupling between components
 4. **Defensive Programming** - Comprehensive error handling and validation
 5. **Performance Optimization** - Throttled updates and efficient data handling
+6. **Code Quality** - Automated verification through enhanced setup script
+
+### Refactoring Verification
+
+The `setup_foilview()` script now includes comprehensive refactoring verification:
+- Validates that old manager files have been removed
+- Confirms new consolidated manager exists and works
+- Tests basic instantiation and functionality
+- Provides detailed feedback on the consolidation process
 
 ## Troubleshooting
 

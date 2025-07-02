@@ -60,7 +60,7 @@ classdef foilview_ui < handle
     end
     
     methods (Access = private)
-        function components = buildCompleteInterface(obj, app)
+        function components = buildCompleteInterface(obj, ~)
             % Main interface building method with better organization
             components = struct();
             
@@ -386,7 +386,6 @@ classdef foilview_ui < handle
         
         function [stepDownBtn, stepField, stepUpBtn] = createStepSizeControls(obj, grid)
             % Create the step size control group
-            colors = foilview_styling.getColors();
             
             % Step decrease button
             stepDownBtn = obj.createStepButton(grid, obj.SYMBOLS.Left, [1, 2], 'Quick preset: 0.5 μm');

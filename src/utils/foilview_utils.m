@@ -353,7 +353,7 @@ classdef foilview_utils < handle
         function shouldUpdate = shouldThrottleUpdate(lastUpdateTime, interval)
             % Check if enough time has passed for throttled updates
             if nargin < 2, interval = foilview_utils.DEFAULT_UPDATE_THROTTLE; end
-            currentTime = now * 24 * 3600;  % Convert to seconds
+            currentTime = seconds(datetime('now')) * 24 * 3600;  % Convert to seconds
             shouldUpdate = (currentTime - lastUpdateTime) >= interval;
         end
         

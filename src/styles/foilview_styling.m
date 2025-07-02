@@ -209,7 +209,7 @@ classdef foilview_styling < handle
                 'FamilySerif', foilview_styling.FONT_FAMILY_SERIF);
         end
         
-        function styleButton(button, variant, size, state)
+        function styleButton(button, variant, size, ~)
             % Apply modern button styling with variants, sizes, and states
             
             if ~foilview_styling.validateComponent(button)
@@ -222,7 +222,6 @@ classdef foilview_styling < handle
             % Set defaults
             if nargin < 2 || isempty(variant), variant = 'primary'; end
             if nargin < 3 || isempty(size), size = 'base'; end
-            if nargin < 4 || isempty(state), state = 'default'; end
             
             % Apply variant styling
             switch lower(variant)
@@ -320,7 +319,7 @@ classdef foilview_styling < handle
             end
         end
         
-        function styleDirectionButton(button, direction, isRunning)
+        function styleDirectionButton(button, direction, ~)
             % Style direction button
             if ~foilview_styling.validateComponent(button)
                 return;

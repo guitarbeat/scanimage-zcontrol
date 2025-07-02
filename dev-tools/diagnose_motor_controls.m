@@ -42,7 +42,7 @@ function diagnose_motor_controls(varargin)
     
     % Initialize output
     if opts.save
-        timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+        timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
         filename = sprintf('motor_controls_diagnostic_%s.txt', timestamp);
         fid = fopen(filename, 'w');
         outputFunc = @(varargin) fprintf(fid, varargin{:});
@@ -53,7 +53,7 @@ function diagnose_motor_controls(varargin)
     % Header
     outputFunc('===============================================\n');
     outputFunc('ScanImage Motor Controls Diagnostic Report\n');
-    outputFunc('Generated: %s\n', datestr(now));
+    outputFunc('Generated: %s\n', char(datetime('now')));
     outputFunc('===============================================\n\n');
     
     % Window information
@@ -66,12 +66,24 @@ function diagnose_motor_controls(varargin)
     
     % Collect control information
     controlInfo = [];
-    for i = 1:numel(controls)
+    % Preallocate for better performance
+    maxControls = numel(controls);
+    controlInfo = cell(maxControls, 1);
+    validCount = 0;
+    
+    for i = 1:maxControls
         info = extractControlInfo(controls(i), opts.verbose);
         if ~isempty(opts.filter) && ~strcmpi(info.style, opts.filter)
             continue;
         end
-        controlInfo = [controlInfo; info];
+        validCount = validCount + 1;
+        controlInfo{validCount} = info;
+    end
+    
+    % Trim to actual size
+    controlInfo = controlInfo(1:validCount);
+    if ~isempty(controlInfo)
+        controlInfo = [controlInfo{:}];
     end
     
     % Summary statistics
@@ -216,7 +228,7 @@ function str = formatString(input)
         str = [str(1:47) '...'];
     end
     % Remove newlines
-    str = strrep(str, sprintf('\n'), ' ');
+    str = strrep(str, newline, ' ');
 end
 
 function str = formatCallback(cb)

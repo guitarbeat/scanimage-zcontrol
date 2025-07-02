@@ -165,7 +165,7 @@ classdef foilview_updater < handle
                 return;
             end
             
-            baseTitle = foilview_ui.TEXT.WindowTitle;
+            baseTitle = foilview_constants.WINDOW_TITLE;
             if app.PlotManager.getIsPlotExpanded()
                 baseTitle = sprintf('%s - Plot Expanded', baseTitle);
             end

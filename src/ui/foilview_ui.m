@@ -499,9 +499,9 @@ classdef foilview_ui < handle
             
             % Status components
             statusDisplay = struct();
-            statusDisplay.Label = obj.createLabel(statusGrid, 'Ready:', obj.FIELD_FONT_SIZE, 'bold', [0.3 0.3 0.3]);
-            statusDisplay.Display = obj.createLabel(statusGrid, '100.0 μm upward (5.0s)', obj.FIELD_FONT_SIZE, 'normal', [0.4 0.4 0.4]);
-            statusDisplay.Units = obj.createLabel(statusGrid, 'μm × steps @ s', obj.BASE_FONT_SIZE, 'normal', [0.6 0.6 0.6]);
+            statusDisplay.Label = obj.createLabel(statusGrid, 'Ready:', foilview_constants.FIELD_FONT_SIZE, 'bold', foilview_constants.STATUS_LABEL_COLOR);
+            statusDisplay.Display = obj.createLabel(statusGrid, '100.0 μm upward (5.0s)', foilview_constants.FIELD_FONT_SIZE, 'normal', foilview_constants.STATUS_DISPLAY_COLOR);
+            statusDisplay.Units = obj.createLabel(statusGrid, 'μm × steps @ s', foilview_constants.BASE_FONT_SIZE, 'normal', foilview_constants.STATUS_UNITS_COLOR);
         end
         
         function plotControls = addPlotArea(obj, plotControls, uiFigure)
@@ -518,9 +518,9 @@ classdef foilview_ui < handle
             % Create plot panel with proper configuration
             panel = uipanel(uiFigure);
             panel.Units = 'pixels';
-            panel.Position = [obj.DEFAULT_WINDOW_WIDTH + 10, 10, obj.PLOT_WIDTH, obj.DEFAULT_WINDOW_HEIGHT - 20];
-            panel.Title = obj.TEXT.MetricsPlotTitle;
-            panel.FontSize = obj.LARGE_FONT_SIZE;
+            panel.Position = [foilview_constants.DEFAULT_WINDOW_WIDTH + 10, 10, foilview_constants.PLOT_WIDTH, foilview_constants.DEFAULT_WINDOW_HEIGHT - 20];
+            panel.Title = foilview_constants.METRICS_PLOT_TITLE;
+            panel.FontSize = foilview_constants.LARGE_FONT_SIZE;
             panel.FontWeight = 'bold';
             panel.Visible = 'off';
             panel.AutoResizeChildren = 'on';
@@ -594,7 +594,7 @@ classdef foilview_ui < handle
             % Create standardized numeric input fields
             field = uieditfield(parent, 'numeric');
             field.Value = defaultValue;
-            field.FontSize = obj.FIELD_FONT_SIZE;
+            field.FontSize = foilview_constants.FIELD_FONT_SIZE;
             field.Layout.Row = position(1);
             field.Layout.Column = position(2);
             field.Tooltip = tooltip;

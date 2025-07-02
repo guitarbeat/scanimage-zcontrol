@@ -16,6 +16,7 @@
 - **RULE**: "Nothing outside a class may reach a private member"
 - **When moving code**: Immediately promote methods to `public` or `public, Hidden`
 - **Use `public, Hidden`** for internal methods that need external access but shouldn't appear in help
+- **Callback/Event Handler Rule**: Any method used as a callback or event handler (e.g., for listeners, UI buttons) and set from outside the class **must** be `public` or `public, Hidden`. Private methods cannot be used as callbacks if the callback is set externally. This is required for App Designer and OOP event/callback patterns in MATLAB.
 
 ## MATLAB-Specific Best Practices
 
@@ -94,6 +95,7 @@ matlab -batch "checkcode('src', '-cyc', '-id')"
 **Error**: `Cannot access method 'methodName' in class 'ClassName'`
 **Cause**: Private method called from outside class
 **Solution**: Promote to `public` or `public, Hidden`
+**Lesson**: All event handler and callback methods set from outside the class must be `public` or `public, Hidden`. After changing method visibility, always run `clear classes` in MATLAB to refresh the class cache and avoid stale method tables.
 
 ### Static Method Not Found
 **Error**: `Class has no Static method named 'methodName'`

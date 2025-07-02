@@ -45,7 +45,7 @@ classdef foilview_manager < handle
             foilview_manager.initializePlot(app);
             foilview_manager.performInitialUpdates(app);
             foilview_manager.launchAdditionalWindows(app);
-            foilview_manager.startTimers(app);
+            % Timers are now started in the app directly
         end
         
         function initializeCore(app)
@@ -87,13 +87,6 @@ classdef foilview_manager < handle
             % Launch additional windows and update status
             app.WindowManager.launchAllWindows();
             app.WindowManager.updateWindowStatusButtons();
-        end
-        
-        function startTimers(app)
-            % Start all application timers
-            foilview_manager.startRefreshTimer(app);
-            foilview_manager.startMetricTimer(app);
-            foilview_manager.startResizeMonitorTimer(app);
         end
         
         %% Callback Setup Methods
@@ -290,41 +283,6 @@ classdef foilview_manager < handle
     end
     
     methods (Access = private)
-        %% Private Timer Methods
-        function startRefreshTimer(app)
-            % Start position refresh timer
-            app.RefreshTimer = foilview_utils.createTimer('fixedRate', ...
-                foilview_constants.POSITION_REFRESH_PERIOD, ...
-                @(~,~) app.Controller.refreshPosition());
-            start(app.RefreshTimer);
-        end
-        
-        function startMetricTimer(app)
-            % Start metrics update timer
-            app.MetricTimer = foilview_utils.createTimer('fixedRate', ...
-                foilview_constants.METRIC_REFRESH_PERIOD, ...
-                @(~,~) app.Controller.updateMetric());
-            
-            % Pass timer reference to controller for coordination
-            app.Controller.setMetricTimer(app.MetricTimer);
-            start(app.MetricTimer);
-        end
-        
-        function startResizeMonitorTimer(app)
-            % Start window resize monitoring timer
-            app.ResizeMonitorTimer = foilview_utils.createTimer('fixedRate', ...
-                foilview_constants.RESIZE_MONITOR_INTERVAL, ...
-                @(~,~) app.monitorWindowResize());
-            
-            % Initialize the last window size
-            if isvalid(app.UIFigure)
-                app.LastWindowSize = foilview_constants.DEFAULT_WINDOW_SIZE;
-                app.LastWindowSize = app.UIFigure.Position;
-            end
-            
-            start(app.ResizeMonitorTimer);
-        end
-        
         %% Private Callback Methods
         %% Private Window Management Methods
         function positionStageViewWindow(obj)

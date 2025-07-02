@@ -113,6 +113,9 @@ classdef foilview < matlab.apps.AppBase
             % Initialize application
             foilview_manager.initializeApplication(app);
             
+            % Start timers (now handled in app)
+            app.startAllTimers();
+            
             % Register app
             registerApp(app, app.UIFigure);
             
@@ -150,7 +153,7 @@ classdef foilview < matlab.apps.AppBase
     end
     
     %% Controller Event Handlers
-    methods (Access = private)
+    methods (Access = public, Hidden)
         function onControllerStatusChanged(app)
             foilview_updater.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller);
         end
@@ -185,7 +188,7 @@ classdef foilview < matlab.apps.AppBase
     end
     
     %% UI Event Handlers
-    methods (Access = private)
+    methods (Access = public, Hidden)
         % Manual Control Events
         function onUpButtonPushed(app, varargin)
             foilview_logic.moveStageManual(app.Controller, app.ManualControls, 1);
@@ -342,8 +345,6 @@ classdef foilview < matlab.apps.AppBase
     
     %% Helper Methods
     methods (Access = private)
-
-        
         function monitorWindowResize(app)
             % Monitor window size changes and adjust UI elements accordingly
             if ~isvalid(app.UIFigure)
@@ -450,6 +451,43 @@ classdef foilview < matlab.apps.AppBase
             if ~isempty(app.MetricsPlotControls) && foilview_utils.validateUIComponent(app.MetricsPlotControls.Panel)
                 delete(app.MetricsPlotControls.Panel);
             end
+        end
+        
+        function startAllTimers(app)
+            app.startRefreshTimer();
+            app.startMetricTimer();
+            app.startResizeMonitorTimer();
+        end
+        
+        function startRefreshTimer(app)
+            % Start position refresh timer
+            app.RefreshTimer = foilview_utils.createTimer('fixedRate', ...
+                foilview_constants.POSITION_REFRESH_PERIOD, ...
+                @(~,~) app.Controller.refreshPosition());
+            start(app.RefreshTimer);
+        end
+        
+        function startMetricTimer(app)
+            % Start metrics update timer
+            app.MetricTimer = foilview_utils.createTimer('fixedRate', ...
+                foilview_constants.METRIC_REFRESH_PERIOD, ...
+                @(~,~) app.Controller.updateMetric());
+            % Pass timer reference to controller for coordination
+            app.Controller.setMetricTimer(app.MetricTimer);
+            start(app.MetricTimer);
+        end
+        
+        function startResizeMonitorTimer(app)
+            % Start window resize monitoring timer
+            app.ResizeMonitorTimer = foilview_utils.createTimer('fixedRate', ...
+                foilview_constants.RESIZE_MONITOR_INTERVAL, ...
+                @(~,~) app.monitorWindowResize());
+            % Initialize the last window size
+            if isvalid(app.UIFigure)
+                app.LastWindowSize = foilview_constants.DEFAULT_WINDOW_SIZE;
+                app.LastWindowSize = app.UIFigure.Position;
+            end
+            start(app.ResizeMonitorTimer);
         end
     end
     

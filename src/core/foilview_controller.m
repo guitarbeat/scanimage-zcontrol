@@ -916,9 +916,9 @@ classdef foilview_controller < handle
     
     %% Private Methods
     methods (Access = private)
-        function setSimulationMode(obj, isSimulation, message)
+        function setSimulationMode(obj, isSimulation, ~)
             obj.SimulationMode = isSimulation;
-            obj.StatusMessage = message;
+            obj.StatusMessage = '';
             obj.notifyStatusChanged();
         end
         

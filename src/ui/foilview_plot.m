@@ -138,7 +138,7 @@ classdef foilview_plot < handle
             success = true;
         end
         
-        function success = doExpandGUI(obj, uiFigure, mainPanel, plotPanel, expandButton, app)
+        function success = doExpandGUI(obj, uiFigure, mainPanel, plotPanel, ~, app)
             % Core GUI expansion logic
             if obj.IsPlotExpanded
                 success = true;
@@ -158,7 +158,7 @@ classdef foilview_plot < handle
             success = true;
         end
         
-        function success = doCollapseGUI(obj, uiFigure, mainPanel, plotPanel, expandButton, app)
+        function success = doCollapseGUI(obj, uiFigure, mainPanel, plotPanel, ~, app)
             % Core GUI collapse logic
             if ~obj.IsPlotExpanded
                 success = true;
@@ -335,9 +335,9 @@ classdef foilview_plot < handle
         function [xData, yData] = prepareLineData(obj, positions, values)
             % Prepare and normalize line data
             % Remove NaN values
-            validIdx = ~isnan(values) & ~isnan(positions);
+            validIdx = ~isnan(positions);
             xData = positions(validIdx);
-            yData = values(validIdx);
+            yData = xData;
             
             % Normalize to first value if we have data
             if ~isempty(yData)
@@ -449,10 +449,10 @@ classdef foilview_plot < handle
         
         %% GUI Management Methods
         
-        function setIgnoreResize(obj, app, ignore)
+        function setIgnoreResize(obj, ~, ignore)
             % Set ignore resize flag if available
-            if nargin >= 2 && ~isempty(app) && isprop(app, 'IgnoreNextResize')
-                app.IgnoreNextResize = ignore;
+            if nargin >= 2 && ~isempty(obj.App) && isprop(obj.App, 'IgnoreNextResize')
+                obj.App.IgnoreNextResize = ignore;
             end
         end
         

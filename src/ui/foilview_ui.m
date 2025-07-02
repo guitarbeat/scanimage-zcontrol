@@ -103,9 +103,10 @@ classdef foilview_ui < handle
             uiFigure.Position = [100 100 obj.DEFAULT_WINDOW_WIDTH obj.DEFAULT_WINDOW_HEIGHT];
             uiFigure.Name = obj.TEXT.WindowTitle;
             uiFigure.Resize = 'on';
-            uiFigure.AutoResizeChildren = 'on';
+            uiFigure.AutoResizeChildren = 'off';
             uiFigure.WindowState = 'normal';
-            
+            % Enforce minimum window size on resize
+            uiFigure.SizeChangedFcn = @(src, event) foilview_ui.enforceMinSize(src, obj.MIN_WINDOW_WIDTH, obj.MIN_WINDOW_HEIGHT);
             % Apply styling
             colors = foilview_styling.getColors();
             uiFigure.Color = colors.Background;
@@ -133,7 +134,8 @@ classdef foilview_ui < handle
             % Configure minimal spacing for compactness
             mainLayout.Padding = [foilview_styling.SPACE_1, foilview_styling.SPACE_1, foilview_styling.SPACE_1, foilview_styling.SPACE_1];
             mainLayout.RowSpacing = foilview_styling.SPACE_1;
-            mainLayout.Scrollable = 'off';
+            % Make main layout scrollable to prevent cutoff
+            mainLayout.Scrollable = 'on';
         end
         
         %% Display Component Creation
@@ -670,6 +672,23 @@ classdef foilview_ui < handle
                 catch
                     continue;
                 end
+            end
+        end
+        
+        function enforceMinSize(uiFigure, minWidth, minHeight)
+            % Helper to enforce minimum window size
+            pos = uiFigure.Position;
+            changed = false;
+            if pos(3) < minWidth
+                pos(3) = minWidth;
+                changed = true;
+            end
+            if pos(4) < minHeight
+                pos(4) = minHeight;
+                changed = true;
+            end
+            if changed
+                uiFigure.Position = pos;
             end
         end
     end

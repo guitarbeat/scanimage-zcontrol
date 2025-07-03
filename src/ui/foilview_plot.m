@@ -185,7 +185,7 @@ classdef foilview_plot < handle
             end
         end
         
-        function updateAxisLimits(obj, axes, metrics)
+        function updateAxisLimits(~, axes, metrics)
             % Helper method to update axis limits intelligently using utilities
             foilview_utils.safeExecute(@() doUpdateLimits(), 'updateAxisLimits');
             
@@ -304,13 +304,11 @@ classdef foilview_plot < handle
             end
         end
         
-        function success = collapseGUI(obj, uiFigure, mainPanel, plotPanel, expandButton, app)
+        function success = collapseGUI(obj, uiFigure, ~, plotPanel, expandButton, app)
             % Enhanced GUI collapse with dynamic sizing support
             success = foilview_utils.safeExecuteWithReturn(@() doCollapse(), 'collapseGUI', false);
             
             function success = doCollapse()
-                success = false;
-                
                 if ~obj.IsPlotExpanded
                     success = true;  % Already collapsed
                     return;
@@ -346,7 +344,7 @@ classdef foilview_plot < handle
             expanded = obj.IsPlotExpanded;
         end
         
-        function success = exportPlotData(obj, uiFigure, controller)
+        function success = exportPlotData(~, uiFigure, controller)
             % Export the current plot data to a file using centralized error handling
             success = foilview_utils.safeExecuteWithReturn(@() doExport(), 'exportPlotData', false);
             

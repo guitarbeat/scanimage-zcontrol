@@ -62,7 +62,7 @@ classdef foilview_ui < handle
     end
     
     methods (Access = private)
-        function [uiFigure, mainPanel, mainLayout] = createMainWindow(obj, app)
+        function [uiFigure, mainPanel, mainLayout] = createMainWindow(obj, ~)
             % Create main figure with resizable functionality
             uiFigure = uifigure('Visible', 'off');
             uiFigure.Units = 'pixels';
@@ -147,7 +147,7 @@ classdef foilview_ui < handle
             positionDisplay.Status.FontColor = obj.COLORS.TextMuted;
         end
         
-        function expandButton = createExpandButton(obj, mainLayout, app)
+        function expandButton = createExpandButton(obj, mainLayout, ~)
             % Create expand/collapse button
             expandButton = uibutton(mainLayout, 'push');
             expandButton.Layout.Row = 5;
@@ -196,7 +196,7 @@ classdef foilview_ui < handle
             statusControls.RefreshButton.FontWeight = 'bold';
         end
         
-        function manualControls = createManualControlContainer(obj, mainLayout, app)
+        function manualControls = createManualControlContainer(obj, mainLayout, ~)
             % Create manual control panel
             manualPanel = uipanel(mainLayout);
             manualPanel.Title = 'Manual Control';
@@ -283,7 +283,7 @@ classdef foilview_ui < handle
             manualControls.CurrentStepIndex = find(manualControls.StepSizes == foilview_controller.DEFAULT_STEP_SIZE, 1);
         end
         
-        function autoControls = createAutoStepContainer(obj, mainLayout, app)
+        function autoControls = createAutoStepContainer(obj, mainLayout, ~)
             % Create auto step panel
             autoPanel = uipanel(mainLayout);
             autoPanel.Title = 'Auto Step';
@@ -370,7 +370,7 @@ classdef foilview_ui < handle
             unitsLabel.Layout.Column = 3;
         end
         
-        function metricsPlotControls = createMetricsPlotArea(obj, uiFigure, app)
+        function metricsPlotControls = createMetricsPlotArea(obj, uiFigure, ~)
             metricsPlotControls = struct();
             
             % Create panel for plot area (initially hidden and positioned dynamically)
@@ -413,7 +413,7 @@ classdef foilview_ui < handle
                 'primary', 'EXPORT', [], [2, 2]);
         end
         
-        function button = createStyledButton(obj, parent, style, text, callback, position)
+        function button = createStyledButton(~, parent, style, text, callback, position)
             button = uibutton(parent, 'push');
             button.Layout.Row = position(1);
             

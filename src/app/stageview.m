@@ -382,7 +382,7 @@ classdef stageview < matlab.apps.AppBase
                         
                         % Create new figure for snapshot
                         figName = sprintf('Snapshot - Camera %d', i);
-                        snapshotFig = figure('Name', figName, 'NumberTitle', 'off');
+                        figure('Name', figName, 'NumberTitle', 'off');
                         imshow(img);
                         title(sprintf('Camera %d - %s', i, datestr(now, 'yyyy-mm-dd HH:MM:SS')));
                         

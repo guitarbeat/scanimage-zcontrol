@@ -73,9 +73,6 @@ classdef foilview_updater < handle
                     return;
                 end
                 
-                % Use centralized styling system
-                colors = foilview_styling.getColors();
-                
                 % Update position status based on controller state
                 if controller.IsAutoRunning
                     progressText = sprintf('Auto-stepping: %d/%d', controller.CurrentStep, controller.TotalSteps);

@@ -228,7 +228,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            success = foilview_utils.safeExecute(@() doMoveStage(), 'moveStage');
+            foilview_utils.safeExecute(@() doMoveStage(), 'moveStage');
             
             function doMoveStage()
                 if obj.SimulationMode
@@ -314,7 +314,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            success = foilview_utils.safeExecute(@() doMoveStageY(), 'moveStageY');
+            foilview_utils.safeExecute(@() doMoveStageY(), 'moveStageY');
             
             function doMoveStageY()
                 if obj.SimulationMode || isempty(obj.etYPos)
@@ -358,7 +358,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            success = foilview_utils.safeExecute(@() doSetPosition(), 'setPosition');
+            foilview_utils.safeExecute(@() doSetPosition(), 'setPosition');
             
             function doSetPosition()
                 if obj.SimulationMode
@@ -379,7 +379,7 @@ classdef foilview_controller < handle
         
         function setXYZPosition(obj, xPos, yPos, zPos)
             % Set X, Y, and Z positions simultaneously
-            success = foilview_utils.safeExecute(@() doSetXYZPosition(), 'setXYZPosition');
+            foilview_utils.safeExecute(@() doSetXYZPosition(), 'setXYZPosition');
             
             function doSetXYZPosition()
                 if obj.SimulationMode
@@ -692,7 +692,7 @@ classdef foilview_controller < handle
             end
         end
         
-        function value = calculateMetric(obj, pixelData, metricType)
+        function value = calculateMetric(~, pixelData, metricType)
             if isempty(pixelData)
                 value = NaN;
                 return;

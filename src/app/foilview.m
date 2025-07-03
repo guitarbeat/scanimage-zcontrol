@@ -259,7 +259,6 @@ classdef foilview < matlab.apps.AppBase
             % Position stage view window relative to main window
             if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp.UIFigure)
                 mainPos = app.UIFigure.Position;
-                stagePos = app.StageViewApp.UIFigure.Position;
                 
                 % Place stage view to the right of main window with some spacing
                 app.StageViewApp.UIFigure.Position(1) = mainPos(1) + mainPos(3) + 20;
@@ -568,7 +567,6 @@ classdef foilview < matlab.apps.AppBase
             
             % Get direction
             direction = app.Controller.AutoDirection;
-            directionText = '';
             if direction > 0
                 directionText = 'upward';
             else

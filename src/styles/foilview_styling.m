@@ -104,7 +104,7 @@ classdef foilview_styling < handle
             end
         end
         
-        function styleWindowIndicatorButton(button, isActive, iconText, activeText, inactiveText)
+        function styleWindowIndicatorButton(button, isActive, ~, activeText, inactiveText)
             % Style window indicator buttons (bookmarks, stage view)
             % Usage: foilview_styling.styleWindowIndicatorButton(button, true, '📌', '📌●', '📌')
             

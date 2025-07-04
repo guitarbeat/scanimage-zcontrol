@@ -1,34 +1,5 @@
 classdef foilview < matlab.apps.AppBase
-    % foilview - Modern GUI for Z-stage positioning control and foil analysis
-    %
-    % This MATLAB App Designer application provides a comprehensive user interface
-    % for microscope Z-stage control optimized for foil analysis workflows. 
-    % This refactored version uses separate classes for different concerns, 
-    % improving maintainability and code organization.
-    %
-    % Key Features:
-    %   - Tabbed interface (Manual Control, Auto Step, Bookmarks)
-    %   - Real-time position and focus metrics display
-    %   - Expandable metrics plotting with data export
-    %   - Position bookmarking system with labeled storage
-    %   - Automated stepping sequences with progress tracking
-    %   - Modern UI with responsive design and visual feedback
-    %
-    % Architecture:
-    %   - Follows Model-View-Controller pattern with ZStageController
-    %   - Separated UI creation, plotting, business logic, and UI updates
-    %   - Event-driven updates for responsive user experience
-    %   - Fixed-width main window with horizontal plot expansion
-    %   - Timer-based refresh for position and metrics
-    %
-    % Usage:
-    %   app = foilview();    % Launch the application
-    %   delete(app);         % Clean shutdown when done
-    %
-    % See also: foilview_controller, foilview_ui, foilview_plot, 
-    %           foilview_logic, foilview_updater
     
-    %% Public Properties - UI Components
     properties (Access = public)
         UIFigure                    matlab.ui.Figure
         MainPanel                   matlab.ui.container.Panel
@@ -36,81 +7,36 @@ classdef foilview < matlab.apps.AppBase
         ControlTabs                 matlab.ui.container.TabGroup
     end
     
-    %% Private Properties - UI Component Groups
     properties (Access = public)
-        % Position Display
         PositionDisplay
-        
-        % Metric Display Components
         MetricDisplay
-        
-        % Manual Control Components
         ManualControls
-        
-        % Auto Step Components  
         AutoControls
-        
-        % Status Components
         StatusControls
-        
-        % Metrics Plot Components
         MetricsPlotControls
     end
     
-    %% Properties - Application State and Helpers
     properties (Access = public)
-        % Core Controller
         Controller                  foilview_controller
-        
-        % Helper Classes
-        PlotManager                 foilview_plot
-        
-        % Additional Windows
-        StageViewApp                % Can be stageview object or empty
-        BookmarksViewApp            % Can be bookmarksview object or empty
+        PlotManager                 ui_components
+        StageViewApp
+        BookmarksViewApp
     end
     
-    %% Private Properties - Internal State
     properties (Access = private)
-        % Timers
         RefreshTimer
         MetricTimer
         ResizeMonitorTimer
-        
-        % Window sizing tracking
-        LastWindowSize = [0 0 0 0]  % Track previous window size for resize detection
-        IgnoreNextResize = false    % Flag to ignore programmatic resizes
+        LastWindowSize = [0 0 0 0]
+        IgnoreNextResize = false
     end
     
-    %% Constructor and Destructor
     methods (Access = public)
         function app = foilview()
-            % foilview Constructor
-            % 
-            % Creates and initializes the Z-Stage Control application with full
-            % GUI setup, controller integration, and timer-based updates.
-            %
-            % Initialization sequence:
-            %   1. Create all UI components using UICreator
-            %   2. Initialize foilview_controller and helper classes
-            %   3. Set up event listeners
-            %   4. Start refresh timers for position and metrics
-            %   5. Register app with MATLAB App framework
-            %
-            % Returns:
-            %   app - foilview instance ready for use
-            
-            % Create UI components using the UI creator
-            components = foilview_ui.createAllComponents(app);
+            components = ui_components.createAllComponents(app);
             app.copyComponentsFromStruct(components);
-            
-            % Set up all callbacks
             app.setupCallbacks();
-            
-            % Initialize application
             app.initializeApplication();
-            
-            % Register app
             registerApp(app, app.UIFigure);
             
             if nargout == 0
@@ -119,26 +45,19 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function delete(app)
-            % foilview Destructor
-            %
-            % Performs clean shutdown of the application including:
-            %   - Stopping all timers safely
-            %   - Cleaning up controller resources
-            %   - Closing UI figure
-            %
-            % Called automatically when app goes out of scope or is explicitly deleted.
-            
+            % Main destructor for the application.
             app.cleanup();
+            
+            % Safely delete the UIFigure without recursion.
             if isvalid(app.UIFigure)
+                app.UIFigure.CloseRequestFcn = '';
                 delete(app.UIFigure);
             end
         end
     end
     
-    %% Initialization Methods
     methods (Access = private)
         function copyComponentsFromStruct(app, components)
-            % Copy UI components from struct to app properties
             fields = fieldnames(components);
             for i = 1:length(fields)
                 app.(fields{i}) = components.(fields{i});
@@ -146,38 +65,21 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function initializeApplication(app)
-            % Initialize the application with controller and helpers
-            
-            % Create controller
             app.Controller = foilview_controller();
+            app.PlotManager = ui_components(app);
             
-            % Create helper classes
-            app.PlotManager = foilview_plot(app);
-            
-            % Set up event listeners
             addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
             addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
             addlistener(app.Controller, 'MetricChanged', @(src,evt) app.onControllerMetricChanged());
             addlistener(app.Controller, 'AutoStepComplete', @(src,evt) app.onControllerAutoStepComplete());
             
-            % Initialize plot
             app.PlotManager.initializeMetricsPlot(app.MetricsPlotControls.Axes);
-            
-            % Update initial display
-            foilview_updater.updateAllUI(app);
-            
-            % Initialize status displays
+            ui_components.updateAllUI(app);
             app.updateAutoStepStatus();
             app.updateDirectionButtons();
-            
-            % Launch additional windows
             app.launchStageView();
             app.launchBookmarksView();
-            
-            % Update window status buttons to show initial state
             app.updateWindowStatusButtons();
-            
-            % Start refresh timers
             app.startRefreshTimer();
             app.startMetricTimer();
             app.startResizeMonitorTimer();
@@ -212,69 +114,30 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function launchStageView(app)
-            % Launch the Stage View window automatically
-            try
-                % Create the stage view application
-                app.StageViewApp = stageview();
-                
-                % Position the stage view window to the right of the main window
-                app.positionStageViewWindow();
-                
-            catch ME
-                warning('foilview:StageViewLaunch', ...
-                       'Failed to launch Stage View: %s', ME.message);
-                % Don't show error dialog during initialization to avoid blocking
-                app.StageViewApp = [];
-            end
-            
-            % Update button status after attempting to launch
-            if isvalid(app.UIFigure) && ~isempty(app.StatusControls)
-                app.updateWindowStatusButtons();
+            % Launch the stage view window
+            if isempty(app.StageViewApp) || ~isvalid(app.StageViewApp) || ~isvalid(app.StageViewApp.UIFigure)
+                try
+                    app.StageViewApp = StageView();
+                catch ME
+                    warning('foilview:StageViewLaunch', 'Failed to launch Stage View: %s', ME.message);
+                    app.StageViewApp = [];
+                end
+            else
+                app.StageViewApp.bringToFront();
             end
         end
         
         function launchBookmarksView(app)
             % Launch the Bookmarks View window automatically
-            try
-                % Create the bookmarks view application with controller reference
-                app.BookmarksViewApp = bookmarksview(app.Controller);
-                
-                % Position the bookmarks window to the left of the main window
-                app.positionBookmarksViewWindow();
-                
-            catch ME
-                warning('foilview:BookmarksViewLaunch', ...
-                       'Failed to launch Bookmarks View: %s', ME.message);
-                % Don't show error dialog during initialization to avoid blocking
-                app.BookmarksViewApp = [];
-            end
-            
-            % Update button status after attempting to launch
-            if isvalid(app.UIFigure) && ~isempty(app.StatusControls)
-                app.updateWindowStatusButtons();
-            end
-        end
-        
-        function positionStageViewWindow(app)
-            % Position stage view window relative to main window
-            if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp.UIFigure)
-                mainPos = app.UIFigure.Position;
-                
-                % Place stage view to the right of main window with some spacing
-                app.StageViewApp.UIFigure.Position(1) = mainPos(1) + mainPos(3) + 20;
-                app.StageViewApp.UIFigure.Position(2) = mainPos(2);
-            end
-        end
-        
-        function positionBookmarksViewWindow(app)
-            % Position bookmarks view window relative to main window
-            if ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp.UIFigure)
-                mainPos = app.UIFigure.Position;
-                bookmarksPos = app.BookmarksViewApp.UIFigure.Position;
-                
-                % Place bookmarks view to the left of main window with some spacing
-                app.BookmarksViewApp.UIFigure.Position(1) = mainPos(1) - bookmarksPos(3) - 20;
-                app.BookmarksViewApp.UIFigure.Position(2) = mainPos(2);
+            if isempty(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp.UIFigure)
+                try
+                    app.BookmarksViewApp = BookmarksView(app.Controller);
+                catch ME
+                    warning('foilview:BookmarksViewLaunch', 'Failed to launch Bookmarks View: %s', ME.message);
+                    app.BookmarksViewApp = [];
+                end
+            else
+                figure(app.BookmarksViewApp.UIFigure);
             end
         end
         
@@ -336,22 +199,22 @@ classdef foilview < matlab.apps.AppBase
         end
     end
     
-    %% Controller Event Handlers
+
     methods (Access = private)
         function onControllerStatusChanged(app)
-            foilview_updater.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller);
+            ui_components.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller);
         end
         
         function onControllerPositionChanged(app)
-            foilview_updater.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller);
+            ui_components.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller);
         end
         
         function onControllerMetricChanged(app)
-            foilview_updater.updateMetricDisplay(app.MetricDisplay, app.Controller);
+            ui_components.updateMetricDisplay(app.MetricDisplay, app.Controller);
         end
         
         function onControllerAutoStepComplete(app)
-            foilview_updater.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
+            ui_components.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
             % If metrics were recorded, update the plot and expand the GUI
             if app.Controller.RecordMetrics
                 metrics = app.Controller.getAutoStepMetrics();
@@ -367,25 +230,25 @@ classdef foilview < matlab.apps.AppBase
         end
     end
     
-    %% UI Event Handlers
+
     methods (Access = private)
-        % Manual Control Events
+
         function onUpButtonPushed(app, varargin)
-            foilview_logic.moveStageManual(app.Controller, app.ManualControls, 1);
+            app.Controller.moveStageManual(app.ManualControls, 1);
         end
         
         function onDownButtonPushed(app, varargin)
-            foilview_logic.moveStageManual(app.Controller, app.ManualControls, -1);
+            app.Controller.moveStageManual(app.ManualControls, -1);
         end
         
         function onZeroButtonPushed(app, varargin)
-            foilview_logic.resetPosition(app.Controller);
+            app.Controller.resetPosition();
         end
         
         function onStepSizeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
-                foilview_logic.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, true);
+                app.Controller.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, true);
             end
         end
         
@@ -409,11 +272,11 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         
-        % Auto Step Events
+
         function onAutoStepSizeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
-                foilview_logic.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, false);
+                app.Controller.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, false);
                 app.updateAutoStepStatus();
             end
         end
@@ -430,96 +293,87 @@ classdef foilview < matlab.apps.AppBase
             % Toggle between up and down directions
             currentDirection = app.Controller.AutoDirection;
             newDirection = -currentDirection;  % Toggle: 1 -> -1, -1 -> 1
-            foilview_logic.setAutoDirection(app.Controller, app.AutoControls, newDirection);
+            app.Controller.setAutoDirectionWithValidation(app.AutoControls, newDirection);
             app.updateAutoStepStatus();
             app.updateDirectionButtons();
         end
         
         function onStartStopButtonPushed(app, varargin)
             if app.Controller.IsAutoRunning
-                foilview_logic.stopAutoStepping(app.Controller);
+                app.Controller.stopAutoStepping();
             else
-                foilview_logic.startAutoStepping(app, app.Controller, app.AutoControls, app.PlotManager);
+                app.Controller.startAutoSteppingWithValidation(app, app.AutoControls, app.PlotManager);
             end
-            foilview_updater.updateAllUI(app);
+            ui_components.updateAllUI(app);
             app.updateAutoStepStatus();
             app.updateDirectionButtons();
         end
         
 
         
-        % System Events
-        function onRefreshButtonPushed(app, varargin)
-            foilview_logic.refreshConnection(app.Controller);
-            foilview_updater.updateAllUI(app);
+
+        function onRefreshButtonPushed(app, ~, ~)
+            app.Controller.refreshPosition();
         end
         
-        function onBookmarksButtonPushed(app, varargin)
-            % Toggle Bookmarks window (Open/Close)
+        function onBookmarksButtonPushed(app, ~, ~)
             if isempty(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp.UIFigure)
-                % Window doesn't exist or was closed, create new one
                 app.launchBookmarksView();
             else
-                % Window exists - check if it's visible
-                if strcmp(app.BookmarksViewApp.UIFigure.Visible, 'on')
-                    % Window is visible, close it
-                    delete(app.BookmarksViewApp);
-                    app.BookmarksViewApp = [];
-                else
-                    % Window exists but hidden, make it visible and bring to front
-                    app.BookmarksViewApp.UIFigure.Visible = 'on';
-                    figure(app.BookmarksViewApp.UIFigure);
-                    app.positionBookmarksViewWindow();
-                end
+                delete(app.BookmarksViewApp);
+                app.BookmarksViewApp = [];
             end
-            % Update button appearance to reflect current window status
             app.updateWindowStatusButtons();
         end
         
-        function onStageViewButtonPushed(app, varargin)
-            % Toggle Stage View window (Open/Close)
+        function onStageViewButtonPushed(app, ~, ~)
             if isempty(app.StageViewApp) || ~isvalid(app.StageViewApp) || ~isvalid(app.StageViewApp.UIFigure)
-                % Window doesn't exist or was closed, create new one
                 app.launchStageView();
             else
-                % Window exists - check if it's visible
-                if strcmp(app.StageViewApp.UIFigure.Visible, 'on')
-                    % Window is visible, close it
-                    delete(app.StageViewApp);
-                    app.StageViewApp = [];
-                else
-                    % Window exists but hidden, make it visible and bring to front
-                    app.StageViewApp.UIFigure.Visible = 'on';
-                    figure(app.StageViewApp.UIFigure);
-                    app.positionStageViewWindow();
-                end
+                delete(app.StageViewApp);
+                app.StageViewApp = [];
             end
-            % Update button appearance to reflect current window status
             app.updateWindowStatusButtons();
         end
         
         function onWindowClose(app, varargin)
-            app.cleanup();
+            % This function is called when the main window is closed.
+            % The delete() method will handle all cleanup.
             delete(app);
         end
         
-        % Metric Events
+
         function onMetricTypeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
-                foilview_logic.setMetricType(app.Controller, event.Value);
+                app.Controller.setMetricTypeWithValidation(event.Value);
             end
+            
+            % Close any child windows
+            if ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp)
+                delete(app.BookmarksViewApp);
+            end
+            app.BookmarksViewApp = [];
+            
+            if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp)
+                delete(app.StageViewApp);
+            end
+            app.StageViewApp = [];
+            
+            foilview_utils.safeStopTimer(app.ResizeMonitorTimer);
+            app.ResizeMonitorTimer = [];
         end
         
-        function onMetricRefreshButtonPushed(app, varargin)
-            foilview_logic.updateMetric(app.Controller);
+        function onMetricRefreshButtonPushed(app, ~, ~)
+            app.Controller.updateMetric();
         end
         
 
         
-        % Plot Control Events
-        function onExpandButtonPushed(app, varargin)
-            if app.PlotManager.getIsPlotExpanded()
+
+        function onExpandButtonPushed(app, ~, ~)
+            isExpanded = app.PlotManager.getIsPlotExpanded();
+            if isExpanded
                 app.PlotManager.collapseGUI(app.UIFigure, app.MainPanel, ...
                     app.MetricsPlotControls.Panel, app.MetricsPlotControls.ExpandButton, app);
             else
@@ -537,7 +391,7 @@ classdef foilview < matlab.apps.AppBase
         end
     end
     
-    %% Helper Methods
+
     methods (Access = private)
         function updateStepSizeDisplay(app, newIndex, newStepSize)
             % Update step size display and sync controls
@@ -557,84 +411,74 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function updateAutoStepStatus(app)
-            % Update the smart status display
-            stepSize = app.AutoControls.StepField.Value;
-            numSteps = app.AutoControls.StepsField.Value;
-            delay = app.AutoControls.DelayField.Value;
-            
-            % Calculate total distance
-            totalDistance = stepSize * numSteps;
-            
-            % Get direction
-            direction = app.Controller.AutoDirection;
-            if direction > 0
-                directionText = 'upward';
-            else
-                directionText = 'downward';
-            end
-            
-            % Create status message
-            if app.Controller.IsAutoRunning
-                statusText = sprintf('Sweeping %.1f μm %s...', totalDistance, directionText);
-            else
-                totalTime = numSteps * delay;
-                if totalTime < 60
-                    statusText = sprintf('Ready: %.1f μm %s (%.1fs)', totalDistance, directionText, totalTime);
-                else
-                    minutes = floor(totalTime / 60);
-                    seconds = mod(totalTime, 60);
-                    statusText = sprintf('Ready: %.1f μm %s (%dm %.0fs)', totalDistance, directionText, minutes, seconds);
-                end
-            end
-            
-            app.AutoControls.StatusDisplay.Text = statusText;
+            ui_components.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
         end
         
         function updateDirectionButtons(app)
             % Update direction button and start button to show current direction
             direction = app.Controller.AutoDirection;
             
-            % Style direction button using centralized styling
-            foilview_styling.styleDirectionButton(app.AutoControls.DirectionButton, direction, app.Controller.IsAutoRunning);
+            % Style direction button based on direction and running state
+            if direction > 0
+                app.AutoControls.DirectionButton.Text = '▲';
+                baseColor = [0.2 0.7 0.3];  % success color
+            else
+                app.AutoControls.DirectionButton.Text = '▼';
+                baseColor = [0.9 0.6 0.2];  % warning color
+            end
+            
+            if app.Controller.IsAutoRunning
+                app.AutoControls.DirectionButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
+            else
+                app.AutoControls.DirectionButton.BackgroundColor = baseColor;
+            end
+            
+            app.AutoControls.DirectionButton.FontColor = [1 1 1];  % white text
+            app.AutoControls.DirectionButton.FontSize = 10;
+            app.AutoControls.DirectionButton.FontWeight = 'bold';
             
             % Style start/stop button based on state and direction
             if direction > 0
                 if app.Controller.IsAutoRunning
-                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Danger', 'STOP ▲');
+                    app.AutoControls.StartStopButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
+                    app.AutoControls.StartStopButton.Text = 'STOP ▲';
                 else
-                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Success', 'START ▲');
+                    app.AutoControls.StartStopButton.BackgroundColor = [0.2 0.7 0.3];  % success color
+                    app.AutoControls.StartStopButton.Text = 'START ▲';
                 end
             else
                 if app.Controller.IsAutoRunning
-                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Danger', 'STOP ▼');
+                    app.AutoControls.StartStopButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
+                    app.AutoControls.StartStopButton.Text = 'STOP ▼';
                 else
-                    foilview_styling.styleButton(app.AutoControls.StartStopButton, 'Success', 'START ▼');
+                    app.AutoControls.StartStopButton.BackgroundColor = [0.2 0.7 0.3];  % success color
+                    app.AutoControls.StartStopButton.Text = 'START ▼';
                 end
             end
+            app.AutoControls.StartStopButton.FontColor = [1 1 1];  % white text
+            app.AutoControls.StartStopButton.FontSize = 10;
+            app.AutoControls.StartStopButton.FontWeight = 'bold';
         end
         
         function updateWindowStatusButtons(app)
-            % Update the appearance of window control buttons to show if windows are active
-            
-            % Check Bookmarks window status
-            bookmarksActive = ~isempty(app.BookmarksViewApp) && ...
-                             isvalid(app.BookmarksViewApp) && ...
-                             isvalid(app.BookmarksViewApp.UIFigure) && ...
-                             strcmp(app.BookmarksViewApp.UIFigure.Visible, 'on');
-            
-            % Check Stage View window status  
-            stageViewActive = ~isempty(app.StageViewApp) && ...
-                             isvalid(app.StageViewApp) && ...
-                             isvalid(app.StageViewApp.UIFigure) && ...
-                             strcmp(app.StageViewApp.UIFigure.Visible, 'on');
-            
-            % Update Bookmarks button using centralized styling
-            foilview_styling.styleWindowIndicatorButton(app.StatusControls.BookmarksButton, ...
-                bookmarksActive, '📌', '📌●', '📌');
-            
-            % Update Stage View button using centralized styling
-            foilview_styling.styleWindowIndicatorButton(app.StatusControls.StageViewButton, ...
-                stageViewActive, '📹', '📹●', '📹');
+            isBookmarksOpen = ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp.UIFigure);
+            isStageViewOpen = ~isempty(app.StageViewApp) && isvalid(app.StageViewApp) && isvalid(app.StageViewApp.UIFigure);
+
+            if isBookmarksOpen
+                app.StatusControls.BookmarksButton.Text = 'Close Bookmarks';
+                app.StatusControls.BookmarksButton.Icon = '';
+            else
+                app.StatusControls.BookmarksButton.Text = 'Open Bookmarks';
+                app.StatusControls.BookmarksButton.Icon = '';
+            end
+
+            if isStageViewOpen
+                app.StatusControls.StageViewButton.Text = 'Close Stage View';
+                app.StatusControls.StageViewButton.Icon = '';
+            else
+                app.StatusControls.StageViewButton.Text = 'Open Stage View';
+                app.StatusControls.StageViewButton.Icon = '';
+            end
         end
         
         function monitorWindowResize(app)
@@ -676,7 +520,7 @@ classdef foilview < matlab.apps.AppBase
                     
                     % Calculate scaling based on height change only
                     heightBasedSize = [currentSize(1:2), app.LastWindowSize(3), currentSize(4)];
-                    foilview_ui.adjustFontSizes(components, heightBasedSize);
+                    ui_components.adjustFontSizes(components, heightBasedSize);
                     
                 catch ME
                     % Log errors for debugging but don't crash
@@ -694,7 +538,7 @@ classdef foilview < matlab.apps.AppBase
                         
                         % Only adjust if we have reasonable window dimensions
                         if currentSize(3) > 400 && currentSize(4) > 200
-                            foilview_ui.adjustPlotPosition(app.UIFigure, ...
+                            ui_components.adjustPlotPosition(app.UIFigure, ...
                                 app.MetricsPlotControls.Panel, 400);
                             
                             % Ensure plot panel stays visible
@@ -712,21 +556,8 @@ classdef foilview < matlab.apps.AppBase
             app.LastWindowSize = currentSize;
         end
         
-        function cleanup(app)
-            % Clean up additional windows
-            if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp)
-                delete(app.StageViewApp);
-            end
-            if ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp)
-                delete(app.BookmarksViewApp);
-            end
-            
-            % Clean up controller
-            if ~isempty(app.Controller) && isvalid(app.Controller)
-                delete(app.Controller);
-            end
-            
-            % Stop timers using centralized utility
+        function stopTimers(app)
+            % Stop and delete all timers
             foilview_utils.safeStopTimer(app.RefreshTimer);
             app.RefreshTimer = [];
             
@@ -735,16 +566,28 @@ classdef foilview < matlab.apps.AppBase
             
             foilview_utils.safeStopTimer(app.ResizeMonitorTimer);
             app.ResizeMonitorTimer = [];
+        end
+        
+        function cleanup(app)
+            % Clean up all application resources.
             
-            % Clean up all timers using centralized utility
-            foilview_utils.cleanupAllTimers();
+            % Stop timers
+            app.stopTimers();
             
-            % Clean up panels using centralized validation
-            if foilview_utils.validateUIComponent(app.MainPanel)
-                delete(app.MainPanel);
+            % Clean up controller
+            if ~isempty(app.Controller) && isvalid(app.Controller)
+                app.Controller.cleanup();
             end
-            if ~isempty(app.MetricsPlotControls) && foilview_utils.validateUIComponent(app.MetricsPlotControls.Panel)
-                delete(app.MetricsPlotControls.Panel);
+            
+            % Close any child windows by deleting their app objects.
+            if ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp)
+                delete(app.BookmarksViewApp);
+                app.BookmarksViewApp = [];
+            end
+            
+            if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp)
+                delete(app.StageViewApp);
+                app.StageViewApp = [];
             end
         end
     end

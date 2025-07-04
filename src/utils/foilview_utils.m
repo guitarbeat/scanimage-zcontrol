@@ -1,16 +1,8 @@
 classdef foilview_utils < handle
-    % foilview_utils - Utility functions to eliminate code duplication
-    %
-    % This class consolidates common functionality used across the foilview
-    % application to eliminate code duplication and improve maintainability.
     
     properties (Constant, Access = public)
-        % Centralized constants to eliminate duplication
-        
-        % Error handling configuration
         ERROR_PREFIX = 'Error in %s: %s\n'
         
-        % UI styling constants - consolidate from foilview_ui
         UI_STYLE = struct(...
             'FONT_SIZE_SMALL', 9, ...
             'FONT_SIZE_NORMAL', 10, ...
@@ -22,7 +14,6 @@ classdef foilview_utils < handle
             'LINE_WIDTH', 1.5, ...
             'MARKER_SIZE', 4)
         
-        % Common UI component field names for validation
         BUTTON_FIELDS = {'UpButton', 'DownButton', 'DirectionButton', 'StartStopButton', 'ZeroButton', ...
                          'MarkButton', 'GoToButton', 'DeleteButton', 'RefreshButton', ...
                          'ClearButton', 'ExportButton', 'ExpandButton'}
@@ -31,17 +22,15 @@ classdef foilview_utils < handle
         
         DROPDOWN_FIELDS = {'StepSizeDropdown', 'TypeDropdown'}
         
-        % Performance constants
-        DEFAULT_UPDATE_THROTTLE = 0.05  % 50ms minimum between updates
-        DEFAULT_PLOT_THROTTLE = 0.1     % 100ms minimum between plot updates
+        DEFAULT_UPDATE_THROTTLE = 0.05
+        DEFAULT_PLOT_THROTTLE = 0.1
         DEFAULT_MAX_DATA_POINTS = 1000
         
-        % Validation constants
-        POSITION_PRECISION_THRESHOLD = 0.1  % When to use high precision formatting
+        POSITION_PRECISION_THRESHOLD = 0.1
     end
     
     methods (Static)
-        %% Enhanced Error Handling Utilities
+    
         function logError(context, error)
             % Centralized error logging with consistent formatting
             if ischar(error)
@@ -67,20 +56,17 @@ classdef foilview_utils < handle
             end
         end
         
-        function success = safeExecuteWithReturn(func, context, defaultReturn)
-            % Execute function with error handling and return value
-            if nargin < 3, defaultReturn = []; end
+        function output = safeExecuteWithReturn(func, functionName, defaultValue)
+            % Safely execute a function and return a value, with error handling
             try
-                success = func();
-            catch e
-                foilview_utils.logError(context, e);
-                success = defaultReturn;
+                output = func();
+            catch ME
+                fprintf('Error in %s: %s\n', functionName, ME.message);
+                output = defaultValue;
             end
         end
         
-        %% Enhanced UI Styling Utilities
-        % NOTE: Button styling moved to foilview_styling.styleButton()
-        % This maintains backward compatibility for existing code.
+        
         
         function setControlEnabled(control, enabled, fieldName)
             % Safely enable/disable a control with validation
@@ -116,7 +102,7 @@ classdef foilview_utils < handle
                      foilview_utils.DROPDOWN_FIELDS];
         end
         
-        %% Enhanced Position Formatting Utilities
+    
         function str = formatPosition(position, highPrecision)
             % Centralized position formatting with automatic precision detection
             if nargin < 2
@@ -155,7 +141,7 @@ classdef foilview_utils < handle
             end
         end
         
-        %% Enhanced Timer Utilities
+    
         function timerObj = createTimer(mode, period, callback)
             % Centralized timer creation with validation
             if ~ischar(mode) || ~isnumeric(period) || period <= 0
@@ -193,7 +179,7 @@ classdef foilview_utils < handle
             end
         end
         
-        %% Enhanced UI Validation Utilities
+    
         function valid = validateUIComponent(component)
             % Centralized UI component validation
             valid = ~isempty(component) && isvalid(component);
@@ -229,7 +215,7 @@ classdef foilview_utils < handle
             enableState = matlab.lang.OnOffSwitchState(enabled);
         end
         
-        %% Enhanced Plot Utilities
+    
         function configureAxes(axes, titleText, xlabelText, ylabelText)
             % Centralized axis configuration with optional labels
             if ~foilview_utils.validateUIComponent(axes)
@@ -279,7 +265,7 @@ classdef foilview_utils < handle
                            'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_SMALL, 'Box', 'on');
         end
         
-        %% Enhanced Validation Utilities
+    
         function valid = validateNumericRange(value, minVal, maxVal, name)
             % Centralized numeric range validation
             valid = true;
@@ -359,7 +345,7 @@ classdef foilview_utils < handle
             end
         end
         
-        %% Enhanced String Utilities
+    
         function result = extractStepSizeFromString(str)
             % Extract numeric step size from formatted string
             result = str2double(extractBefore(str, ' μm'));
@@ -386,11 +372,11 @@ classdef foilview_utils < handle
                 metricType);
         end
         
-        %% Enhanced Performance Utilities
+    
         function shouldUpdate = shouldThrottleUpdate(lastUpdateTime, interval)
             % Check if enough time has passed for throttled updates
             if nargin < 2, interval = foilview_utils.DEFAULT_UPDATE_THROTTLE; end
-            currentTime = now * 24 * 3600;  % Convert to seconds
+            currentTime = posixtime(datetime('now'));  % Convert to seconds
             shouldUpdate = (currentTime - lastUpdateTime) >= interval;
         end
         
@@ -427,7 +413,7 @@ classdef foilview_utils < handle
             end
         end
         
-        %% UI Update Utilities
+    
         function success = batchUIUpdate(updateFunctions, suppressErrors)
             % Perform multiple UI updates efficiently
             if nargin < 2, suppressErrors = true; end
@@ -435,7 +421,7 @@ classdef foilview_utils < handle
             
             try
                 % Temporarily disable graphics updates
-                drawnow('limitrate');
+                drawnow limitrate;
                 
                 % Execute all update functions
                 for i = 1:length(updateFunctions)
@@ -454,7 +440,7 @@ classdef foilview_utils < handle
             end
         end
         
-        %% Configuration Utilities
+    
         function config = getDefaultUIConfig()
             % Get default UI configuration to eliminate duplication
             config = struct(...

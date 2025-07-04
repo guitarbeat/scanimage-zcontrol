@@ -269,8 +269,6 @@ classdef FoilviewController < handle
             end
             
             function doRefreshPosition()
-                positionChanged = false;
-                
                 % Refresh each axis position using the helper
                 [obj.CurrentPosition, zChanged] = obj.refreshAxisPosition(obj.etZPos, obj.CurrentPosition);
                 [obj.CurrentXPosition, xChanged] = obj.refreshAxisPosition(obj.etXPos, obj.CurrentXPosition);
@@ -699,7 +697,7 @@ classdef FoilviewController < handle
             obj.CurrentYPosition = obj.readUIPosition(obj.etYPos, 0);
         end
 
-        function pos = readUIPosition(obj, handle, defaultValue)
+        function pos = readUIPosition(~, handle, defaultValue)
             % Helper to read and parse a position value from a UI element.
             if ~isempty(handle)
                 pos = str2double(handle.String);

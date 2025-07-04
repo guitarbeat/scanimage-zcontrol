@@ -18,7 +18,7 @@ classdef foilview < matlab.apps.AppBase
     
     properties (Access = public)
         Controller                  FoilviewController
-        PlotManager                 UiComponents
+        PlotManager                 PlotManager
         StageViewApp
         BookmarksViewApp
     end
@@ -33,7 +33,7 @@ classdef foilview < matlab.apps.AppBase
     
     methods (Access = public)
         function app = foilview()
-            components = UiComponents.createAllComponents(app);
+            components = UiBuilder.build(app);
             app.copyComponentsFromStruct(components);
             app.setupCallbacks();
             app.initializeApplication();
@@ -66,7 +66,7 @@ classdef foilview < matlab.apps.AppBase
         
         function initializeApplication(app)
             app.Controller = FoilviewController();
-            app.PlotManager = UiComponents(app);
+            app.PlotManager = PlotManager(app);
             
             addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
             addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
@@ -248,7 +248,8 @@ classdef foilview < matlab.apps.AppBase
         function onStepSizeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
-                app.Controller.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, true);
+                app.Controller.setStepSize(event.Value);
+                app.updateStepSizeDisplay();
             end
         end
         
@@ -410,6 +411,10 @@ classdef foilview < matlab.apps.AppBase
             app.AutoControls.StepField.Value = newStepSize;
         end
         
+        function updateAllUI(app)
+            UiComponents.updateAllUI(app);
+        end
+
         function updateAutoStepStatus(app)
             UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
         end

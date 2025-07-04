@@ -1,4 +1,4 @@
-classdef foilview_utils < handle
+classdef FoilviewUtils < handle
     
     properties (Constant, Access = public)
         ERROR_PREFIX = 'Error in %s: %s\n'
@@ -34,9 +34,9 @@ classdef foilview_utils < handle
         function logError(context, error)
             % Centralized error logging with consistent formatting
             if ischar(error)
-                fprintf(foilview_utils.ERROR_PREFIX, context, error);
+                fprintf(FoilviewUtils.ERROR_PREFIX, context, error);
             elseif isstruct(error) && isfield(error, 'message')
-                fprintf(foilview_utils.ERROR_PREFIX, context, error.message);
+                fprintf(FoilviewUtils.ERROR_PREFIX, context, error.message);
             else
                 fprintf('Error in %s: Unknown error\n', context);
             end
@@ -51,7 +51,7 @@ classdef foilview_utils < handle
                 success = true;
             catch e
                 if ~suppressErrors
-                    foilview_utils.logError(context, e);
+                    FoilviewUtils.logError(context, e);
                 end
             end
         end
@@ -73,13 +73,13 @@ classdef foilview_utils < handle
             if nargin < 3, fieldName = ''; end
             
             if ~isempty(fieldName)
-                if ~isfield(control, fieldName) || ~foilview_utils.validateUIComponent(control.(fieldName))
+                if ~isfield(control, fieldName) || ~FoilviewUtils.validateUIComponent(control.(fieldName))
                     return;
                 end
-                control.(fieldName).Enable = foilview_utils.getEnableState(enabled);
+                control.(fieldName).Enable = FoilviewUtils.getEnableState(enabled);
             else
-                if foilview_utils.validateUIComponent(control)
-                    control.Enable = foilview_utils.getEnableState(enabled);
+                if FoilviewUtils.validateUIComponent(control)
+                    control.Enable = FoilviewUtils.getEnableState(enabled);
                 end
             end
         end
@@ -87,29 +87,29 @@ classdef foilview_utils < handle
         function setControlsEnabled(controlStruct, enabled, fieldNames)
             % Enable/disable multiple controls efficiently
             if nargin < 3
-                fieldNames = foilview_utils.getAllControlFields();
+                fieldNames = FoilviewUtils.getAllControlFields();
             end
             
             for i = 1:length(fieldNames)
-                foilview_utils.setControlEnabled(controlStruct, enabled, fieldNames{i});
+                FoilviewUtils.setControlEnabled(controlStruct, enabled, fieldNames{i});
             end
         end
         
         function fields = getAllControlFields()
             % Get all common control field names
-            fields = [foilview_utils.BUTTON_FIELDS, ...
-                     foilview_utils.FIELD_FIELDS, ...
-                     foilview_utils.DROPDOWN_FIELDS];
+            fields = [FoilviewUtils.BUTTON_FIELDS, ...
+                     FoilviewUtils.FIELD_FIELDS, ...
+                     FoilviewUtils.DROPDOWN_FIELDS];
         end
         
     
         function str = formatPosition(position, highPrecision)
             % Centralized position formatting with automatic precision detection
             if nargin < 2
-                highPrecision = abs(position) < foilview_utils.POSITION_PRECISION_THRESHOLD;
+                highPrecision = abs(position) < FoilviewUtils.POSITION_PRECISION_THRESHOLD;
             end
             
-            if highPrecision && abs(position) < foilview_utils.POSITION_PRECISION_THRESHOLD
+            if highPrecision && abs(position) < FoilviewUtils.POSITION_PRECISION_THRESHOLD
                 str = sprintf('%.2f μm', position);
             else
                 str = sprintf('%.1f μm', position);
@@ -118,7 +118,7 @@ classdef foilview_utils < handle
         
         function items = formatStepSizeItems(stepSizes)
             % Format step sizes for dropdown items
-            items = arrayfun(@(x) foilview_utils.formatPosition(x), stepSizes, 'UniformOutput', false);
+            items = arrayfun(@(x) FoilviewUtils.formatPosition(x), stepSizes, 'UniformOutput', false);
         end
         
         function str = formatPositionRange(minPos, maxPos)
@@ -172,7 +172,7 @@ classdef foilview_utils < handle
             try
                 allTimers = timerfindall();
                 for timerObj = allTimers'
-                    foilview_utils.safeStopTimer(timerObj);
+                    FoilviewUtils.safeStopTimer(timerObj);
                 end
             catch
                 % Ignore errors if timerfindall is not available
@@ -189,7 +189,7 @@ classdef foilview_utils < handle
             % Validate multiple UI components at once
             valid = true;
             for i = 1:nargin
-                if ~foilview_utils.validateUIComponent(varargin{i})
+                if ~FoilviewUtils.validateUIComponent(varargin{i})
                     valid = false;
                     break;
                 end
@@ -203,7 +203,7 @@ classdef foilview_utils < handle
             
             for i = 1:length(requiredFields)
                 if ~isfield(controlStruct, requiredFields{i}) || ...
-                   ~foilview_utils.validateUIComponent(controlStruct.(requiredFields{i}))
+                   ~FoilviewUtils.validateUIComponent(controlStruct.(requiredFields{i}))
                     valid = false;
                     break;
                 end
@@ -218,51 +218,51 @@ classdef foilview_utils < handle
     
         function configureAxes(axes, titleText, xlabelText, ylabelText)
             % Centralized axis configuration with optional labels
-            if ~foilview_utils.validateUIComponent(axes)
+            if ~FoilviewUtils.validateUIComponent(axes)
                 return;
             end
             
             set(axes, 'Box', 'on', 'TickDir', 'out', ...
-                'LineWidth', foilview_utils.UI_STYLE.LINE_WIDTH);
+                'LineWidth', FoilviewUtils.UI_STYLE.LINE_WIDTH);
             
             if nargin >= 3 && ~isempty(xlabelText)
-                xlabel(axes, xlabelText, 'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_NORMAL);
+                xlabel(axes, xlabelText, 'FontSize', FoilviewUtils.UI_STYLE.FONT_SIZE_NORMAL);
             else
-                xlabel(axes, 'Z Position (μm)', 'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_NORMAL);
+                xlabel(axes, 'Z Position (μm)', 'FontSize', FoilviewUtils.UI_STYLE.FONT_SIZE_NORMAL);
             end
             
             if nargin >= 4 && ~isempty(ylabelText)
-                ylabel(axes, ylabelText, 'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_NORMAL);
+                ylabel(axes, ylabelText, 'FontSize', FoilviewUtils.UI_STYLE.FONT_SIZE_NORMAL);
             else
-                ylabel(axes, 'Normalized Metric Value', 'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_NORMAL);
+                ylabel(axes, 'Normalized Metric Value', 'FontSize', FoilviewUtils.UI_STYLE.FONT_SIZE_NORMAL);
             end
             
             if nargin >= 2 && ~isempty(titleText)
-                foilview_utils.setPlotTitle(axes, titleText);
+                FoilviewUtils.setPlotTitle(axes, titleText);
             end
         end
         
         function setPlotTitle(axes, titleText, showRange, minPos, maxPos)
             % Centralized plot title setting
-            if ~foilview_utils.validateUIComponent(axes)
+            if ~FoilviewUtils.validateUIComponent(axes)
                 return;
             end
             
             if nargin > 3 && showRange && ~isempty(minPos) && ~isempty(maxPos)
-                fullTitle = sprintf('%s (%s)', titleText, foilview_utils.formatPositionRange(minPos, maxPos));
+                fullTitle = sprintf('%s (%s)', titleText, FoilviewUtils.formatPositionRange(minPos, maxPos));
             else
                 fullTitle = titleText;
             end
             
-            title(axes, fullTitle, 'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_MEDIUM, ...
-                'FontWeight', foilview_utils.UI_STYLE.FONT_WEIGHT_BOLD);
+            title(axes, fullTitle, 'FontSize', FoilviewUtils.UI_STYLE.FONT_SIZE_MEDIUM, ...
+                'FontWeight', FoilviewUtils.UI_STYLE.FONT_WEIGHT_BOLD);
         end
         
         function legendObj = createLegend(axes, location)
             % Centralized legend creation
             if nargin < 2, location = 'northeast'; end
             legendObj = legend(axes, 'Location', location, 'Interpreter', 'none', ...
-                           'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_SMALL, 'Box', 'on');
+                           'FontSize', FoilviewUtils.UI_STYLE.FONT_SIZE_SMALL, 'Box', 'on');
         end
         
     
@@ -297,7 +297,7 @@ classdef foilview_utils < handle
         
         function valid = validateInteger(value, minVal, maxVal, name)
             % Centralized integer validation
-            valid = foilview_utils.validateNumericRange(value, minVal, maxVal, name);
+            valid = FoilviewUtils.validateNumericRange(value, minVal, maxVal, name);
             
             if valid && mod(value, 1) ~= 0
                 if nargin >= 4
@@ -366,7 +366,7 @@ classdef foilview_utils < handle
             
             formatted = sprintf('%-*s X:%.1f Y:%.1f Z:%.1f   %.1f %s', ...
                 maxLabelLength, ...
-                foilview_utils.truncateString(label, maxLabelLength), ...
+                FoilviewUtils.truncateString(label, maxLabelLength), ...
                 xPos, yPos, zPos, ...
                 metricValue, ...
                 metricType);
@@ -375,14 +375,14 @@ classdef foilview_utils < handle
     
         function shouldUpdate = shouldThrottleUpdate(lastUpdateTime, interval)
             % Check if enough time has passed for throttled updates
-            if nargin < 2, interval = foilview_utils.DEFAULT_UPDATE_THROTTLE; end
+            if nargin < 2, interval = FoilviewUtils.DEFAULT_UPDATE_THROTTLE; end
             currentTime = posixtime(datetime('now'));  % Convert to seconds
             shouldUpdate = (currentTime - lastUpdateTime) >= interval;
         end
         
         function limitedData = limitDataForPerformance(data, maxPoints)
             % Limit data points for performance
-            if nargin < 2, maxPoints = foilview_utils.DEFAULT_MAX_DATA_POINTS; end
+            if nargin < 2, maxPoints = FoilviewUtils.DEFAULT_MAX_DATA_POINTS; end
             
             if length(data) <= maxPoints
                 limitedData = data;
@@ -395,7 +395,7 @@ classdef foilview_utils < handle
         
         function [limitedPositions, limitedValues] = limitMetricsData(positions, valuesStruct, maxPoints)
             % Limit both positions and metrics data consistently
-            if nargin < 3, maxPoints = foilview_utils.DEFAULT_MAX_DATA_POINTS; end
+            if nargin < 3, maxPoints = FoilviewUtils.DEFAULT_MAX_DATA_POINTS; end
             
             if length(positions) <= maxPoints
                 limitedPositions = positions;
@@ -425,7 +425,7 @@ classdef foilview_utils < handle
                 
                 % Execute all update functions
                 for i = 1:length(updateFunctions)
-                    if ~foilview_utils.safeExecute(updateFunctions{i}, ...
+                    if ~FoilviewUtils.safeExecute(updateFunctions{i}, ...
                             sprintf('batchUpdate function %d', i), suppressErrors)
                         success = false;
                     end
@@ -435,7 +435,7 @@ classdef foilview_utils < handle
                 drawnow;
                 
             catch e
-                foilview_utils.logError('batchUIUpdate', e);
+                FoilviewUtils.logError('batchUIUpdate', e);
                 success = false;
             end
         end
@@ -444,13 +444,13 @@ classdef foilview_utils < handle
         function config = getDefaultUIConfig()
             % Get default UI configuration to eliminate duplication
             config = struct(...
-                'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_NORMAL, ...
-                'FontWeight', foilview_utils.UI_STYLE.FONT_WEIGHT_NORMAL, ...
-                'LineWidth', foilview_utils.UI_STYLE.LINE_WIDTH, ...
-                'MarkerSize', foilview_utils.UI_STYLE.MARKER_SIZE, ...
-                'UpdateThrottle', foilview_utils.DEFAULT_UPDATE_THROTTLE, ...
-                'PlotThrottle', foilview_utils.DEFAULT_PLOT_THROTTLE, ...
-                'MaxDataPoints', foilview_utils.DEFAULT_MAX_DATA_POINTS);
+                'FontSize', FoilviewUtils.UI_STYLE.FONT_SIZE_NORMAL, ...
+                'FontWeight', FoilviewUtils.UI_STYLE.FONT_WEIGHT_NORMAL, ...
+                'LineWidth', FoilviewUtils.UI_STYLE.LINE_WIDTH, ...
+                'MarkerSize', FoilviewUtils.UI_STYLE.MARKER_SIZE, ...
+                'UpdateThrottle', FoilviewUtils.DEFAULT_UPDATE_THROTTLE, ...
+                'PlotThrottle', FoilviewUtils.DEFAULT_PLOT_THROTTLE, ...
+                'MaxDataPoints', FoilviewUtils.DEFAULT_MAX_DATA_POINTS);
         end
     end
 end 

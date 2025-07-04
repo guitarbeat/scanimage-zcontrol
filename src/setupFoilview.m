@@ -1,7 +1,7 @@
-function setup_foilview()
+function setupFoilview()
     
     scriptDir = fileparts(mfilename('fullpath'));
-    subdirs = {'app', 'core', 'ui', 'utils'};
+    subdirs = {'app', 'controllers', 'views', 'utils'};
     
     for i = 1:length(subdirs)
         subdir = fullfile(scriptDir, subdirs{i});
@@ -13,8 +13,8 @@ function setup_foilview()
         end
     end
     
-    requiredClasses = {'foilview', 'foilview_controller', ...
-                       'ui_components', 'foilview_utils'};
+    requiredClasses = {'foilview', 'FoilviewController', ...
+                       'UiComponents', 'FoilviewUtils'};
     
     fprintf('\nVerifying class availability:\n');
     allFound = true;

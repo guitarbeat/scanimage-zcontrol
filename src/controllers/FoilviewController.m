@@ -1,4 +1,4 @@
-classdef foilview_controller < handle
+classdef FoilviewController < handle
     
 
     properties (Constant, Access = public)
@@ -103,7 +103,7 @@ classdef foilview_controller < handle
     
 
     methods (Access = public)
-        function obj = foilview_controller()
+        function obj = FoilviewController()
             % Initialize the controller
             obj.CurrentMetricType = obj.DEFAULT_METRIC;
             obj.connectToScanImage();
@@ -150,7 +150,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            foilview_utils.safeExecute(@() doMoveStage(), 'moveStage');
+            FoilviewUtils.safeExecute(@() doMoveStage(), 'moveStage');
             
             function doMoveStage()
                 axisInfo = struct(...
@@ -166,7 +166,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            foilview_utils.safeExecute(@() doMoveStageX(), 'moveStageX');
+            FoilviewUtils.safeExecute(@() doMoveStageX(), 'moveStageX');
             
             function doMoveStageX()
                 axisInfo = struct(...
@@ -182,7 +182,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            foilview_utils.safeExecute(@() doMoveStageY(), 'moveStageY');
+            FoilviewUtils.safeExecute(@() doMoveStageY(), 'moveStageY');
             
             function doMoveStageY()
                 axisInfo = struct(...
@@ -198,7 +198,7 @@ classdef foilview_controller < handle
                 return;
             end
             
-            foilview_utils.safeExecute(@() doSetPosition(), 'setPosition');
+            FoilviewUtils.safeExecute(@() doSetPosition(), 'setPosition');
             
             function doSetPosition()
                 if obj.SimulationMode
@@ -219,7 +219,7 @@ classdef foilview_controller < handle
         
         function setXYZPosition(obj, xPos, yPos, zPos)
             % Set X, Y, and Z positions simultaneously
-            foilview_utils.safeExecute(@() doSetXYZPosition(), 'setXYZPosition');
+            FoilviewUtils.safeExecute(@() doSetXYZPosition(), 'setXYZPosition');
             
             function doSetXYZPosition()
                 if obj.SimulationMode
@@ -252,7 +252,7 @@ classdef foilview_controller < handle
         end
         
         function success = resetPosition(obj)
-            success = foilview_utils.safeExecuteWithReturn(@() doResetPosition(), 'resetPosition', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doResetPosition(), 'resetPosition', false);
             
             function success = doResetPosition()
                 oldPosition = obj.CurrentPosition;
@@ -265,7 +265,7 @@ classdef foilview_controller < handle
         
         function refreshPosition(obj)
             if obj.shouldRefreshPosition()
-                foilview_utils.safeExecute(@() doRefreshPosition(), 'refreshPosition');
+                FoilviewUtils.safeExecute(@() doRefreshPosition(), 'refreshPosition');
             end
             
             function doRefreshPosition()
@@ -284,7 +284,7 @@ classdef foilview_controller < handle
         end
         
         function updateMetric(obj)
-            foilview_utils.safeExecute(@() doUpdateMetric(), 'updateMetric');
+            FoilviewUtils.safeExecute(@() doUpdateMetric(), 'updateMetric');
             
             function doUpdateMetric()
                 % Preallocate AllMetrics structure
@@ -369,7 +369,7 @@ classdef foilview_controller < handle
                 obj.AutoStepMetrics = struct('Positions', [], 'Values', struct());
             end
             
-            obj.AutoTimer = foilview_utils.createTimer('fixedRate', delay, ...
+            obj.AutoTimer = FoilviewUtils.createTimer('fixedRate', delay, ...
                 @(~,~) obj.executeAutoStep(stepSize));
             
             start(obj.AutoTimer);
@@ -379,10 +379,10 @@ classdef foilview_controller < handle
         end
         
         function stopAutoStepping(obj)
-            foilview_utils.safeExecute(@() doStop(), 'stopAutoStepping');
+            FoilviewUtils.safeExecute(@() doStop(), 'stopAutoStepping');
             
             function doStop()
-                foilview_utils.safeStopTimer(obj.AutoTimer);
+                FoilviewUtils.safeStopTimer(obj.AutoTimer);
                 obj.AutoTimer = [];
                 obj.IsAutoRunning = false;
                 obj.notifyStatusChanged();
@@ -445,7 +445,7 @@ classdef foilview_controller < handle
         
         function success = startAutoSteppingWithValidation(obj, app, autoControls, plotManager)
             % Start the auto-stepping sequence with comprehensive validation
-            success = foilview_utils.safeExecuteWithReturn(@() doStartAutoStepping(), ...
+            success = FoilviewUtils.safeExecuteWithReturn(@() doStartAutoStepping(), ...
                 'startAutoSteppingWithValidation', false);
             
             function success = doStartAutoStepping()
@@ -484,14 +484,14 @@ classdef foilview_controller < handle
         
         function success = markCurrentPositionWithValidation(obj, uiFigure, label, updateCallback)
             % Enhanced position marking with validation and error handling
-            success = foilview_utils.safeExecuteWithReturn(@() doMarkPosition(), ...
+            success = FoilviewUtils.safeExecuteWithReturn(@() doMarkPosition(), ...
                 'markCurrentPositionWithValidation', false);
             
             function success = doMarkPosition()
                 success = false;
                 
                 % Validate label using centralized validation
-                [valid, errorMsg] = foilview_utils.validateStringInput(label, ...
+                [valid, errorMsg] = FoilviewUtils.validateStringInput(label, ...
                     obj.MIN_LABEL_LENGTH, obj.MAX_LABEL_LENGTH, ...
                     obj.LABEL_INVALID_CHARS, 'Label');
                 if ~valid
@@ -507,7 +507,7 @@ classdef foilview_controller < handle
         
         function success = goToMarkedPositionWithValidation(obj, index)
             % Enhanced position navigation with safety checks
-            success = foilview_utils.safeExecuteWithReturn(@() doGoToPosition(), ...
+            success = FoilviewUtils.safeExecuteWithReturn(@() doGoToPosition(), ...
                 'goToMarkedPositionWithValidation', false);
             
             function success = doGoToPosition()
@@ -530,7 +530,7 @@ classdef foilview_controller < handle
         
         function success = deleteMarkedPositionWithValidation(obj, index, updateCallback)
             % Enhanced bookmark deletion with validation
-            success = foilview_utils.safeExecuteWithReturn(@() doDeletePosition(), ...
+            success = FoilviewUtils.safeExecuteWithReturn(@() doDeletePosition(), ...
                 'deleteMarkedPositionWithValidation', false);
             
             function success = doDeletePosition()
@@ -549,7 +549,7 @@ classdef foilview_controller < handle
         
         function success = moveStageManual(obj, stepSize, direction)
             % Enhanced manual stage movement with validation
-            success = foilview_utils.safeExecuteWithReturn(@() doMoveStage(), ...
+            success = FoilviewUtils.safeExecuteWithReturn(@() doMoveStage(), ...
                 'moveStageManual', false);
             
             function success = doMoveStage()
@@ -567,7 +567,7 @@ classdef foilview_controller < handle
         
         function success = refreshConnection(obj)
             % Enhanced connection refresh with return value
-            success = foilview_utils.safeExecuteWithReturn(@() doRefresh(), ...
+            success = FoilviewUtils.safeExecuteWithReturn(@() doRefresh(), ...
                 'refreshConnection', false);
             
             function success = doRefresh()
@@ -578,7 +578,7 @@ classdef foilview_controller < handle
         
         function success = setMetricTypeWithValidation(obj, metricType)
             % Enhanced metric type setting with validation
-            success = foilview_utils.safeExecuteWithReturn(@() doSetMetricType(), ...
+            success = FoilviewUtils.safeExecuteWithReturn(@() doSetMetricType(), ...
                 'setMetricTypeWithValidation', false);
             
             function success = doSetMetricType()
@@ -601,12 +601,12 @@ classdef foilview_controller < handle
         
         function syncStepSizes(obj, manualControls, autoControls, sourceValue, isFromManual)
             % Enhanced step size synchronization with validation
-            foilview_utils.safeExecute(@() doSync(), 'syncStepSizes');
+            FoilviewUtils.safeExecute(@() doSync(), 'syncStepSizes');
             
             function doSync()
                 if isFromManual
                     % Manual dropdown changed, update auto field
-                    stepValue = foilview_utils.extractStepSizeFromString(sourceValue);
+                    stepValue = FoilviewUtils.extractStepSizeFromString(sourceValue);
                     if ~isnan(stepValue) && stepValue > 0
                         autoControls.StepField.Value = stepValue;
                     end
@@ -615,7 +615,7 @@ classdef foilview_controller < handle
                     newStepSize = sourceValue;
                     if isnumeric(newStepSize) && newStepSize > 0
                         [~, idx] = min(abs(obj.STEP_SIZES - newStepSize));
-                        targetValue = foilview_utils.formatPosition(obj.STEP_SIZES(idx));
+                        targetValue = FoilviewUtils.formatPosition(obj.STEP_SIZES(idx));
                         if ismember(targetValue, manualControls.StepSizeDropdown.Items)
                             manualControls.StepSizeDropdown.Value = targetValue;
                         end
@@ -626,7 +626,7 @@ classdef foilview_controller < handle
         
         function setAutoDirectionWithValidation(obj, autoControls, direction)
             % Enhanced direction setting with validation and visual feedback using utilities
-            foilview_utils.safeExecute(@() doSetDirection(), 'setAutoDirectionWithValidation');
+            FoilviewUtils.safeExecute(@() doSetDirection(), 'setAutoDirectionWithValidation');
             
             function doSetDirection()
                 if ~isnumeric(direction) || ~ismember(direction, [-1, 1])
@@ -720,7 +720,7 @@ classdef foilview_controller < handle
         function should = shouldRefreshPosition(obj)
             should = ~obj.SimulationMode && ...
                      ~obj.IsAutoRunning && ...
-                     foilview_utils.validateUIComponent(obj.etZPos);
+                     FoilviewUtils.validateUIComponent(obj.etZPos);
         end
         
         function handleConnectionLoss(obj)
@@ -729,7 +729,7 @@ classdef foilview_controller < handle
         end
         
         function executeAutoStep(obj, stepSize)
-            foilview_utils.safeExecute(@() doExecuteStep(), 'executeAutoStep');
+            FoilviewUtils.safeExecute(@() doExecuteStep(), 'executeAutoStep');
             
             function doExecuteStep()
                 % Check if controller is still valid and auto running
@@ -749,7 +749,7 @@ classdef foilview_controller < handle
         
         function pixelData = getImageData(obj)
             pixelData = [];
-            foilview_utils.safeExecute(@() doGetImageData(), 'getImageData', true);  % Suppress errors
+            FoilviewUtils.safeExecute(@() doGetImageData(), 'getImageData', true);  % Suppress errors
             
             function doGetImageData()
                 if ~isempty(obj.hSI) && isprop(obj.hSI, 'hDisplay')
@@ -893,7 +893,7 @@ classdef foilview_controller < handle
             end
             
             % Clean up any timers using centralized utility
-            foilview_utils.safeStopTimer(obj.AutoTimer);
+            FoilviewUtils.safeStopTimer(obj.AutoTimer);
             obj.AutoTimer = [];
         end
         
@@ -931,7 +931,7 @@ classdef foilview_controller < handle
         
         function success = validatePosition(obj, position)
             % Use centralized validation utilities
-            success = foilview_utils.validateNumericRange(position, obj.MIN_POSITION, obj.MAX_POSITION, 'Position');
+            success = FoilviewUtils.validateNumericRange(position, obj.MIN_POSITION, obj.MAX_POSITION, 'Position');
         end
         
         function handleMovementError(obj, e, microns)
@@ -965,7 +965,7 @@ classdef foilview_controller < handle
             delay = autoControls.DelayField.Value;
             
             % Validate step size using utility
-            if ~foilview_utils.validateNumericRange(stepSize, obj.MIN_STEP_SIZE, obj.MAX_STEP_SIZE, 'Step size')
+            if ~FoilviewUtils.validateNumericRange(stepSize, obj.MIN_STEP_SIZE, obj.MAX_STEP_SIZE, 'Step size')
                 valid = false;
                 errorMsg = sprintf('Step size must be between %.3f and %.1f μm', ...
                     obj.MIN_STEP_SIZE, obj.MAX_STEP_SIZE);
@@ -973,7 +973,7 @@ classdef foilview_controller < handle
             end
             
             % Validate number of steps using utility
-            if ~foilview_utils.validateInteger(numSteps, obj.MIN_AUTO_STEPS, obj.MAX_AUTO_STEPS, 'Number of steps')
+            if ~FoilviewUtils.validateInteger(numSteps, obj.MIN_AUTO_STEPS, obj.MAX_AUTO_STEPS, 'Number of steps')
                 valid = false;
                 errorMsg = sprintf('Number of steps must be between %d and %d', ...
                     obj.MIN_AUTO_STEPS, obj.MAX_AUTO_STEPS);
@@ -981,7 +981,7 @@ classdef foilview_controller < handle
             end
             
             % Validate delay using utility
-            if ~foilview_utils.validateNumericRange(delay, obj.MIN_AUTO_DELAY, obj.MAX_AUTO_DELAY, 'Delay')
+            if ~FoilviewUtils.validateNumericRange(delay, obj.MIN_AUTO_DELAY, obj.MAX_AUTO_DELAY, 'Delay')
                 valid = false;
                 errorMsg = sprintf('Delay must be between %.1f and %.1f seconds', ...
                     obj.MIN_AUTO_DELAY, obj.MAX_AUTO_DELAY);
@@ -991,7 +991,7 @@ classdef foilview_controller < handle
         
         function [valid, errorMsg] = validateLabel(obj, label)
             % Use centralized string validation
-            [valid, errorMsg] = foilview_utils.validateStringInput(label, ...
+            [valid, errorMsg] = FoilviewUtils.validateStringInput(label, ...
                 obj.MIN_LABEL_LENGTH, obj.MAX_LABEL_LENGTH, ...
                 obj.LABEL_INVALID_CHARS, 'Label');
         end

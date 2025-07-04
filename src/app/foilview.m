@@ -17,8 +17,8 @@ classdef foilview < matlab.apps.AppBase
     end
     
     properties (Access = public)
-        Controller                  foilview_controller
-        PlotManager                 ui_components
+        Controller                  FoilviewController
+        PlotManager                 UiComponents
         StageViewApp
         BookmarksViewApp
     end
@@ -33,7 +33,7 @@ classdef foilview < matlab.apps.AppBase
     
     methods (Access = public)
         function app = foilview()
-            components = ui_components.createAllComponents(app);
+            components = UiComponents.createAllComponents(app);
             app.copyComponentsFromStruct(components);
             app.setupCallbacks();
             app.initializeApplication();
@@ -65,8 +65,8 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function initializeApplication(app)
-            app.Controller = foilview_controller();
-            app.PlotManager = ui_components(app);
+            app.Controller = FoilviewController();
+            app.PlotManager = UiComponents(app);
             
             addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
             addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
@@ -74,7 +74,7 @@ classdef foilview < matlab.apps.AppBase
             addlistener(app.Controller, 'AutoStepComplete', @(src,evt) app.onControllerAutoStepComplete());
             
             app.PlotManager.initializeMetricsPlot(app.MetricsPlotControls.Axes);
-            ui_components.updateAllUI(app);
+            UiComponents.updateAllUI(app);
             app.updateAutoStepStatus();
             app.updateDirectionButtons();
             app.launchStageView();
@@ -86,14 +86,14 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function startRefreshTimer(app)
-            app.RefreshTimer = foilview_utils.createTimer('fixedRate', ...
+            app.RefreshTimer = FoilviewUtils.createTimer('fixedRate', ...
                 app.Controller.POSITION_REFRESH_PERIOD, ...
                 @(~,~) app.Controller.refreshPosition());
             start(app.RefreshTimer);
         end
         
         function startMetricTimer(app)
-            app.MetricTimer = foilview_utils.createTimer('fixedRate', ...
+            app.MetricTimer = FoilviewUtils.createTimer('fixedRate', ...
                 app.Controller.METRIC_REFRESH_PERIOD, ...
                 @(~,~) app.Controller.updateMetric());
             start(app.MetricTimer);
@@ -101,7 +101,7 @@ classdef foilview < matlab.apps.AppBase
         
         function startResizeMonitorTimer(app)
             % Monitor window size changes and adjust UI responsively
-            app.ResizeMonitorTimer = foilview_utils.createTimer('fixedRate', ...
+            app.ResizeMonitorTimer = FoilviewUtils.createTimer('fixedRate', ...
                 0.5, ...  % Check every 0.5 seconds
                 @(~,~) app.monitorWindowResize());
             
@@ -202,19 +202,19 @@ classdef foilview < matlab.apps.AppBase
 
     methods (Access = private)
         function onControllerStatusChanged(app)
-            ui_components.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller);
+            UiComponents.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller);
         end
         
         function onControllerPositionChanged(app)
-            ui_components.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller);
+            UiComponents.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller);
         end
         
         function onControllerMetricChanged(app)
-            ui_components.updateMetricDisplay(app.MetricDisplay, app.Controller);
+            UiComponents.updateMetricDisplay(app.MetricDisplay, app.Controller);
         end
         
         function onControllerAutoStepComplete(app)
-            ui_components.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
+            UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
             % If metrics were recorded, update the plot and expand the GUI
             if app.Controller.RecordMetrics
                 metrics = app.Controller.getAutoStepMetrics();
@@ -304,7 +304,7 @@ classdef foilview < matlab.apps.AppBase
             else
                 app.Controller.startAutoSteppingWithValidation(app, app.AutoControls, app.PlotManager);
             end
-            ui_components.updateAllUI(app);
+            UiComponents.updateAllUI(app);
             app.updateAutoStepStatus();
             app.updateDirectionButtons();
         end
@@ -360,7 +360,7 @@ classdef foilview < matlab.apps.AppBase
             end
             app.StageViewApp = [];
             
-            foilview_utils.safeStopTimer(app.ResizeMonitorTimer);
+            FoilviewUtils.safeStopTimer(app.ResizeMonitorTimer);
             app.ResizeMonitorTimer = [];
         end
         
@@ -401,7 +401,7 @@ classdef foilview < matlab.apps.AppBase
             app.ManualControls.StepSizeDisplay.Text = sprintf('%.1fμm', newStepSize);
             
             % Update hidden dropdown for compatibility
-            formattedValue = foilview_utils.formatPosition(newStepSize);
+            formattedValue = FoilviewUtils.formatPosition(newStepSize);
             if ismember(formattedValue, app.ManualControls.StepSizeDropdown.Items)
                 app.ManualControls.StepSizeDropdown.Value = formattedValue;
             end
@@ -411,7 +411,7 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function updateAutoStepStatus(app)
-            ui_components.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
+            UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
         end
         
         function updateDirectionButtons(app)
@@ -520,7 +520,7 @@ classdef foilview < matlab.apps.AppBase
                     
                     % Calculate scaling based on height change only
                     heightBasedSize = [currentSize(1:2), app.LastWindowSize(3), currentSize(4)];
-                    ui_components.adjustFontSizes(components, heightBasedSize);
+                    UiComponents.adjustFontSizes(components, heightBasedSize);
                     
                 catch ME
                     % Log errors for debugging but don't crash
@@ -538,7 +538,7 @@ classdef foilview < matlab.apps.AppBase
                         
                         % Only adjust if we have reasonable window dimensions
                         if currentSize(3) > 400 && currentSize(4) > 200
-                            ui_components.adjustPlotPosition(app.UIFigure, ...
+                            UiComponents.adjustPlotPosition(app.UIFigure, ...
                                 app.MetricsPlotControls.Panel, 400);
                             
                             % Ensure plot panel stays visible
@@ -558,13 +558,13 @@ classdef foilview < matlab.apps.AppBase
         
         function stopTimers(app)
             % Stop and delete all timers
-            foilview_utils.safeStopTimer(app.RefreshTimer);
+            FoilviewUtils.safeStopTimer(app.RefreshTimer);
             app.RefreshTimer = [];
             
-            foilview_utils.safeStopTimer(app.MetricTimer);
+            FoilviewUtils.safeStopTimer(app.MetricTimer);
             app.MetricTimer = [];
             
-            foilview_utils.safeStopTimer(app.ResizeMonitorTimer);
+            FoilviewUtils.safeStopTimer(app.ResizeMonitorTimer);
             app.ResizeMonitorTimer = [];
         end
         

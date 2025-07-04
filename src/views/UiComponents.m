@@ -4,7 +4,7 @@
 % - UI updates and state management  
 % - Plot functionality and visualization
 
-classdef ui_components < handle
+classdef UiComponents < handle
     
     properties (Constant, Access = public)
         MIN_WINDOW_WIDTH = 280
@@ -29,7 +29,7 @@ classdef ui_components < handle
     
     methods (Static)
         function components = createAllComponents(app)
-            creator = ui_components();
+            creator = UiComponents();
             components = struct();
             
             [components.UIFigure, components.MainPanel, components.MainLayout] = ...
@@ -68,8 +68,8 @@ classdef ui_components < handle
                 return;
             end
             
-            widthScale = windowSize(3) / ui_components.DEFAULT_WINDOW_WIDTH;
-            heightScale = windowSize(4) / ui_components.DEFAULT_WINDOW_HEIGHT;
+            widthScale = windowSize(3) / UiComponents.DEFAULT_WINDOW_WIDTH;
+            heightScale = windowSize(4) / UiComponents.DEFAULT_WINDOW_HEIGHT;
             overallScale = min(max(sqrt(widthScale * heightScale), 0.7), 1.5);
             
             if isfield(components, 'PositionDisplay') && isfield(components.PositionDisplay, 'Label')
@@ -86,7 +86,7 @@ classdef ui_components < handle
                     fontFields = {'AutoControls', 'ManualControls', 'MetricDisplay', 'StatusControls'};
                     for i = 1:length(fontFields)
                         if isfield(components, fontFields{i})
-                            ui_components.adjustControlFonts(components.(fontFields{i}), overallScale);
+                            UiComponents.adjustControlFonts(components.(fontFields{i}), overallScale);
                         end
                     end
                 catch
@@ -119,10 +119,10 @@ classdef ui_components < handle
             % Creates a cell array of function handles for UI updates.
             % This avoids recreating the array on every throttled update call.
             functions = {
-                @() ui_components.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller), ...
-                @() ui_components.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller), ...
-                @() ui_components.updateControlStates(app.ManualControls, app.AutoControls, app.Controller), ...
-                @() ui_components.updateMetricDisplay(app.MetricDisplay, app.Controller)
+                @() UiComponents.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller), ...
+                @() UiComponents.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller), ...
+                @() UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller), ...
+                @() UiComponents.updateMetricDisplay(app.MetricDisplay, app.Controller)
             };
         end
         
@@ -132,8 +132,8 @@ classdef ui_components < handle
             % Returns a bookmarks app instance that can be managed separately
             
             if nargin < 1 || isempty(controller)
-                error('ui_components:NoController', ...
-                      'A foilview_controller instance is required');
+                error('UiComponents:NoController', ...
+                      'A FoilviewController instance is required');
             end
             
             % Create the bookmarks app instance using the new class
@@ -151,40 +151,40 @@ classdef ui_components < handle
         
         % ===== UI UPDATE METHODS (formerly foilview_updater) =====
         function success = updateAllUI(app)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateAll(app), 'updateAllUI', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdateAll(app), 'updateAllUI', false);
             
             function success = doUpdateAll(app)
                 persistent lastUpdateTime updateFunctions;
                 if isempty(lastUpdateTime)
                     lastUpdateTime = 0;
-                    updateFunctions = ui_components.createUpdateFunctions(app);
+                    updateFunctions = UiComponents.createUpdateFunctions(app);
                 end
                 
-                if ~foilview_utils.shouldThrottleUpdate(lastUpdateTime)
+                if ~FoilviewUtils.shouldThrottleUpdate(lastUpdateTime)
                     success = true;
                     return;
                 end
                 lastUpdateTime = posixtime(datetime('now'));
                                 
-                success = foilview_utils.batchUIUpdate(updateFunctions);
+                success = FoilviewUtils.batchUIUpdate(updateFunctions);
             end
         end
         
         function success = updatePositionDisplay(uiFigure, positionDisplay, controller)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdatePosition(), 'updatePositionDisplay', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdatePosition(), 'updatePositionDisplay', false);
             
             function success = doUpdatePosition()
                 success = false;
                 
-                if ~foilview_utils.validateMultipleComponents(uiFigure, positionDisplay.Label) || isempty(controller)
+                if ~FoilviewUtils.validateMultipleComponents(uiFigure, positionDisplay.Label) || isempty(controller)
                     return;
                 end
                 
-                positionStr = foilview_utils.formatPosition(controller.CurrentPosition, true);
+                positionStr = FoilviewUtils.formatPosition(controller.CurrentPosition, true);
                 positionDisplay.Label.Text = positionStr;
                 
-                baseTitle = ui_components.TEXT.WindowTitle;
-                newTitle = sprintf('%s (%s)', baseTitle, foilview_utils.formatPosition(controller.CurrentPosition));
+                baseTitle = UiComponents.TEXT.WindowTitle;
+                newTitle = sprintf('%s (%s)', baseTitle, FoilviewUtils.formatPosition(controller.CurrentPosition));
                 uiFigure.Name = newTitle;
                 
                 success = true;
@@ -192,12 +192,12 @@ classdef ui_components < handle
         end
         
         function success = updateStatusDisplay(positionDisplay, statusControls, controller)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateStatus(), 'updateStatusDisplay', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdateStatus(), 'updateStatusDisplay', false);
             
             function success = doUpdateStatus()
                 success = false;
                 
-                if ~foilview_utils.validateMultipleComponents(positionDisplay.Status, statusControls.Label) || isempty(controller)
+                if ~FoilviewUtils.validateMultipleComponents(positionDisplay.Status, statusControls.Label) || isempty(controller)
                     return;
                 end
                 
@@ -225,7 +225,7 @@ classdef ui_components < handle
         end
         
         function success = updateControlStates(manualControls, autoControls, controller)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateControlStates(), 'updateControlStates', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdateControlStates(), 'updateControlStates', false);
             
             function success = doUpdateControlStates()
                 success = false;
@@ -236,51 +236,51 @@ classdef ui_components < handle
                 
                 isRunning = controller.IsAutoRunning;
                 
-                ui_components.setControlsEnabled(manualControls, ~isRunning);
+                UiComponents.setControlsEnabled(manualControls, ~isRunning);
                 
                 if isRunning
-                    foilview_utils.setControlEnabled(autoControls, false, 'StepField');
-                    foilview_utils.setControlEnabled(autoControls, false, 'StepsField');
-                    foilview_utils.setControlEnabled(autoControls, false, 'DelayField');
+                    FoilviewUtils.setControlEnabled(autoControls, false, 'StepField');
+                    FoilviewUtils.setControlEnabled(autoControls, false, 'StepsField');
+                    FoilviewUtils.setControlEnabled(autoControls, false, 'DelayField');
                     
-                    foilview_utils.setControlEnabled(autoControls, true, 'DirectionButton');
-                    foilview_utils.setControlEnabled(autoControls, true, 'StartStopButton');
+                    FoilviewUtils.setControlEnabled(autoControls, true, 'DirectionButton');
+                    FoilviewUtils.setControlEnabled(autoControls, true, 'StartStopButton');
                     
-                    ui_components.updateDirectionButtonStyling(autoControls, controller.AutoDirection);
+                    UiComponents.updateDirectionButtonStyling(autoControls, controller.AutoDirection);
                 else
-                    ui_components.setControlsEnabled(autoControls, true);
-                    ui_components.updateDirectionButtonStyling(autoControls, controller.AutoDirection);
+                    UiComponents.setControlsEnabled(autoControls, true);
+                    UiComponents.updateDirectionButtonStyling(autoControls, controller.AutoDirection);
                 end
                 
-                ui_components.updateAutoStepButton(autoControls, isRunning);
+                UiComponents.updateAutoStepButton(autoControls, isRunning);
                 
                 success = true;
             end
         end
         
         function setControlsEnabled(controls, enabled)
-            foilview_utils.safeExecute(@() doSetControls(), 'setControlsEnabled');
+            FoilviewUtils.safeExecute(@() doSetControls(), 'setControlsEnabled');
             
             function doSetControls()
-                controlFields = foilview_utils.getAllControlFields();
-                foilview_utils.setControlsEnabled(controls, enabled, controlFields);
+                controlFields = FoilviewUtils.getAllControlFields();
+                FoilviewUtils.setControlsEnabled(controls, enabled, controlFields);
             end
         end
         
         function success = updateAutoStepButton(autoControls, isRunning)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateButton(), 'updateAutoStepButton', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdateButton(), 'updateAutoStepButton', false);
             
             function success = doUpdateButton()
                 success = false;
                 
-                if ~foilview_utils.validateControlStruct(autoControls, {'StartStopButton'})
+                if ~FoilviewUtils.validateControlStruct(autoControls, {'StartStopButton'})
                     return;
                 end
                 
                 if isRunning
-                    ui_components.applyButtonStyle(autoControls.StartStopButton, 'Danger', 'STOP');
+                    UiComponents.applyButtonStyle(autoControls.StartStopButton, 'Danger', 'STOP');
                 else
-                    ui_components.applyButtonStyle(autoControls.StartStopButton, 'Success', 'START');
+                    UiComponents.applyButtonStyle(autoControls.StartStopButton, 'Success', 'START');
                 end
                 
                 success = true;
@@ -288,19 +288,19 @@ classdef ui_components < handle
         end
         
         function success = updateDirectionButtonStyling(autoControls, direction)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateDirection(), 'updateDirectionButtonStyling', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdateDirection(), 'updateDirectionButtonStyling', false);
             
             function success = doUpdateDirection()
                 success = false;
                 
-                if ~foilview_utils.validateControlStruct(autoControls, {'DirectionButton'})
+                if ~FoilviewUtils.validateControlStruct(autoControls, {'DirectionButton'})
                     return;
                 end
                 
                 if direction == 1
-                    ui_components.applyButtonStyle(autoControls.DirectionButton, 'Success', '▲ UP');
+                    UiComponents.applyButtonStyle(autoControls.DirectionButton, 'Success', '▲ UP');
                 else
-                    ui_components.applyButtonStyle(autoControls.DirectionButton, 'Warning', '▼ DOWN');
+                    UiComponents.applyButtonStyle(autoControls.DirectionButton, 'Warning', '▼ DOWN');
                 end
                 
                 success = true;
@@ -308,17 +308,17 @@ classdef ui_components < handle
         end
         
         function success = updateMetricDisplay(metricDisplay, controller)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateMetric(), 'updateMetricDisplay', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdateMetric(), 'updateMetricDisplay', false);
             
             function success = doUpdateMetric()
                 success = false;
                 
-                if ~foilview_utils.validateControlStruct(metricDisplay, {'Value'}) || isempty(controller)
+                if ~FoilviewUtils.validateControlStruct(metricDisplay, {'Value'}) || isempty(controller)
                     return;
                 end
                 
                 metricValue = controller.CurrentMetric;
-                displayText = foilview_utils.formatMetricValue(metricValue);
+                displayText = FoilviewUtils.formatMetricValue(metricValue);
                 
                 if isnan(metricValue)
                     textColor = [0.5 0.5 0.5];  % TEXT_MUTED_COLOR
@@ -343,19 +343,19 @@ classdef ui_components < handle
         end
         
         function success = updatePlotExpansionState(plotControls, isExpanded)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdateExpansion(), 'updatePlotExpansionState', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdateExpansion(), 'updatePlotExpansionState', false);
             
             function success = doUpdateExpansion()
                 success = false;
                 
-                if ~foilview_utils.validateControlStruct(plotControls, {'ExpandButton'})
+                if ~FoilviewUtils.validateControlStruct(plotControls, {'ExpandButton'})
                     return;
                 end
                 
                 if isExpanded
-                    ui_components.applyButtonStyle(plotControls.ExpandButton, 'Warning', '📊 Hide Plot');
+                    UiComponents.applyButtonStyle(plotControls.ExpandButton, 'Warning', '📊 Hide Plot');
                 else
-                    ui_components.applyButtonStyle(plotControls.ExpandButton, 'Primary', '📊 Show Plot');
+                    UiComponents.applyButtonStyle(plotControls.ExpandButton, 'Primary', '📊 Show Plot');
                 end
                 
                 success = true;
@@ -363,7 +363,7 @@ classdef ui_components < handle
         end
         
         function success = batchUpdate(updateFunctions)
-            success = foilview_utils.batchUIUpdate(updateFunctions);
+            success = FoilviewUtils.batchUIUpdate(updateFunctions);
         end
     end
     
@@ -382,7 +382,7 @@ classdef ui_components < handle
     end
     
     methods
-        function obj = ui_components(app)
+        function obj = UiComponents(app)
             if nargin >= 1 && ~isempty(app)
                 obj.App = app;
                 obj.LastPlotUpdate = 0;
@@ -390,12 +390,12 @@ classdef ui_components < handle
         end
         
         function success = initializeMetricsPlot(obj, axes)
-            success = foilview_utils.safeExecuteWithReturn(@() doInitialize(), 'initializeMetricsPlot', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doInitialize(), 'initializeMetricsPlot', false);
             
             function success = doInitialize()
                 success = false;
                 
-                if ~foilview_utils.validateUIComponent(axes)
+                if ~FoilviewUtils.validateUIComponent(axes)
                     fprintf('Invalid axes provided to initializeMetricsPlot\n');
                     return;
                 end
@@ -415,13 +415,13 @@ classdef ui_components < handle
                         'Color', obj.DEFAULT_COLORS{colorIdx}, ...
                         'Marker', obj.DEFAULT_MARKERS{markerIdx}, ...
                         'LineStyle', '-', ...
-                        'LineWidth', foilview_utils.UI_STYLE.LINE_WIDTH, ...
-                        'MarkerSize', foilview_utils.UI_STYLE.MARKER_SIZE, ...
+                        'LineWidth', FoilviewUtils.UI_STYLE.LINE_WIDTH, ...
+                        'MarkerSize', FoilviewUtils.UI_STYLE.MARKER_SIZE, ...
                         'DisplayName', metricType);
                 end
                 
-                foilview_utils.configureAxes(axes, 'Metrics vs Z Position');
-                foilview_utils.createLegend(axes);
+                FoilviewUtils.configureAxes(axes, 'Metrics vs Z Position');
+                FoilviewUtils.createLegend(axes);
                 
                 drawnow;
                 success = true;
@@ -429,17 +429,17 @@ classdef ui_components < handle
         end
         
         function success = clearMetricsPlot(obj, axes)
-            success = foilview_utils.safeExecuteWithReturn(@() doClear(), 'clearMetricsPlot', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doClear(), 'clearMetricsPlot', false);
             
             function success = doClear()
                 success = false;
                 
-                if ~foilview_utils.validateUIComponent(axes)
+                if ~FoilviewUtils.validateUIComponent(axes)
                     return;
                 end
                 
                 for i = 1:length(obj.MetricsPlotLines)
-                    if ~isempty(obj.MetricsPlotLines{i}) && foilview_utils.validateUIComponent(obj.MetricsPlotLines{i})
+                    if ~isempty(obj.MetricsPlotLines{i}) && FoilviewUtils.validateUIComponent(obj.MetricsPlotLines{i})
                         set(obj.MetricsPlotLines{i}, 'XData', NaN, 'YData', NaN);
                     end
                 end
@@ -447,7 +447,7 @@ classdef ui_components < handle
                 xlim(axes, [0, 1]);
                 ylim(axes, [0, 1]);
                 
-                foilview_utils.configureAxes(axes, 'Metrics vs Z Position');
+                FoilviewUtils.configureAxes(axes, 'Metrics vs Z Position');
                 
                 drawnow;
                 success = true;
@@ -455,17 +455,17 @@ classdef ui_components < handle
         end
         
         function success = updateMetricsPlot(obj, axes, controller)
-            success = foilview_utils.safeExecuteWithReturn(@() doUpdate(), 'updateMetricsPlot', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doUpdate(), 'updateMetricsPlot', false);
             
             function success = doUpdate()
                 success = false;
                 
-                if ~foilview_utils.shouldThrottleUpdate(obj.LastPlotUpdate, foilview_utils.DEFAULT_PLOT_THROTTLE)
+                if ~FoilviewUtils.shouldThrottleUpdate(obj.LastPlotUpdate, FoilviewUtils.DEFAULT_PLOT_THROTTLE)
                     return;
                 end
                 obj.LastPlotUpdate = posixtime(datetime('now'));
                 
-                if ~foilview_utils.validateUIComponent(axes) || isempty(controller)
+                if ~FoilviewUtils.validateUIComponent(axes) || isempty(controller)
                     return;
                 end
                 
@@ -476,12 +476,12 @@ classdef ui_components < handle
                     return;
                 end
                 
-                [limitedPositions, limitedValues] = foilview_utils.limitMetricsData(metrics.Positions, metrics.Values);
+                [limitedPositions, limitedValues] = FoilviewUtils.limitMetricsData(metrics.Positions, metrics.Values);
                 
                 validMetrics = false;
                 metricTypes = {'Std Dev', 'Mean', 'Max'};
                 for i = 1:length(metricTypes)
-                    if i > length(obj.MetricsPlotLines) || ~foilview_utils.validateUIComponent(obj.MetricsPlotLines{i})
+                    if i > length(obj.MetricsPlotLines) || ~FoilviewUtils.validateUIComponent(obj.MetricsPlotLines{i})
                         continue;
                     end
                     
@@ -518,7 +518,7 @@ classdef ui_components < handle
         end
         
         function updateAxisLimits(~, axes, metrics)
-            foilview_utils.safeExecute(@() doUpdateLimits(), 'updateAxisLimits');
+            FoilviewUtils.safeExecute(@() doUpdateLimits(), 'updateAxisLimits');
             
             function doUpdateLimits()
                 xMin = min(metrics.Positions);
@@ -570,16 +570,16 @@ classdef ui_components < handle
                     ylim(axes, [yMin, yMax]);
                 end
                 
-                foilview_utils.setPlotTitle(axes, 'Normalized Metrics vs Z Position', true, ...
+                FoilviewUtils.setPlotTitle(axes, 'Normalized Metrics vs Z Position', true, ...
                     min(metrics.Positions), max(metrics.Positions));
                 
                 ylabel(axes, 'Normalized Metric Value (relative to first)', ...
-                    'FontSize', foilview_utils.UI_STYLE.FONT_SIZE_NORMAL);
+                    'FontSize', FoilviewUtils.UI_STYLE.FONT_SIZE_NORMAL);
             end
         end
         
         function success = expandGUI(obj, uiFigure, mainPanel, plotPanel, expandButton, app)
-            success = foilview_utils.safeExecuteWithReturn(@() doExpand(), 'expandGUI', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doExpand(), 'expandGUI', false);
             
             function success = doExpand()
                 success = false;
@@ -589,7 +589,7 @@ classdef ui_components < handle
                     return;
                 end
                 
-                if ~foilview_utils.validateMultipleComponents(uiFigure, mainPanel, plotPanel)
+                if ~FoilviewUtils.validateMultipleComponents(uiFigure, mainPanel, plotPanel)
                     return;
                 end
                 
@@ -618,13 +618,13 @@ classdef ui_components < handle
                 
                 obj.IsPlotExpanded = true;
                 
-                uiFigure.Name = sprintf('%s - Plot Expanded', ui_components.TEXT.WindowTitle);
+                uiFigure.Name = sprintf('%s - Plot Expanded', UiComponents.TEXT.WindowTitle);
                 success = true;
             end
         end
         
         function success = collapseGUI(obj, uiFigure, ~, plotPanel, expandButton, app)
-            success = foilview_utils.safeExecuteWithReturn(@() doCollapse(), 'collapseGUI', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doCollapse(), 'collapseGUI', false);
             
             function success = doCollapse()
                 if ~obj.IsPlotExpanded
@@ -650,7 +650,7 @@ classdef ui_components < handle
                 
                 obj.IsPlotExpanded = false;
                 
-                uiFigure.Name = ui_components.TEXT.WindowTitle;
+                uiFigure.Name = UiComponents.TEXT.WindowTitle;
                 success = true;
             end
         end
@@ -660,7 +660,7 @@ classdef ui_components < handle
         end
         
         function success = exportPlotData(~, uiFigure, controller)
-            success = foilview_utils.safeExecuteWithReturn(@() doExport(), 'exportPlotData', false);
+            success = FoilviewUtils.safeExecuteWithReturn(@() doExport(), 'exportPlotData', false);
             
             function success = doExport()
                 success = false;
@@ -861,12 +861,12 @@ classdef ui_components < handle
             manualControls.ZeroButton = obj.createStyledButton(grid, 'primary', 'ZERO', [], [1, 6]);
             
             manualControls.StepSizeDropdown = uidropdown(grid);
-            manualControls.StepSizeDropdown.Items = foilview_utils.formatStepSizeItems(foilview_controller.STEP_SIZES);
-            manualControls.StepSizeDropdown.Value = foilview_utils.formatPosition(foilview_controller.DEFAULT_STEP_SIZE);
+            manualControls.StepSizeDropdown.Items = FoilviewUtils.formatStepSizeItems(FoilviewController.STEP_SIZES);
+            manualControls.StepSizeDropdown.Value = FoilviewUtils.formatPosition(FoilviewController.DEFAULT_STEP_SIZE);
             manualControls.StepSizeDropdown.Visible = 'off';
             
-            manualControls.StepSizes = foilview_controller.STEP_SIZES;
-            manualControls.CurrentStepIndex = find(manualControls.StepSizes == foilview_controller.DEFAULT_STEP_SIZE, 1);
+            manualControls.StepSizes = FoilviewController.STEP_SIZES;
+            manualControls.CurrentStepIndex = find(manualControls.StepSizes == FoilviewController.DEFAULT_STEP_SIZE, 1);
         end
         
         function autoControls = createAutoStepContainer(obj, mainLayout, ~)
@@ -888,21 +888,21 @@ classdef ui_components < handle
             autoControls.StartStopButton = obj.createStyledButton(grid, 'success', 'START ▲', [], [1, 1]);
             
             autoControls.StepField = uieditfield(grid, 'numeric');
-            autoControls.StepField.Value = foilview_controller.DEFAULT_AUTO_STEP;
+            autoControls.StepField.Value = FoilviewController.DEFAULT_AUTO_STEP;
             autoControls.StepField.FontSize = 10;
             autoControls.StepField.Layout.Row = 1;
             autoControls.StepField.Layout.Column = 2;
             autoControls.StepField.Tooltip = 'Step size (μm)';
             
             autoControls.StepsField = uieditfield(grid, 'numeric');
-            autoControls.StepsField.Value = foilview_controller.DEFAULT_AUTO_STEPS;
+            autoControls.StepsField.Value = FoilviewController.DEFAULT_AUTO_STEPS;
             autoControls.StepsField.FontSize = 10;
             autoControls.StepsField.Layout.Row = 1;
             autoControls.StepsField.Layout.Column = 3;
             autoControls.StepsField.Tooltip = 'Number of steps';
             
             autoControls.DelayField = uieditfield(grid, 'numeric');
-            autoControls.DelayField.Value = foilview_controller.DEFAULT_AUTO_DELAY;
+            autoControls.DelayField.Value = FoilviewController.DEFAULT_AUTO_DELAY;
             autoControls.DelayField.FontSize = 10;
             autoControls.DelayField.Layout.Row = 1;
             autoControls.DelayField.Layout.Column = 4;
@@ -986,7 +986,7 @@ classdef ui_components < handle
             end
             
             % Apply button styling using the centralized helper
-            ui_components.applyButtonStyle(button, style, text);
+            UiComponents.applyButtonStyle(button, style, text);
         end
     end
     
@@ -999,10 +999,10 @@ classdef ui_components < handle
             % Capitalize first letter of style for consistency with COLORS struct
             styleName = [upper(style(1)), lower(style(2:end))];
 
-            if isfield(ui_components.COLORS, styleName)
-                button.BackgroundColor = ui_components.COLORS.(styleName);
+            if isfield(UiComponents.COLORS, styleName)
+                button.BackgroundColor = UiComponents.COLORS.(styleName);
             else
-                button.BackgroundColor = ui_components.COLORS.Primary; % Default style
+                button.BackgroundColor = UiComponents.COLORS.Primary; % Default style
             end
 
             button.FontColor = [1 1 1]; % White text for all styled buttons

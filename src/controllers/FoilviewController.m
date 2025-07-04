@@ -51,7 +51,6 @@ classdef FoilviewController < handle
         CurrentPosition (1,1) double = 0
         CurrentXPosition (1,1) double = 0
         CurrentYPosition (1,1) double = 0
-        MarkedPositions = struct('Labels', {{}}, 'XPositions', [], 'YPositions', [], 'ZPositions', [], 'Metrics', {{}})
         
         IsAutoRunning (1,1) logical = false
         CurrentStep (1,1) double = 0
@@ -66,25 +65,13 @@ classdef FoilviewController < handle
         
         SimulationMode (1,1) logical = true
         StatusMessage char = ''
+        
+        BookmarkManager
     end
     
 
     properties (Access = private)
-        hSI
-        motorFig
-        etZPos
-        etXPos
-        etYPos
-        Zstep
-        Xstep
-        Ystep
-        Zdec
-        Zinc
-        Xdec
-        Xinc
-        Ydec
-        Yinc
-        
+        ScanImageManager
         AutoTimer
         
         StatusUpdateCallback
@@ -105,6 +92,8 @@ classdef FoilviewController < handle
     methods (Access = public)
         function obj = FoilviewController()
             % Initialize the controller
+            obj.ScanImageManager = ScanImageManager();
+            obj.BookmarkManager = BookmarkManager();
             obj.CurrentMetricType = obj.DEFAULT_METRIC;
             obj.connectToScanImage();
         end
@@ -118,29 +107,15 @@ classdef FoilviewController < handle
     methods (Access = public)
         function connectToScanImage(obj)
             % Establishes connection to ScanImage and initializes motor controls.
-            try
-                if ~obj.isScanImageRunning()
-                    obj.setSimulationMode(true, obj.TEXT.NotRunning);
-                    return;
-                end
-                
-                if ~obj.findMotorControlWindow()
-                    obj.setSimulationMode(true, obj.TEXT.WindowNotFound);
-                    return;
-                end
-                
-                if ~obj.findMotorUIElements()
-                    obj.setSimulationMode(true, obj.TEXT.MissingElements);
-                    return;
-                end
-                
+            [success, message] = obj.ScanImageManager.connect();
+            obj.SimulationMode = ~success;
+            obj.StatusMessage = message;
+            obj.notifyStatusChanged();
+
+            if success
                 % Successfully connected
-                obj.setSimulationMode(false, obj.TEXT.Connected);
-                obj.initializePositionsFromUI();
+                obj.initializePositionsFromManager();
                 obj.notifyPositionChanged();
-                
-            catch ex
-                obj.setSimulationMode(true, ['Error: ' ex.message]);
             end
         end
         
@@ -153,10 +128,11 @@ classdef FoilviewController < handle
             FoilviewUtils.safeExecute(@() doMoveStage(), 'moveStage');
             
             function doMoveStage()
-                axisInfo = struct(...
-                    'posProp', 'CurrentPosition', 'etPos', obj.etZPos, ...
-                    'step', obj.Zstep, 'inc', obj.Zinc, 'dec', obj.Zdec, 'axisName', 'Z');
-                obj.moveAxis(axisInfo, microns);
+                newPos = obj.ScanImageManager.moveStage('Z', microns);
+                obj.CurrentPosition = newPos;
+                fprintf('Z Stage moved %.1f μm to position %.1f μm\n', ...
+                    microns, obj.CurrentPosition);
+                obj.notifyPositionChanged();
             end
         end
         
@@ -169,10 +145,11 @@ classdef FoilviewController < handle
             FoilviewUtils.safeExecute(@() doMoveStageX(), 'moveStageX');
             
             function doMoveStageX()
-                axisInfo = struct(...
-                    'posProp', 'CurrentXPosition', 'etPos', obj.etXPos, ...
-                    'step', obj.Xstep, 'inc', obj.Xinc, 'dec', obj.Xdec, 'axisName', 'X');
-                obj.moveAxis(axisInfo, microns);
+                newPos = obj.ScanImageManager.moveStage('X', microns);
+                obj.CurrentXPosition = newPos;
+                fprintf('X Stage moved %.1f μm to position %.1f μm\n', ...
+                    microns, obj.CurrentXPosition);
+                obj.notifyPositionChanged();
             end
         end
         
@@ -185,10 +162,11 @@ classdef FoilviewController < handle
             FoilviewUtils.safeExecute(@() doMoveStageY(), 'moveStageY');
             
             function doMoveStageY()
-                axisInfo = struct(...
-                    'posProp', 'CurrentYPosition', 'etPos', obj.etYPos, ...
-                    'step', obj.Ystep, 'inc', obj.Yinc, 'dec', obj.Ydec, 'axisName', 'Y');
-                obj.moveAxis(axisInfo, microns);
+                newPos = obj.ScanImageManager.moveStage('Y', microns);
+                obj.CurrentYPosition = newPos;
+                fprintf('Y Stage moved %.1f μm to position %.1f μm\n', ...
+                    microns, obj.CurrentYPosition);
+                obj.notifyPositionChanged();
             end
         end
         
@@ -203,17 +181,18 @@ classdef FoilviewController < handle
             function doSetPosition()
                 if obj.SimulationMode
                     obj.CurrentPosition = position;
+                    obj.notifyPositionChanged();
                 else
                     % Calculate delta
                     delta = position - obj.CurrentPosition;
                     
                     if abs(delta) > obj.POSITION_TOLERANCE
                         obj.moveStage(delta);
-                        return; % moveStage already calls notifyPositionChanged
+                        % moveStage already calls notifyPositionChanged
+                    else
+                        obj.notifyPositionChanged(); % Notify if already at position
                     end
                 end
-                
-                obj.notifyPositionChanged();
             end
         end
         
@@ -222,30 +201,19 @@ classdef FoilviewController < handle
             FoilviewUtils.safeExecute(@() doSetXYZPosition(), 'setXYZPosition');
             
             function doSetXYZPosition()
-                if obj.SimulationMode
-                    obj.CurrentXPosition = xPos;
-                    obj.CurrentYPosition = yPos;
-                    obj.CurrentPosition = zPos;
-                else
-                    % Calculate deltas
-                    deltaX = xPos - obj.CurrentXPosition;
-                    deltaY = yPos - obj.CurrentYPosition;
-                    deltaZ = zPos - obj.CurrentPosition;
-                    
-                    % Move stages if needed
-                    if abs(deltaX) > obj.POSITION_TOLERANCE
-                        obj.moveStageX(deltaX);
-                    end
-                    if abs(deltaY) > obj.POSITION_TOLERANCE
-                        obj.moveStageY(deltaY);
-                    end
-                    if abs(deltaZ) > obj.POSITION_TOLERANCE
-                        obj.moveStage(deltaZ);
-                        return; % moveStage already calls notifyPositionChanged
-                    end
+                % Move stages if needed
+                if abs(xPos - obj.CurrentXPosition) > obj.POSITION_TOLERANCE
+                    obj.moveStageX(xPos - obj.CurrentXPosition);
                 end
-                
-                obj.notifyPositionChanged();
+                if abs(yPos - obj.CurrentYPosition) > obj.POSITION_TOLERANCE
+                    obj.moveStageY(yPos - obj.CurrentYPosition);
+                end
+                if abs(zPos - obj.CurrentPosition) > obj.POSITION_TOLERANCE
+                    obj.moveStage(zPos - obj.CurrentPosition);
+                end
+
+                % Final position update and notification
+                obj.refreshPosition(); % Get final state from manager
                 fprintf('Position set to X:%.1f, Y:%.1f, Z:%.1f μm\n', ...
                        obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition);
             end
@@ -269,12 +237,16 @@ classdef FoilviewController < handle
             end
             
             function doRefreshPosition()
-                % Refresh each axis position using the helper
-                [obj.CurrentPosition, zChanged] = obj.refreshAxisPosition(obj.etZPos, obj.CurrentPosition);
-                [obj.CurrentXPosition, xChanged] = obj.refreshAxisPosition(obj.etXPos, obj.CurrentXPosition);
-                [obj.CurrentYPosition, yChanged] = obj.refreshAxisPosition(obj.etYPos, obj.CurrentYPosition);
+                positions = obj.ScanImageManager.getPositions();
                 
-                % Notify if any position changed
+                xChanged = abs(positions.x - obj.CurrentXPosition) > obj.POSITION_TOLERANCE;
+                yChanged = abs(positions.y - obj.CurrentYPosition) > obj.POSITION_TOLERANCE;
+                zChanged = abs(positions.z - obj.CurrentPosition) > obj.POSITION_TOLERANCE;
+                
+                obj.CurrentXPosition = positions.x;
+                obj.CurrentYPosition = positions.y;
+                obj.CurrentPosition = positions.z;
+                
                 if zChanged || xChanged || yChanged
                     obj.notifyPositionChanged();
                 end
@@ -313,7 +285,7 @@ classdef FoilviewController < handle
                     end
                 else
                     % Get real image data from ScanImage
-                    pixelData = obj.getImageData();
+                    pixelData = obj.ScanImageManager.getImageData();
                     if ~isempty(pixelData)
                         % Calculate all metrics
                         for i = 1:length(obj.METRIC_TYPES)
@@ -396,36 +368,27 @@ classdef FoilviewController < handle
             if isempty(strtrim(label))
                 error('Label cannot be empty');
             end
-            % Use helper to add or replace bookmark
+            
             metricStruct = struct('Type', obj.CurrentMetricType, 'Value', obj.CurrentMetric);
-            obj.addOrReplaceBookmark(label, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition, metricStruct);
+            obj.BookmarkManager.add(label, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition, metricStruct);
 
             fprintf('Position marked: "%s" at X:%.1f, Y:%.1f, Z:%.1f μm (Metric: %.2f)\n', ...
                 label, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition, obj.CurrentMetric);
         end
         
         function goToMarkedPosition(obj, index)
-            if obj.isValidBookmarkIndex(index) && ~obj.IsAutoRunning
-                xPos = obj.MarkedPositions.XPositions(index);
-                yPos = obj.MarkedPositions.YPositions(index);
-                zPos = obj.MarkedPositions.ZPositions(index);
-                label = obj.MarkedPositions.Labels{index};
-                
-                obj.setXYZPosition(xPos, yPos, zPos);
-                fprintf('Moved to bookmark "%s": X:%.1f, Y:%.1f, Z:%.1f μm\n', label, xPos, yPos, zPos);
+            bookmark = obj.BookmarkManager.get(index);
+            if ~isempty(bookmark) && ~obj.IsAutoRunning
+                obj.setXYZPosition(bookmark.X, bookmark.Y, bookmark.Z);
+                fprintf('Moved to bookmark "%s": X:%.1f, Y:%.1f, Z:%.1f μm\n', bookmark.Label, bookmark.X, bookmark.Y, bookmark.Z);
             end
         end
         
         function deleteMarkedPosition(obj, index)
-            if obj.isValidBookmarkIndex(index)
-                label = obj.MarkedPositions.Labels{index};
-                obj.MarkedPositions.Labels(index) = [];
-                obj.MarkedPositions.XPositions(index) = [];
-                obj.MarkedPositions.YPositions(index) = [];
-                obj.MarkedPositions.ZPositions(index) = [];
-                obj.MarkedPositions.Metrics(index) = [];
-                
-                fprintf('Deleted bookmark: "%s"\n', label);
+            bookmark = obj.BookmarkManager.get(index);
+            if ~isempty(bookmark)
+                obj.BookmarkManager.remove(index);
+                fprintf('Deleted bookmark: "%s"\n', bookmark.Label);
             end
         end
         
@@ -511,7 +474,7 @@ classdef FoilviewController < handle
             function success = doGoToPosition()
                 success = false;
                 
-                if ~obj.isValidBookmarkIndex(index)
+                if ~obj.BookmarkManager.isValidIndex(index)
                     fprintf('Invalid bookmark index: %d\n', index);
                     return;
                 end
@@ -534,7 +497,7 @@ classdef FoilviewController < handle
             function success = doDeletePosition()
                 success = false;
                 
-                if ~obj.isValidBookmarkIndex(index)
+                if ~obj.BookmarkManager.isValidIndex(index)
                     fprintf('Invalid bookmark index: %d\n', index);
                     return;
                 end
@@ -664,48 +627,13 @@ classdef FoilviewController < handle
     
 
     methods (Access = private)
-        function isRunning = isScanImageRunning(obj)
-            % Check if ScanImage is running and get the handle.
-            isRunning = evalin('base', 'exist(''hSI'', ''var'') && isobject(hSI)');
-            if isRunning
-                obj.hSI = evalin('base', 'hSI');
-            end
-        end
-
-        function found = findMotorControlWindow(obj)
-            % Find the motor controls window figure.
-            obj.motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
-            found = ~isempty(obj.motorFig);
-        end
-
-        function found = findMotorUIElements(obj)
-            % Find all required motor UI elements.
-            tags = {'etZPos', 'etXPos', 'etYPos', 'Zstep', 'Xstep', 'Ystep', ...
-                    'Zdec', 'Zinc', 'Xdec', 'Xinc', 'Ydec', 'Yinc'};
-            for i = 1:length(tags)
-                obj.(tags{i}) = findall(obj.motorFig, 'Tag', tags{i});
-            end
-            
-            % Z controls are required; X/Y are optional.
-            found = ~any(cellfun(@isempty, {obj.etZPos, obj.Zstep, obj.Zdec, obj.Zinc}));
-        end
-
-        function initializePositionsFromUI(obj)
-            % Read initial X, Y, and Z positions from the UI.
-            obj.CurrentPosition = obj.readUIPosition(obj.etZPos, 0);
-            obj.CurrentXPosition = obj.readUIPosition(obj.etXPos, 0);
-            obj.CurrentYPosition = obj.readUIPosition(obj.etYPos, 0);
-        end
-
-        function pos = readUIPosition(~, handle, defaultValue)
-            % Helper to read and parse a position value from a UI element.
-            if ~isempty(handle)
-                pos = str2double(handle.String);
-                if isnan(pos)
-                    pos = defaultValue;
-                end
-            else
-                pos = defaultValue;
+        function initializePositionsFromManager(obj)
+            % Read initial X, Y, and Z positions from the manager.
+            if ~obj.SimulationMode
+                positions = obj.ScanImageManager.getPositions();
+                obj.CurrentPosition = positions.z;
+                obj.CurrentXPosition = positions.x;
+                obj.CurrentYPosition = positions.y;
             end
         end
 
@@ -716,14 +644,7 @@ classdef FoilviewController < handle
         end
         
         function should = shouldRefreshPosition(obj)
-            should = ~obj.SimulationMode && ...
-                     ~obj.IsAutoRunning && ...
-                     FoilviewUtils.validateUIComponent(obj.etZPos);
-        end
-        
-        function handleConnectionLoss(obj)
-            obj.SimulationMode = true;
-            obj.setSimulationMode(true, obj.TEXT.LostConnection);
+            should = ~obj.SimulationMode && ~obj.IsAutoRunning;
         end
         
         function executeAutoStep(obj, stepSize)
@@ -741,29 +662,6 @@ classdef FoilviewController < handle
                 
                 if obj.CurrentStep >= obj.TotalSteps
                     obj.stopAutoStepping();
-                end
-            end
-        end
-        
-        function pixelData = getImageData(obj)
-            pixelData = [];
-            FoilviewUtils.safeExecute(@() doGetImageData(), 'getImageData', true);  % Suppress errors
-            
-            function doGetImageData()
-                if ~isempty(obj.hSI) && isprop(obj.hSI, 'hDisplay')
-                    % Try to get ROI data array
-                    roiData = obj.hSI.hDisplay.getRoiDataArray();
-                    if ~isempty(roiData) && isprop(roiData(1), 'imageData') && ~isempty(roiData(1).imageData)
-                        pixelData = roiData(1).imageData{1}{1};
-                    end
-                    
-                    % If that fails, try buffer method
-                    if isempty(pixelData) && isprop(obj.hSI.hDisplay, 'stripeDataBuffer')
-                        buffer = obj.hSI.hDisplay.stripeDataBuffer;
-                        if ~isempty(buffer) && iscell(buffer) && ~isempty(buffer{1})
-                            pixelData = buffer{1}.roiData{1}.imageData{1}{1};
-                        end
-                    end
                 end
             end
         end
@@ -820,68 +718,16 @@ classdef FoilviewController < handle
                     values = values(~isnan(values));  % Remove any NaN values
                     
                     % If this is the first value or a new maximum
-                    if isempty(values) || currentValue == max(values)
+                    if isempty(values) || currentValue >= max(values) % Use >= to handle first value
                         % Create a bookmark for this maximum
-                        obj.createMaxBookmark(metricType, currentValue);
+                        obj.BookmarkManager.updateMax(metricType, currentValue, ...
+                            obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition);
+                        
+                        fprintf('Updated max %s bookmark at X:%.1f, Y:%.1f, Z:%.1f μm\n', ...
+                            metricType, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition);
                     end
                 end
             end
-        end
-        
-        function createMaxBookmark(obj, metricType, value)
-            % Create a bookmark for a maximum value
-            label = sprintf('Max %s (%.1f)', metricType, value);
-
-            % Remove any existing bookmark with the same metric type prefix
-            existingIdx = cellfun(@(x) startsWith(x, ['Max ' metricType]), obj.MarkedPositions.Labels);
-            if any(existingIdx)
-                obj.MarkedPositions.Labels(existingIdx) = [];
-                obj.MarkedPositions.XPositions(existingIdx) = [];
-                obj.MarkedPositions.YPositions(existingIdx) = [];
-                obj.MarkedPositions.ZPositions(existingIdx) = [];
-                obj.MarkedPositions.Metrics(existingIdx) = [];
-            end
-
-            metricStruct = struct('Type', metricType, 'Value', value);
-            obj.addOrReplaceBookmark(label, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition, metricStruct);
-
-            fprintf('Created bookmark for maximum %s: %.1f at X:%.1f, Y:%.1f, Z:%.1f μm\n', ...
-                metricType, value, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition);
-        end
-        
-        function addOrReplaceBookmark(obj, label, xPos, yPos, zPos, metricStruct)
-            % Unified helper to add a bookmark, replacing any with the same label.
-            % Ensures MarkedPositions fields are initialized.
-
-            % Remove existing bookmark with identical label
-            existingIdx = strcmp(obj.MarkedPositions.Labels, label);
-            if any(existingIdx)
-                obj.MarkedPositions.Labels(existingIdx) = [];
-                obj.MarkedPositions.XPositions(existingIdx) = [];
-                obj.MarkedPositions.YPositions(existingIdx) = [];
-                obj.MarkedPositions.ZPositions(existingIdx) = [];
-                obj.MarkedPositions.Metrics(existingIdx) = [];
-            end
-
-            % Initialize structure arrays if empty
-            if isempty(obj.MarkedPositions.Labels)
-                obj.MarkedPositions.Labels = {};
-                obj.MarkedPositions.XPositions = [];
-                obj.MarkedPositions.YPositions = [];
-                obj.MarkedPositions.ZPositions = [];
-                obj.MarkedPositions.Metrics = {};
-            end
-
-            % Append new bookmark
-            obj.MarkedPositions.Labels{end+1} = label;
-            obj.MarkedPositions.XPositions(end+1) = xPos;
-            obj.MarkedPositions.YPositions(end+1) = yPos;
-            obj.MarkedPositions.ZPositions(end+1) = zPos;
-            obj.MarkedPositions.Metrics{end+1} = metricStruct;
-        end
-        
-        function valid = isValidBookmarkIndex(obj, index)
-            valid = index >= 1 && index <= length(obj.MarkedPositions.Labels);
         end
         
         function cleanupInternal(obj)
@@ -938,19 +784,6 @@ classdef FoilviewController < handle
             fprintf('Movement error: %.1f μm\n', microns);
         end
         
-        function [newPos, changed] = refreshAxisPosition(~, etHandle, currentPos)
-            % Helper to refresh a single axis position from its UI element.
-            newPos = currentPos;
-            changed = false;
-            if ~isempty(etHandle)
-                pos = str2double(etHandle.String);
-                if ~isnan(pos) && abs(pos - currentPos) > 0.001 % Use tolerance
-                    newPos = pos;
-                    changed = true;
-                end
-            end
-        end
-        
         % ===== VALIDATION METHODS (consolidated from foilview_logic) =====
         
         function [valid, errorMsg] = validateAutoStepParameters(obj, autoControls)
@@ -993,49 +826,6 @@ classdef FoilviewController < handle
                 obj.MIN_LABEL_LENGTH, obj.MAX_LABEL_LENGTH, ...
                 obj.LABEL_INVALID_CHARS, 'Label');
         end
-        
-        function moveAxis(obj, axisInfo, microns)
-            % Private helper to move a generic axis.
-            % axisInfo is a struct with fields: posProp, etPos, step, inc, dec, axisName
-            
-            if obj.SimulationMode || isempty(axisInfo.etPos)
-                obj.(axisInfo.posProp) = obj.(axisInfo.posProp) + microns;
-            else
-                % Set step size in the UI
-                if ~isempty(axisInfo.step)
-                    axisInfo.step.String = num2str(abs(microns));
-                    if isfield(axisInfo.step, 'Callback') && ~isempty(axisInfo.step.Callback)
-                        axisInfo.step.Callback(axisInfo.step, []);
-                    end
-                end
-                
-                % Determine which button to press
-                buttonToPress = [];
-                if microns > 0 && ~isempty(axisInfo.inc)
-                    buttonToPress = axisInfo.inc;
-                elseif microns < 0 && ~isempty(axisInfo.dec)
-                    buttonToPress = axisInfo.dec;
-                end
-                
-                % Trigger the button callback
-                if ~isempty(buttonToPress) && isprop(buttonToPress, 'Callback') && ~isempty(buttonToPress.Callback)
-                    buttonToPress.Callback(buttonToPress, []);
-                end
-                
-                % Pause and read back the new position
-                pause(obj.MOVEMENT_WAIT_TIME);
-                pos = str2double(axisInfo.etPos.String);
-                if ~isnan(pos)
-                    obj.(axisInfo.posProp) = pos;
-                else
-                    obj.(axisInfo.posProp) = obj.(axisInfo.posProp) + microns; % Fallback
-                end
-            end
-            
-            fprintf('%s Stage moved %.1f μm to position %.1f μm\n', ...
-                axisInfo.axisName, microns, obj.(axisInfo.posProp));
-            obj.notifyPositionChanged();
-        end
     end
     
     methods (Access = public)
@@ -1045,3 +835,4 @@ classdef FoilviewController < handle
         end
     end
 end 
+

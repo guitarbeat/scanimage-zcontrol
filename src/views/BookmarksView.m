@@ -197,7 +197,7 @@ classdef BookmarksView < handle
             % Update the bookmarks list display
             if ~isempty(obj.Controller) && isvalid(obj.Controller)
                 try
-                    bookmarks = obj.Controller.MarkedPositions;
+                    bookmarks = obj.Controller.BookmarkManager.MarkedPositions;
                     if isempty(bookmarks.Labels)
                         obj.PositionList.Items = {};
                     else
@@ -327,7 +327,7 @@ classdef BookmarksView < handle
         function label = generateAutoLabel(obj)
             % Generate an auto-numbered bookmark label
             if ~isempty(obj.Controller) && isvalid(obj.Controller)
-                existingLabels = obj.Controller.MarkedPositions.Labels;
+                existingLabels = obj.Controller.BookmarkManager.getLabels();
                 
                 % Find the next available bookmark number
                 bookmarkNum = 1;

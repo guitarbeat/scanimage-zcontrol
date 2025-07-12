@@ -21,6 +21,7 @@ classdef foilview < matlab.apps.AppBase
         PlotManager                 PlotManager
         StageViewApp
         BookmarksViewApp
+        ScanImageManager
     end
     
     properties (Access = private)
@@ -29,6 +30,9 @@ classdef foilview < matlab.apps.AppBase
         ResizeMonitorTimer
         LastWindowSize = [0 0 0 0]
         IgnoreNextResize = false
+        MetadataFile
+        DataDir
+        LastSetupTime
     end
     
     methods (Access = public)
@@ -67,6 +71,7 @@ classdef foilview < matlab.apps.AppBase
         function initializeApplication(app)
             app.Controller = FoilviewController();
             app.PlotManager = PlotManager(app);
+            app.ScanImageManager = ScanImageManager();
             
             addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
             addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
@@ -83,6 +88,9 @@ classdef foilview < matlab.apps.AppBase
             app.startRefreshTimer();
             app.startMetricTimer();
             app.startResizeMonitorTimer();
+            
+            % Initialize ScanImage integration after metadata setup
+            app.ScanImageManager.initialize();
         end
         
         function startRefreshTimer(app)
@@ -188,6 +196,8 @@ classdef foilview < matlab.apps.AppBase
                 createCallbackFcn(app, @app.onBookmarksButtonPushed, true);
             app.StatusControls.StageViewButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onStageViewButtonPushed, true);
+            app.StatusControls.MetadataButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onMetadataButtonPushed, true);
             
             % Plot control callbacks
             app.MetricsPlotControls.ExpandButton.ButtonPushedFcn = ...
@@ -579,6 +589,14 @@ classdef foilview < matlab.apps.AppBase
             % Stop timers
             app.stopTimers();
             
+            % Clean up metadata logging
+            app.cleanupMetadataLogging();
+            
+            % Clean up ScanImage manager
+            if ~isempty(app.ScanImageManager) && isvalid(app.ScanImageManager)
+                app.ScanImageManager.cleanup();
+            end
+            
             % Clean up controller
             if ~isempty(app.Controller) && isvalid(app.Controller)
                 app.Controller.cleanup();
@@ -593,6 +611,246 @@ classdef foilview < matlab.apps.AppBase
             if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp)
                 delete(app.StageViewApp);
                 app.StageViewApp = [];
+            end
+        end
+
+        function cleanupMetadataLogging(app)
+            try
+                metadataFile = app.getMetadataFile();
+                if isempty(metadataFile)
+                    return;
+                end
+                app.generateSessionStats(metadataFile);
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+            end
+        end
+
+        function metadataFile = getMetadataFile(app)
+            try
+                metadataFile = evalin('base', 'metadataFilePath');
+                if ~ischar(metadataFile) || isempty(metadataFile) || ~exist(metadataFile, 'file')
+                    metadataFile = '';
+                end
+            catch
+                metadataFile = '';
+            end
+        end
+
+        function generateSessionStats(app, metadataFile)
+            try
+                content = fileread(metadataFile);
+                lines = regexp(content, '\r?\n', 'split');
+                validLines = lines(~cellfun('isempty', lines));
+                frameCount = max(0, length(validLines)-1);
+                if frameCount > 0
+                    timestamps = app.parseTimestamps(validLines);
+                    duration = app.calculateDuration(timestamps);
+                    if duration > 0
+                        avgFrameRate = frameCount / duration;
+                    else
+                        avgFrameRate = 0;
+                    end
+                    fileInfo = dir(metadataFile);
+                    if ~isempty(fileInfo)
+                        fileSize = fileInfo(1).bytes / 1024;
+                    else
+                        fileSize = 0;
+                    end
+                    app.displaySessionSummary(frameCount, duration, avgFrameRate, fileSize, metadataFile);
+                end
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+            end
+        end
+
+        function timestamps = parseTimestamps(app, lines)
+            timestamps = {};
+            try
+                for i = 2:length(lines)
+                    parts = strsplit(lines{i}, ',');
+                    if length(parts) > 0 && ~isempty(parts{1})
+                        timestamps{end+1} = parts{1};
+                    end
+                end
+            catch
+                % Return whatever we've collected
+            end
+        end
+
+        function duration = calculateDuration(app, timestamps)
+            try
+                if length(timestamps) >= 2
+                    startTime = datenum(timestamps{1}, 'yyyy-mm-dd HH:MM:SS');
+                    endTime = datenum(timestamps{end}, 'yyyy-mm-dd HH:MM:SS');
+                    duration = (endTime - startTime) * 86400;
+                else
+                    duration = 0;
+                end
+            catch
+                duration = 0;
+            end
+        end
+
+        function displaySessionSummary(app, frameCount, duration, avgFrameRate, fileSize, metadataFile)
+            fprintf('\n=== Session Summary ===\n');
+            fprintf('Frames recorded: %d\n', frameCount);
+            if duration >= 60
+                mins = floor(duration / 60);
+                secs = duration - (mins * 60);
+                fprintf('Session duration: %d min %d sec\n', mins, round(secs));
+            else
+                fprintf('Session duration: %.1f sec\n', duration);
+            end
+            if avgFrameRate > 0
+                fprintf('Average frame rate: %.2f frames/sec\n', avgFrameRate);
+            end
+            fprintf('Metadata file: %s\n', metadataFile);
+            fprintf('File size: %.1f KB\n', fileSize);
+        end
+    end
+
+    methods (Access = private)
+        function onMetadataButtonPushed(app, ~, ~)
+            app.initializeMetadataLogging();
+        end
+    end
+
+    methods (Access = private)
+        function initializeMetadataLogging(app)
+            try
+                if ~isempty(app.LastSetupTime) && (now - app.LastSetupTime) < (5/86400)
+                    return;
+                end
+                app.LastSetupTime = now;
+                try
+                    hSI = evalin('base', 'hSI');
+                catch ME
+                    warning('%s: %s', ME.identifier, ME.message);
+                    return;
+                end
+                app.checkBeamSystem(hSI, false);
+                config = app.getConfiguration();
+                baseDir = app.getBaseDirectory(hSI, config);
+                app.DataDir = app.createDataDirectory(baseDir, config);
+                hSI.hScan2D.logFilePath = app.DataDir;
+                app.MetadataFile = fullfile(app.DataDir, config.metadataFileName);
+                app.ensureMetadataFile(app.MetadataFile, config.headers);
+                assignin('base', 'metadataFilePath', app.MetadataFile);
+                assignin('base', 'metadataConfig', config);
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+            end
+        end
+
+        function config = getConfiguration(app)
+            try
+                config = evalin('base', 'metadataConfig');
+                if ~isfield(config, 'baseDir')
+                    config.baseDir = '';
+                end
+            catch
+                config = struct();
+                config.baseDir = '';
+                config.dirFormat = 'yyyy-mm-dd';
+                config.metadataFileName = 'imaging_metadata.csv';
+                config.headers = ['Timestamp,Filename,Scanner,Zoom,FrameRate,Averaging,',...
+                      'Resolution,FOV_um,PowerPercent,PockelsValue,',...
+                      'ModulationVoltage,FeedbackVoltage,PowerWatts,',...
+                      'ZPosition,XPosition,YPosition,Notes\n'];
+            end
+        end
+
+        function baseDir = getBaseDirectory(app, hSI, config)
+            if ~isempty(config.baseDir)
+                baseDir = config.baseDir;
+            elseif ~isempty(hSI.hScan2D.logFilePath)
+                baseDir = fileparts(hSI.hScan2D.logFilePath);
+            else
+                baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Box', 'FOIL', 'Aaron');
+                if ~exist(baseDir, 'dir')
+                    baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Documents');
+                end
+            end
+        end
+
+        function dataDir = createDataDirectory(app, baseDir, config)
+            todayStr = datestr(now, config.dirFormat);
+            dataDir = fullfile(baseDir, todayStr);
+            if ~exist(dataDir, 'dir')
+                [success, msg] = mkdir(dataDir);
+                if ~success
+                    warning('Failed to create directory: %s\nError: %s', dataDir, msg);
+                    dataDir = baseDir;
+                end
+            end
+        end
+
+        function ensureMetadataFile(app, metadataFile, headers)
+            if ~exist(metadataFile, 'file')
+                try
+                    fid = fopen(metadataFile, 'w');
+                    if fid == -1
+                        warning('Failed to create metadata file: %s', metadataFile);
+                        return;
+                    end
+                    fprintf(fid, headers);
+                    fclose(fid);
+                catch ME
+                    if fid ~= -1
+                        fclose(fid);
+                    end
+                    warning('%s: %s', ME.identifier, ME.message);
+                end
+            end
+        end
+
+        function checkBeamSystem(app, hSI, verbose)
+            if nargin < 3
+                verbose = true;
+            end
+            try
+                if verbose
+                    fprintf('\n--- Beam System Diagnostics ---\n');
+                end
+                if ~isprop(hSI, 'hBeams') || isempty(hSI.hBeams)
+                    if verbose
+                        fprintf('❌ No beam control system found\n');
+                    end
+                    return;
+                end
+                if verbose
+                    fprintf('✓ Beam control system detected\n');
+                end
+                if isprop(hSI.hBeams, 'hBeams') && ~isempty(hSI.hBeams.hBeams)
+                    beam = hSI.hBeams.hBeams{1};
+                    if verbose
+                        fprintf('✓ Beam controller type: %s\n', class(beam));
+                    end
+                    if isprop(beam, 'beamBufferSize')
+                        if verbose
+                            fprintf('✓ Beam buffer size: %d\n', beam.beamBufferSize);
+                        end
+                    end
+                    if isprop(beam, 'beamBufferTimeout')
+                        if verbose
+                            fprintf('✓ Beam buffer timeout: %f seconds\n', beam.beamBufferTimeout);
+                            fprintf('  (If timeout errors occur, consider increasing this value)\n');
+                        end
+                    end
+                end
+                if verbose
+                    if isprop(hSI.hBeams, 'hPockels') && ~isempty(hSI.hBeams.hPockels)
+                        fprintf('✓ Pockels cell controller found\n');
+                    else
+                        fprintf('❌ No Pockels cell controller found\n');
+                    end
+                    fprintf('--- End Beam Diagnostics ---\n\n');
+                end
+            catch ME
+                if verbose
+                    fprintf('Error during beam diagnostics: %s\n', ME.message);
+                end
             end
         end
     end

@@ -106,8 +106,8 @@ classdef UiBuilder < handle
         end
 
         function statusControls = createStatusBar(~, mainLayout)
-            statusBar = uigridlayout(mainLayout, [1, 4]);
-            statusBar.ColumnWidth = {'1x', 'fit', 'fit', 'fit'};
+            statusBar = uigridlayout(mainLayout, [1, 5]);
+            statusBar.ColumnWidth = {'1x', 'fit', 'fit', 'fit', 'fit'};
             statusBar.Layout.Row = 6;
 
             statusControls = struct();
@@ -136,6 +136,14 @@ classdef UiBuilder < handle
             statusControls.RefreshButton.Text = '↻';
             statusControls.RefreshButton.FontSize = 11;
             statusControls.RefreshButton.FontWeight = 'bold';
+
+            statusControls.MetadataButton = uibutton(statusBar, 'push');
+            statusControls.MetadataButton.Text = '📝';
+            statusControls.MetadataButton.FontSize = 11;
+            statusControls.MetadataButton.FontWeight = 'bold';
+            statusControls.MetadataButton.Tooltip = 'Initialize Metadata Logging';
+            statusControls.MetadataButton.BackgroundColor = UiComponents.COLORS.Primary;
+            statusControls.MetadataButton.FontColor = [1 1 1];
         end
 
         function manualControls = createManualControlContainer(obj, mainLayout, ~)

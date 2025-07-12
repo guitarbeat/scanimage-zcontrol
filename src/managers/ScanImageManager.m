@@ -8,6 +8,8 @@ classdef ScanImageManager < handle
         MetadataFile
         HSI
         IsInitialized = false
+        SimulationMode = false
+        FoilviewApp
     end
     
     methods (Access = public)
@@ -23,20 +25,32 @@ classdef ScanImageManager < handle
             obj.cleanup();
         end
         
-        function initialize(obj)
+        function initialize(obj, foilviewApp)
             % Initialize the manager and set up event listeners
+            if nargin > 1
+                obj.FoilviewApp = foilviewApp;
+            end
+            
             try
+                % Check if ScanImage is available
                 obj.HSI = evalin('base', 'hSI');
-                obj.MetadataFile = evalin('base', 'metadataFilePath');
+                
+                % Try to get metadata file path, but don't fail if it doesn't exist
+                try
+                    obj.MetadataFile = evalin('base', 'metadataFilePath');
+                catch
+                    obj.MetadataFile = [];
+                end
+                
+                obj.SimulationMode = false;
                 obj.IsInitialized = true;
                 
-                % Set up event listeners for ScanImage
-                if ~isempty(obj.HSI)
-                    addlistener(obj.HSI, 'frameAcquired', @(src, evt) obj.onFrameAcquired(src, evt));
-                    addlistener(obj.HSI, 'acqDone', @(src, evt) obj.onAcquisitionDone(src, evt));
-                end
+                % Note: Event listeners for frameAcquired and acqDone are not set up
+                % as these events may not be available in all ScanImage versions
+                % The application will still function without automatic metadata logging
             catch ME
                 warning('%s: %s', ME.identifier, ME.message);
+                obj.SimulationMode = true;
                 obj.IsInitialized = false;
             end
         end
@@ -51,6 +65,54 @@ classdef ScanImageManager < handle
                 end
             catch ME
                 warning('%s: %s', ME.identifier, ME.message);
+            end
+        end
+        
+        function [success, message] = connect(obj)
+            % connect - Establishes connection to ScanImage
+            % Returns success status and message for compatibility with FoilviewController
+            
+            try
+                fprintf('ScanImageManager: Attempting to connect to ScanImage...\n');
+                
+                % Try to get ScanImage handle
+                obj.HSI = evalin('base', 'hSI');
+                
+                if isempty(obj.HSI)
+                    success = false;
+                    message = 'ScanImage not running';
+                    fprintf('ScanImageManager: %s\n', message);
+                    return;
+                end
+                
+                % Check if it's a valid ScanImage object
+                if ~isobject(obj.HSI) || ~isprop(obj.HSI, 'hScan2D')
+                    success = false;
+                    message = 'Invalid ScanImage handle';
+                    fprintf('ScanImageManager: %s\n', message);
+                    return;
+                end
+                
+                % Try to get metadata file path
+                try
+                    obj.MetadataFile = evalin('base', 'metadataFilePath');
+                catch
+                    obj.MetadataFile = [];
+                end
+                
+                success = true;
+                message = 'Connected to ScanImage';
+                obj.SimulationMode = false;
+                obj.IsInitialized = true;
+                
+                fprintf('ScanImageManager: Successfully connected to ScanImage\n');
+                
+            catch ME
+                success = false;
+                message = sprintf('Connection failed: %s', ME.message);
+                obj.SimulationMode = true;
+                obj.IsInitialized = false;
+                fprintf('ScanImageManager: %s\n', message);
             end
         end
     end
@@ -76,6 +138,14 @@ classdef ScanImageManager < handle
                     return;
                 end
                 obj.LastFrameTime = now;
+                
+                % Handle simulation mode
+                if obj.SimulationMode
+                    if ~isempty(obj.FoilviewApp)
+                        obj.FoilviewApp.collectSimulatedMetadata();
+                    end
+                    return;
+                end
                 
                 % Get handles with minimal overhead
                 if isempty(obj.HSI) || isempty(obj.MetadataFile)
@@ -332,13 +402,22 @@ classdef ScanImageManager < handle
             
             try
                 % Format the metadata string
-                metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,\n',...
-                    metadata.timestamp, metadata.filename, metadata.scanner, ...
-                    metadata.zoom, metadata.frameRate, metadata.averaging,...
-                    metadata.resolution, metadata.fov, metadata.powerPercent, ...
-                    metadata.pockelsValue, metadata.feedbackValue.modulation,...
-                    metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
-                    metadata.zPos, metadata.xPos, metadata.yPos);
+                if isstruct(metadata.feedbackValue)
+                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,\n',...
+                        metadata.timestamp, metadata.filename, metadata.scanner, ...
+                        metadata.zoom, metadata.frameRate, metadata.averaging,...
+                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
+                        metadata.pockelsValue, metadata.feedbackValue.modulation,...
+                        metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
+                        metadata.zPos, metadata.xPos, metadata.yPos);
+                else
+                    % Handle case where feedbackValue is not a struct
+                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,\n',...
+                        metadata.timestamp, metadata.filename, metadata.scanner, ...
+                        metadata.zoom, metadata.frameRate, metadata.averaging,...
+                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
+                        metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos);
+                end
                 
                 if verbose
                     fprintf('Writing to file: %s\n', metadataFile);
@@ -364,6 +443,204 @@ classdef ScanImageManager < handle
         function cleanupMetadataLogging(obj)
             % This method is called when acquisition ends
             % It will be handled by the main foilview app's cleanup method
+        end
+    end
+    
+    methods (Access = public)
+        function positions = getPositions(obj)
+            % getPositions - Get current stage positions from ScanImage
+            % Returns struct with x, y, z positions
+            
+            positions = struct('x', 0, 'y', 0, 'z', 0);
+            
+            try
+                if obj.SimulationMode || isempty(obj.HSI)
+                    % Return simulated positions
+                    positions.x = 0;
+                    positions.y = 0;
+                    positions.z = 0;
+                    return;
+                end
+                
+                % Get positions from ScanImage motors
+                if isprop(obj.HSI, 'hMotors') && ~isempty(obj.HSI.hMotors)
+                    if isprop(obj.HSI.hMotors, 'axesPosition') && ~isempty(obj.HSI.hMotors.axesPosition)
+                        pos = obj.HSI.hMotors.axesPosition;
+                        if numel(pos) >= 3 && all(isfinite(pos))
+                            positions.y = pos(1);
+                            positions.x = pos(2);
+                            positions.z = pos(3);
+                        end
+                    elseif isprop(obj.HSI.hMotors, 'motorPosition') && ~isempty(obj.HSI.hMotors.motorPosition)
+                        pos = obj.HSI.hMotors.motorPosition;
+                        if numel(pos) >= 3 && all(isfinite(pos))
+                            positions.y = pos(1);
+                            positions.x = pos(2);
+                            positions.z = pos(3);
+                        end
+                    end
+                end
+                
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+                % Return default zeros on error
+            end
+        end
+        
+        function newPosition = moveStage(obj, axisName, microns)
+            % moveStage - Move stage by specified amount
+            % Returns new position after movement
+            
+            try
+                if obj.SimulationMode
+                    % Simulate movement
+                    currentPos = obj.getCurrentPosition(axisName);
+                    newPosition = currentPos + microns;
+                    return;
+                end
+                
+                if isempty(obj.HSI)
+                    newPosition = 0;
+                    return;
+                end
+                
+                % Find motor controls window
+                motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
+                if isempty(motorFig)
+                    error('Motor Controls window not found');
+                end
+                
+                % Get UI elements for the specified axis
+                axisInfo = obj.getAxisInfo(motorFig, axisName);
+                if isempty(axisInfo.etPos)
+                    error('Position field not found for axis %s', axisName);
+                end
+                
+                % Set step size
+                if ~isempty(axisInfo.step)
+                    axisInfo.step.String = num2str(abs(microns));
+                    if isprop(axisInfo.step, 'Callback') && ~isempty(axisInfo.step.Callback)
+                        axisInfo.step.Callback(axisInfo.step, []);
+                    end
+                end
+                
+                % Determine which button to press
+                buttonToPress = [];
+                if microns > 0 && ~isempty(axisInfo.inc)
+                    buttonToPress = axisInfo.inc;
+                elseif microns < 0 && ~isempty(axisInfo.dec)
+                    buttonToPress = axisInfo.dec;
+                end
+                
+                % Trigger the button callback
+                if ~isempty(buttonToPress) && isprop(buttonToPress, 'Callback') && ~isempty(buttonToPress.Callback)
+                    buttonToPress.Callback(buttonToPress, []);
+                end
+                
+                % Wait for movement and read back position
+                pause(0.2); % Wait for movement
+                newPosition = str2double(axisInfo.etPos.String);
+                if isnan(newPosition)
+                    newPosition = obj.getCurrentPosition(axisName);
+                end
+                
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+                newPosition = obj.getCurrentPosition(axisName);
+            end
+        end
+        
+        function pixelData = getImageData(obj)
+            % getImageData - Get current image data from ScanImage
+            % Returns pixel data array or empty if not available
+            
+            pixelData = [];
+            
+            try
+                if obj.SimulationMode || isempty(obj.HSI)
+                    return;
+                end
+                
+                if isprop(obj.HSI, 'hDisplay') && ~isempty(obj.HSI.hDisplay)
+                    % Try to get ROI data
+                    roiData = obj.HSI.hDisplay.getRoiDataArray();
+                    if ~isempty(roiData) && isprop(roiData(1), 'imageData') && ~isempty(roiData(1).imageData)
+                        imageData = roiData(1).imageData;
+                        % Check if imageData is a cell array before using brace indexing
+                        if iscell(imageData) && ~isempty(imageData) && iscell(imageData{1})
+                            pixelData = imageData{1}{1};
+                        elseif isnumeric(imageData)
+                            pixelData = imageData;
+                        end
+                    end
+                    
+                    % Fallback to stripe data buffer
+                    if isempty(pixelData) && isprop(obj.HSI.hDisplay, 'stripeDataBuffer')
+                        buffer = obj.HSI.hDisplay.stripeDataBuffer;
+                        if ~isempty(buffer) && iscell(buffer) && ~isempty(buffer{1})
+                            if isfield(buffer{1}, 'roiData') && ~isempty(buffer{1}.roiData)
+                                roiData = buffer{1}.roiData;
+                                if iscell(roiData) && ~isempty(roiData) && isfield(roiData{1}, 'imageData')
+                                    imageData = roiData{1}.imageData;
+                                    if iscell(imageData) && ~isempty(imageData) && iscell(imageData{1})
+                                        pixelData = imageData{1}{1};
+                                    elseif isnumeric(imageData)
+                                        pixelData = imageData;
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+            end
+        end
+        
+    end
+    
+    methods (Access = private)
+        function currentPos = getCurrentPosition(obj, axisName)
+            % getCurrentPosition - Get current position for a specific axis
+            positions = obj.getPositions();
+            switch upper(axisName)
+                case 'X'
+                    currentPos = positions.x;
+                case 'Y'
+                    currentPos = positions.y;
+                case 'Z'
+                    currentPos = positions.z;
+                otherwise
+                    currentPos = 0;
+            end
+        end
+        
+        function axisInfo = getAxisInfo(obj, motorFig, axisName)
+            % getAxisInfo - Get UI elements for a specific axis
+            axisInfo = struct('etPos', [], 'step', [], 'inc', [], 'dec', []);
+            
+            try
+                switch upper(axisName)
+                    case 'X'
+                        axisInfo.etPos = findall(motorFig, 'Tag', 'etXPos');
+                        axisInfo.step = findall(motorFig, 'Tag', 'Xstep');
+                        axisInfo.inc = findall(motorFig, 'Tag', 'Xinc');
+                        axisInfo.dec = findall(motorFig, 'Tag', 'Xdec');
+                    case 'Y'
+                        axisInfo.etPos = findall(motorFig, 'Tag', 'etYPos');
+                        axisInfo.step = findall(motorFig, 'Tag', 'Ystep');
+                        axisInfo.inc = findall(motorFig, 'Tag', 'Yinc');
+                        axisInfo.dec = findall(motorFig, 'Tag', 'Ydec');
+                    case 'Z'
+                        axisInfo.etPos = findall(motorFig, 'Tag', 'etZPos');
+                        axisInfo.step = findall(motorFig, 'Tag', 'Zstep');
+                        axisInfo.inc = findall(motorFig, 'Tag', 'Zinc');
+                        axisInfo.dec = findall(motorFig, 'Tag', 'Zdec');
+                end
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+            end
         end
     end
 end 

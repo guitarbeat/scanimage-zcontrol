@@ -33,6 +33,7 @@ classdef foilview < matlab.apps.AppBase
         MetadataFile
         DataDir
         LastSetupTime
+        MetadataConfig
     end
     
     methods (Access = public)
@@ -90,7 +91,7 @@ classdef foilview < matlab.apps.AppBase
             app.startResizeMonitorTimer();
             
             % Initialize ScanImage integration after metadata setup
-            app.ScanImageManager.initialize();
+            app.ScanImageManager.initialize(app);
         end
         
         function startRefreshTimer(app)
@@ -712,23 +713,161 @@ classdef foilview < matlab.apps.AppBase
 
     methods (Access = private)
         function onMetadataButtonPushed(app, ~, ~)
+            % Check if Controller exists and is valid
+            if isempty(app.Controller) || ~isvalid(app.Controller)
+                return;
+            end
+            
+            % Configure metadata path if not already set
+            if isempty(app.MetadataConfig) || ~isfield(app.MetadataConfig, 'baseDir') || isempty(app.MetadataConfig.baseDir)
+                app.configureMetadataPath();
+            end
+            
             app.initializeMetadataLogging();
+            
+            % In simulation mode, also collect a sample metadata entry for testing
+            if app.Controller.SimulationMode
+                app.collectSimulatedMetadata();
+                fprintf('Sample metadata collected in simulation mode\n');
+            end
         end
-    end
 
-    methods (Access = private)
+        function configureMetadataPath(app)
+            % Open dialog to configure metadata file path
+            try
+                % Get current base directory if available
+                currentDir = '';
+                if ~isempty(app.MetadataConfig) && isfield(app.MetadataConfig, 'baseDir')
+                    currentDir = app.MetadataConfig.baseDir;
+                elseif ~isempty(app.DataDir)
+                    currentDir = fileparts(app.DataDir);
+                else
+                    % Default to user's Documents folder
+                    currentDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Documents');
+                end
+                
+                % Open folder selection dialog
+                selectedDir = uigetdir(currentDir, 'Select Base Directory for Metadata Files');
+                
+                if selectedDir ~= 0  % User didn't cancel
+                    % Initialize or update configuration
+                    if isempty(app.MetadataConfig)
+                        app.MetadataConfig = app.getConfiguration();
+                    end
+                    
+                    app.MetadataConfig.baseDir = selectedDir;
+                    
+                    % Store in workspace for persistence
+                    assignin('base', 'metadataConfig', app.MetadataConfig);
+                    
+                    fprintf('Metadata base directory set to: %s\n', selectedDir);
+                    
+                    % Show confirmation
+                    uialert(app.UIFigure, ...
+                        sprintf('Metadata base directory set to:\n%s\n\nFiles will be saved in date-based subdirectories.', selectedDir), ...
+                        'Configuration Updated', ...
+                        'Icon', 'success');
+                else
+                    fprintf('Metadata path configuration cancelled\n');
+                end
+                
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+                uialert(app.UIFigure, ...
+                    sprintf('Error configuring metadata path:\n%s', ME.message), ...
+                    'Configuration Error', ...
+                    'Icon', 'error');
+            end
+        end
+
+        function config = getConfiguration(app)
+            % Try to get configuration from workspace or use defaults
+            try
+                config = evalin('base', 'metadataConfig');
+                
+                % If found but missing fields, add defaults
+                if ~isfield(config, 'baseDir')
+                    config.baseDir = '';
+                end
+            catch
+                % Create default configuration
+                config = struct();
+                config.baseDir = '';
+                config.dirFormat = 'yyyy-mm-dd';
+                config.metadataFileName = 'imaging_metadata.csv';
+                config.headers = ['Timestamp,Filename,Scanner,Zoom,FrameRate,Averaging,',...
+                              'Resolution,FOV_um,PowerPercent,PockelsValue,',...
+                              'ModulationVoltage,FeedbackVoltage,PowerWatts,',...
+                              'ZPosition,XPosition,YPosition,Notes\n'];
+            end
+        end
+
+        function baseDir = getBaseDirectory(app, hSI, config)
+            % Determine base directory with priority:
+            % 1. Config setting if provided
+            % 2. ScanImage's current path if set
+            % 3. Default Box directory
+            
+            if ~isempty(config.baseDir)
+                baseDir = config.baseDir;
+            elseif ~isempty(hSI.hScan2D.logFilePath)
+                baseDir = fileparts(hSI.hScan2D.logFilePath);
+            else
+                % Default to user's Box directory
+                baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Box', 'FOIL', 'Aaron');
+                
+                % Verify the directory exists, if not, fallback to Documents
+                if ~exist(baseDir, 'dir')
+                    baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Documents');
+                end
+            end
+        end
+
+        function createSimulationMetadataFile(app)
+            % Create metadata file for simulation mode
+            config = app.getConfiguration();
+            
+            % Use configured base directory if available, otherwise use simulation directory
+            if ~isempty(config.baseDir)
+                baseDir = config.baseDir;
+            else
+                baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Documents', 'FoilView_Simulation');
+            end
+            
+            app.DataDir = app.createDataDirectory(baseDir, config);
+            app.MetadataFile = fullfile(app.DataDir, config.metadataFileName);
+            app.ensureMetadataFile(app.MetadataFile, config.headers);
+            assignin('base', 'metadataFilePath', app.MetadataFile);
+            assignin('base', 'metadataConfig', config);
+        end
+
         function initializeMetadataLogging(app)
             try
                 if ~isempty(app.LastSetupTime) && (now - app.LastSetupTime) < (5/86400)
                     return;
                 end
                 app.LastSetupTime = now;
+                
+                % Check if we're in simulation mode
+                isSimulation = app.Controller.SimulationMode;
+                
+                if isSimulation
+                    % Create simulation metadata file
+                    app.createSimulationMetadataFile();
+                    fprintf('Metadata logging initialized in simulation mode\n');
+                    return;
+                end
+                
                 try
                     hSI = evalin('base', 'hSI');
                 catch ME
                     warning('%s: %s', ME.identifier, ME.message);
+                    % Fall back to simulation mode
+                    app.createSimulationMetadataFile();
+                    fprintf('Metadata logging initialized in simulation mode (ScanImage not available)\n');
                     return;
                 end
+                
                 app.checkBeamSystem(hSI, false);
                 config = app.getConfiguration();
                 baseDir = app.getBaseDirectory(hSI, config);
@@ -738,55 +877,115 @@ classdef foilview < matlab.apps.AppBase
                 app.ensureMetadataFile(app.MetadataFile, config.headers);
                 assignin('base', 'metadataFilePath', app.MetadataFile);
                 assignin('base', 'metadataConfig', config);
+                fprintf('Metadata logging initialized successfully\n');
+            catch ME
+                warning('%s: %s', ME.identifier, ME.message);
+                % Fall back to simulation mode
+                app.createSimulationMetadataFile();
+                fprintf('Metadata logging initialized in simulation mode due to error\n');
+            end
+        end
+
+        function collectSimulatedMetadata(app)
+            % Collect simulated metadata for testing
+            try
+                metadata = struct();
+                
+                % Basic info
+                metadata.timestamp = datestr(now, 'yyyy-mm-dd HH:MM:SS');
+                metadata.filename = sprintf('sim_%s.tif', datestr(now, 'yyyymmdd_HHMMSS'));
+                
+                % Simulated scanner and imaging parameters
+                metadata.scanner = 'Simulation';
+                metadata.zoom = 1.0;
+                metadata.frameRate = 30.0;
+                metadata.averaging = 1;
+                metadata.resolution = '512x512';
+                metadata.fov = '100.0x100.0';
+                
+                % Simulated laser power info
+                metadata.powerPercent = 50.0;
+                metadata.pockelsValue = 0.5;
+                metadata.feedbackValue = struct('modulation', '2.5', 'feedback', '1.2', 'power', '0.025');
+                
+                % Current stage position from controller
+                metadata.xPos = app.Controller.CurrentXPosition;
+                metadata.yPos = app.Controller.CurrentYPosition;
+                metadata.zPos = app.Controller.CurrentPosition;
+                
+                % Write to file
+                if ~isempty(app.MetadataFile) && exist(fileparts(app.MetadataFile), 'dir')
+                    app.writeMetadataToFile(metadata, app.MetadataFile, false);
+                end
+                
             catch ME
                 warning('%s: %s', ME.identifier, ME.message);
             end
         end
 
-        function config = getConfiguration(app)
-            try
-                config = evalin('base', 'metadataConfig');
-                if ~isfield(config, 'baseDir')
-                    config.baseDir = '';
-                end
-            catch
-                config = struct();
-                config.baseDir = '';
-                config.dirFormat = 'yyyy-mm-dd';
-                config.metadataFileName = 'imaging_metadata.csv';
-                config.headers = ['Timestamp,Filename,Scanner,Zoom,FrameRate,Averaging,',...
-                      'Resolution,FOV_um,PowerPercent,PockelsValue,',...
-                      'ModulationVoltage,FeedbackVoltage,PowerWatts,',...
-                      'ZPosition,XPosition,YPosition,Notes\n'];
+        function writeMetadataToFile(app, metadata, metadataFile, verbose)
+            if isempty(metadataFile) || ~exist(fileparts(metadataFile), 'dir')
+                return;
             end
-        end
-
-        function baseDir = getBaseDirectory(app, hSI, config)
-            if ~isempty(config.baseDir)
-                baseDir = config.baseDir;
-            elseif ~isempty(hSI.hScan2D.logFilePath)
-                baseDir = fileparts(hSI.hScan2D.logFilePath);
-            else
-                baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Box', 'FOIL', 'Aaron');
-                if ~exist(baseDir, 'dir')
-                    baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Documents');
+            
+            try
+                % Format the metadata string
+                if isstruct(metadata.feedbackValue)
+                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,\n',...
+                        metadata.timestamp, metadata.filename, metadata.scanner, ...
+                        metadata.zoom, metadata.frameRate, metadata.averaging,...
+                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
+                        metadata.pockelsValue, metadata.feedbackValue.modulation,...
+                        metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
+                        metadata.zPos, metadata.xPos, metadata.yPos);
+                else
+                    % Handle case where feedbackValue is not a struct
+                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,\n',...
+                        metadata.timestamp, metadata.filename, metadata.scanner, ...
+                        metadata.zoom, metadata.frameRate, metadata.averaging,...
+                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
+                        metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos);
+                end
+                
+                if verbose
+                    fprintf('Writing to file: %s\n', metadataFile);
+                end
+                
+                % Use a simple fopen/fprintf approach for speed
+                fid = fopen(metadataFile, 'a');
+                if fid == -1
+                    return; % Silently fail if file can't be opened
+                end
+                
+                % Write and close quickly
+                fprintf(fid, metadataStr);
+                fclose(fid);
+            catch
+                % Silently fail for performance reasons
+                if exist('fid', 'var') && fid ~= -1
+                    fclose(fid);
                 end
             end
         end
 
         function dataDir = createDataDirectory(app, baseDir, config)
+            % Create directory using specified date format
             todayStr = datestr(now, config.dirFormat);
             dataDir = fullfile(baseDir, todayStr);
+            
+            % Create directory if it doesn't exist
             if ~exist(dataDir, 'dir')
                 [success, msg] = mkdir(dataDir);
                 if ~success
                     warning('Failed to create directory: %s\nError: %s', dataDir, msg);
+                    % Fallback to base directory if needed
                     dataDir = baseDir;
                 end
             end
         end
 
         function ensureMetadataFile(app, metadataFile, headers)
+            % Create CSV file with headers if it doesn't exist
             if ~exist(metadataFile, 'file')
                 try
                     fid = fopen(metadataFile, 'w');
@@ -806,32 +1005,42 @@ classdef foilview < matlab.apps.AppBase
         end
 
         function checkBeamSystem(app, hSI, verbose)
+            % Diagnostic function to check beam system configuration
             if nargin < 3
-                verbose = true;
+                verbose = true; % Default to verbose output
             end
+            
             try
                 if verbose
                     fprintf('\n--- Beam System Diagnostics ---\n');
                 end
+                
+                % Check if beam control exists
                 if ~isprop(hSI, 'hBeams') || isempty(hSI.hBeams)
                     if verbose
                         fprintf('❌ No beam control system found\n');
                     end
                     return;
                 end
+                
                 if verbose
                     fprintf('✓ Beam control system detected\n');
                 end
+                
+                % Check beam controller type
                 if isprop(hSI.hBeams, 'hBeams') && ~isempty(hSI.hBeams.hBeams)
                     beam = hSI.hBeams.hBeams{1};
                     if verbose
                         fprintf('✓ Beam controller type: %s\n', class(beam));
                     end
+                    
+                    % Check for timing properties
                     if isprop(beam, 'beamBufferSize')
                         if verbose
                             fprintf('✓ Beam buffer size: %d\n', beam.beamBufferSize);
                         end
                     end
+                    
                     if isprop(beam, 'beamBufferTimeout')
                         if verbose
                             fprintf('✓ Beam buffer timeout: %f seconds\n', beam.beamBufferTimeout);
@@ -839,14 +1048,20 @@ classdef foilview < matlab.apps.AppBase
                         end
                     end
                 end
+                
+                % Check for Pockels cell
                 if verbose
                     if isprop(hSI.hBeams, 'hPockels') && ~isempty(hSI.hBeams.hPockels)
                         fprintf('✓ Pockels cell controller found\n');
                     else
                         fprintf('❌ No Pockels cell controller found\n');
                     end
-                    fprintf('--- End Beam Diagnostics ---\n\n');
+                    
+                    if verbose
+                        fprintf('--- End Beam Diagnostics ---\n\n');
+                    end
                 end
+                
             catch ME
                 if verbose
                     fprintf('Error during beam diagnostics: %s\n', ME.message);

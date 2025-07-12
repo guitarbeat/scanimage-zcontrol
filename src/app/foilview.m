@@ -199,6 +199,8 @@ classdef foilview < matlab.apps.AppBase
                 createCallbackFcn(app, @app.onStageViewButtonPushed, true);
             app.StatusControls.MetadataButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onMetadataButtonPushed, true);
+            app.StatusControls.MotorRecoveryButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onMotorRecoveryButtonPushed, true);
             
             % Plot control callbacks
             app.MetricsPlotControls.ExpandButton.ButtonPushedFcn = ...
@@ -245,11 +247,15 @@ classdef foilview < matlab.apps.AppBase
     methods (Access = private)
 
         function onUpButtonPushed(app, varargin)
-            app.Controller.moveStageManual(app.ManualControls, 1);
+            % Extract step size from ManualControls and pass to moveStageManual
+            stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
+            app.Controller.moveStageManual(stepSize, 1);
         end
         
         function onDownButtonPushed(app, varargin)
-            app.Controller.moveStageManual(app.ManualControls, -1);
+            % Extract step size from ManualControls and pass to moveStageManual
+            stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
+            app.Controller.moveStageManual(stepSize, -1);
         end
         
         function onZeroButtonPushed(app, varargin)
@@ -326,6 +332,19 @@ classdef foilview < matlab.apps.AppBase
 
         function onRefreshButtonPushed(app, ~, ~)
             app.Controller.refreshPosition();
+        end
+        
+        function onMotorRecoveryButtonPushed(app, ~, ~)
+            % Attempt to recover from motor error state
+            fprintf('Attempting motor error recovery...\n');
+            success = app.Controller.recoverFromMotorError();
+            if success
+                fprintf('Motor error recovery completed successfully\n');
+                % Refresh position after recovery
+                app.Controller.refreshPosition();
+            else
+                fprintf('Motor error recovery failed. Please check ScanImage Motor Controls manually.\n');
+            end
         end
         
         function onBookmarksButtonPushed(app, ~, ~)

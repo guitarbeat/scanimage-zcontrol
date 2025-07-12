@@ -521,8 +521,59 @@ classdef FoilviewController < handle
                     return;
                 end
                 
+                if ~isnumeric(stepSize) || stepSize <= 0
+                    fprintf('Invalid step size: must be a positive number\n');
+                    return;
+                end
+                
+                fprintf('FoilviewController: Attempting to move stage %.1f μm in direction %d\n', stepSize, direction);
                 obj.moveStage(direction * stepSize);
                 success = true;
+            end
+        end
+        
+        function success = recoverFromMotorError(obj)
+            % recoverFromMotorError - Attempt to recover from motor error state
+            success = FoilviewUtils.safeExecuteWithReturn(@() doRecover(), 'recoverFromMotorError', false);
+            
+            function success = doRecover()
+                success = false;
+                
+                if obj.SimulationMode
+                    fprintf('FoilviewController: No motor error recovery needed in simulation mode\n');
+                    success = true;
+                    return;
+                end
+                
+                try
+                    % Find motor controls window
+                    motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
+                    if isempty(motorFig)
+                        fprintf('FoilviewController: Motor Controls window not found for error recovery\n');
+                        return;
+                    end
+                    
+                    % Check for error state on Z axis
+                    if obj.ScanImageManager.checkMotorErrorState(motorFig, 'Z')
+                        fprintf('FoilviewController: Motor error detected, attempting recovery...\n');
+                        obj.ScanImageManager.clearMotorError(motorFig, 'Z');
+                        pause(1.0); % Give more time for recovery
+                        
+                        % Check if recovery was successful
+                        if ~obj.ScanImageManager.checkMotorErrorState(motorFig, 'Z')
+                            fprintf('FoilviewController: Motor error recovery successful\n');
+                            success = true;
+                        else
+                            fprintf('FoilviewController: Motor error recovery failed\n');
+                        end
+                    else
+                        fprintf('FoilviewController: No motor error detected\n');
+                        success = true;
+                    end
+                    
+                catch ME
+                    fprintf('FoilviewController: Error during motor recovery: %s\n', ME.message);
+                end
             end
         end
         

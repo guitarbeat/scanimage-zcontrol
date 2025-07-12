@@ -144,6 +144,14 @@ classdef UiBuilder < handle
             statusControls.MetadataButton.Tooltip = 'Initialize Metadata Logging';
             statusControls.MetadataButton.BackgroundColor = UiComponents.COLORS.Primary;
             statusControls.MetadataButton.FontColor = [1 1 1];
+            
+            statusControls.MotorRecoveryButton = uibutton(statusBar, 'push');
+            statusControls.MotorRecoveryButton.Text = '🔧';
+            statusControls.MotorRecoveryButton.FontSize = 11;
+            statusControls.MotorRecoveryButton.FontWeight = 'bold';
+            statusControls.MotorRecoveryButton.Tooltip = 'Recover from Motor Error';
+            statusControls.MotorRecoveryButton.BackgroundColor = [0.9 0.6 0.2]; % Warning color
+            statusControls.MotorRecoveryButton.FontColor = [1 1 1];
         end
 
         function manualControls = createManualControlContainer(obj, mainLayout, ~)

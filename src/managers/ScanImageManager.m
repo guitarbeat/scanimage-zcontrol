@@ -496,10 +496,12 @@ classdef ScanImageManager < handle
                     % Simulate movement
                     currentPos = obj.getCurrentPosition(axisName);
                     newPosition = currentPos + microns;
+                    fprintf('Simulation: %s stage moved %.1f μm to position %.1f μm\n', axisName, microns, newPosition);
                     return;
                 end
                 
                 if isempty(obj.HSI)
+                    warning('ScanImageManager: No ScanImage handle available');
                     newPosition = 0;
                     return;
                 end
@@ -507,20 +509,43 @@ classdef ScanImageManager < handle
                 % Find motor controls window
                 motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
                 if isempty(motorFig)
-                    error('Motor Controls window not found');
+                    error('Motor Controls window not found. Please ensure ScanImage Motor Controls window is open.');
+                end
+                
+                % Check for motor error state first
+                if obj.checkMotorErrorState(motorFig, axisName)
+                    fprintf('ScanImageManager: Attempting to clear motor error for %s axis\n', axisName);
+                    obj.clearMotorError(motorFig, axisName);
+                    pause(0.5); % Wait for error to clear
+                    
+                    % Check again after attempting to clear
+                    if obj.checkMotorErrorState(motorFig, axisName)
+                        error('Motor is still in error state for %s axis. Please manually clear the error in ScanImage Motor Controls.', axisName);
+                    end
                 end
                 
                 % Get UI elements for the specified axis
                 axisInfo = obj.getAxisInfo(motorFig, axisName);
                 if isempty(axisInfo.etPos)
-                    error('Position field not found for axis %s', axisName);
+                    error('Position field not found for axis %s. Check if Motor Controls window is properly initialized.', axisName);
+                end
+                
+                % Check current position before movement
+                currentPos = str2double(axisInfo.etPos.String);
+                if isnan(currentPos)
+                    warning('ScanImageManager: Could not read current position for %s axis', axisName);
+                    currentPos = 0;
                 end
                 
                 % Set step size
                 if ~isempty(axisInfo.step)
                     axisInfo.step.String = num2str(abs(microns));
                     if isprop(axisInfo.step, 'Callback') && ~isempty(axisInfo.step.Callback)
-                        axisInfo.step.Callback(axisInfo.step, []);
+                        try
+                            axisInfo.step.Callback(axisInfo.step, []);
+                        catch ME
+                            warning('ScanImageManager: Error setting step size: %s', ME.message);
+                        end
                     end
                 end
                 
@@ -532,20 +557,45 @@ classdef ScanImageManager < handle
                     buttonToPress = axisInfo.dec;
                 end
                 
+                if isempty(buttonToPress)
+                    error('No movement button found for %s axis. Direction: %s, Microns: %.1f', axisName, ...
+                          ternary(microns > 0, 'positive', 'negative'), microns);
+                end
+                
+                % Check if button is enabled before pressing
+                if isprop(buttonToPress, 'Enable') && strcmp(buttonToPress.Enable, 'off')
+                    error('Motor button is disabled. The motor may be in an error state. Please check ScanImage Motor Controls.');
+                end
+                
                 % Trigger the button callback
-                if ~isempty(buttonToPress) && isprop(buttonToPress, 'Callback') && ~isempty(buttonToPress.Callback)
-                    buttonToPress.Callback(buttonToPress, []);
+                if isprop(buttonToPress, 'Callback') && ~isempty(buttonToPress.Callback)
+                    try
+                        buttonToPress.Callback(buttonToPress, []);
+                        fprintf('ScanImageManager: Triggered %s movement of %.1f μm\n', axisName, microns);
+                    catch ME
+                        if contains(ME.message, 'error state')
+                            error('Motor is in error state. Please clear the error in ScanImage Motor Controls before attempting movement.');
+                        else
+                            rethrow(ME);
+                        end
+                    end
+                else
+                    error('Button callback not available for %s axis', axisName);
                 end
                 
                 % Wait for movement and read back position
                 pause(0.2); % Wait for movement
                 newPosition = str2double(axisInfo.etPos.String);
                 if isnan(newPosition)
+                    warning('ScanImageManager: Could not read new position for %s axis, using current position', axisName);
                     newPosition = obj.getCurrentPosition(axisName);
                 end
                 
+                fprintf('ScanImageManager: %s stage moved %.1f μm from %.1f to %.1f μm\n', axisName, microns, currentPos, newPosition);
+                
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                errorMsg = sprintf('Movement error for %s axis: %s', axisName, ME.message);
+                warning('ScanImageManager:MovementError', '%s', errorMsg);
                 newPosition = obj.getCurrentPosition(axisName);
             end
         end
@@ -639,7 +689,76 @@ classdef ScanImageManager < handle
                         axisInfo.dec = findall(motorFig, 'Tag', 'Zdec');
                 end
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                warning('ScanImageManager:GetAxisInfoError', 'Error getting axis info for %s: %s', axisName, ME.message);
+            end
+        end
+        
+        function isError = checkMotorErrorState(obj, motorFig, axisName)
+            % checkMotorErrorState - Check if motor is in error state
+            isError = false;
+            
+            try
+                % Look for error indicators in the motor controls window
+                errorIndicators = findall(motorFig, 'Style', 'text', 'String', '*Error*');
+                if ~isempty(errorIndicators)
+                    isError = true;
+                    fprintf('ScanImageManager: Motor error detected in %s axis\n', axisName);
+                    return;
+                end
+                
+                % Check if movement buttons are disabled
+                axisInfo = obj.getAxisInfo(motorFig, axisName);
+                if ~isempty(axisInfo.inc) && isprop(axisInfo.inc, 'Enable') && strcmp(axisInfo.inc.Enable, 'off')
+                    isError = true;
+                    fprintf('ScanImageManager: Motor buttons disabled for %s axis\n', axisName);
+                    return;
+                end
+                
+                if ~isempty(axisInfo.dec) && isprop(axisInfo.dec, 'Enable') && strcmp(axisInfo.dec.Enable, 'off')
+                    isError = true;
+                    fprintf('ScanImageManager: Motor buttons disabled for %s axis\n', axisName);
+                    return;
+                end
+                
+            catch ME
+                warning('ScanImageManager:CheckMotorErrorError', 'Error checking motor error state: %s', ME.message);
+                isError = true; % Assume error if we can't check
+            end
+        end
+        
+        function clearMotorError(obj, motorFig, axisName)
+            % clearMotorError - Attempt to clear motor error state
+            try
+                % Look for clear/reset buttons
+                clearButtons = findall(motorFig, 'String', 'Clear');
+                if ~isempty(clearButtons)
+                    for i = 1:length(clearButtons)
+                        if isprop(clearButtons(i), 'Callback') && ~isempty(clearButtons(i).Callback)
+                            clearButtons(i).Callback(clearButtons(i), []);
+                            fprintf('ScanImageManager: Attempted to clear motor error for %s axis\n', axisName);
+                            pause(0.5); % Give time for error to clear
+                            return;
+                        end
+                    end
+                end
+                
+                % Look for reset buttons
+                resetButtons = findall(motorFig, 'String', 'Reset');
+                if ~isempty(resetButtons)
+                    for i = 1:length(resetButtons)
+                        if isprop(resetButtons(i), 'Callback') && ~isempty(resetButtons(i).Callback)
+                            resetButtons(i).Callback(resetButtons(i), []);
+                            fprintf('ScanImageManager: Attempted to reset motor for %s axis\n', axisName);
+                            pause(0.5); % Give time for reset
+                            return;
+                        end
+                    end
+                end
+                
+                fprintf('ScanImageManager: No clear/reset buttons found for %s axis\n', axisName);
+                
+            catch ME
+                warning('ScanImageManager:ClearMotorErrorError', 'Error clearing motor error: %s', ME.message);
             end
         end
     end

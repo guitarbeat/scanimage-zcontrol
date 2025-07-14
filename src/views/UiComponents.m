@@ -118,6 +118,8 @@ classdef UiComponents
                 lastUpdateTime = posixtime(datetime('now'));
 
                 success = FoilviewUtils.batchUIUpdate(updateFunctions);
+                % Add direction button update
+                UiComponents.updateDirectionButtons(app);
             end
         end
 
@@ -321,6 +323,56 @@ classdef UiComponents
             if nargin > 2 && ~isempty(text)
                 button.Text = text;
             end
+        end
+
+        function updateDirectionButtons(app)
+            % Update direction button and start button to show current direction
+            direction = app.Controller.AutoDirection;
+            % Update toggle switch to match current direction
+            if isfield(app.AutoControls, 'DirectionSwitch') && ~isempty(app.AutoControls.DirectionSwitch)
+                if direction > 0
+                    app.AutoControls.DirectionSwitch.Value = 'Up';
+                else
+                    app.AutoControls.DirectionSwitch.Value = 'Down';
+                end
+            end
+            % Style direction button based on direction and running state
+            if direction > 0
+                app.AutoControls.DirectionButton.Text = '▲';
+                baseColor = [0.2 0.7 0.3];  % success color
+            else
+                app.AutoControls.DirectionButton.Text = '▼';
+                baseColor = [0.9 0.6 0.2];  % warning color
+            end
+            if app.Controller.IsAutoRunning
+                app.AutoControls.DirectionButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
+            else
+                app.AutoControls.DirectionButton.BackgroundColor = baseColor;
+            end
+            app.AutoControls.DirectionButton.FontColor = [1 1 1];  % white text
+            app.AutoControls.DirectionButton.FontSize = 10;
+            app.AutoControls.DirectionButton.FontWeight = 'bold';
+            % Style start/stop button based on state and direction
+            if direction > 0
+                if app.Controller.IsAutoRunning
+                    app.AutoControls.StartStopButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
+                    app.AutoControls.StartStopButton.Text = 'STOP ▲';
+                else
+                    app.AutoControls.StartStopButton.BackgroundColor = [0.2 0.7 0.3];  % success color
+                    app.AutoControls.StartStopButton.Text = 'START ▲';
+                end
+            else
+                if app.Controller.IsAutoRunning
+                    app.AutoControls.StartStopButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
+                    app.AutoControls.StartStopButton.Text = 'STOP ▼';
+                else
+                    app.AutoControls.StartStopButton.BackgroundColor = [0.2 0.7 0.3];  % success color
+                    app.AutoControls.StartStopButton.Text = 'START ▼';
+                end
+            end
+            app.AutoControls.StartStopButton.FontColor = [1 1 1];  % white text
+            app.AutoControls.StartStopButton.FontSize = 10;
+            app.AutoControls.StartStopButton.FontWeight = 'bold';
         end
     end
 end

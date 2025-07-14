@@ -38,7 +38,7 @@ classdef foilview < matlab.apps.AppBase
     
     methods (Access = public)
         function app = foilview()
-            components = UiBuilder.build(app);
+            components = UiBuilder.build();
             app.copyComponentsFromStruct(components);
             app.setupCallbacks();
             app.initializeApplication();
@@ -85,7 +85,7 @@ classdef foilview < matlab.apps.AppBase
             % Direction buttons now updated via updateAllUI
             app.launchStageView();
             app.launchBookmarksView();
-            % Window status buttons now updated via updateAllUI
+            app.updateWindowStatusButtons();
             app.startRefreshTimer();
             app.startMetricTimer();
             app.startResizeMonitorTimer();
@@ -371,7 +371,7 @@ classdef foilview < matlab.apps.AppBase
                 delete(app.BookmarksViewApp);
                 app.BookmarksViewApp = [];
             end
-            UiComponents.updateAllUI(app);
+            app.updateWindowStatusButtons();
         end
         
         function onStageViewButtonPushed(app, ~, ~)
@@ -381,7 +381,7 @@ classdef foilview < matlab.apps.AppBase
                 delete(app.StageViewApp);
                 app.StageViewApp = [];
             end
-            UiComponents.updateAllUI(app);
+            app.updateWindowStatusButtons();
         end
         
         function onWindowClose(app, varargin)
@@ -466,14 +466,40 @@ classdef foilview < matlab.apps.AppBase
             UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
         end
         
+        function updateWindowStatusButtons(app)
+            isBookmarksOpen = ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp.UIFigure);
+            isStageViewOpen = ~isempty(app.StageViewApp) && isvalid(app.StageViewApp) && isvalid(app.StageViewApp.UIFigure);
+
+            if isBookmarksOpen
+                app.StatusControls.BookmarksButton.Text = 'Close Bookmarks';
+                app.StatusControls.BookmarksButton.Icon = '';
+            else
+                app.StatusControls.BookmarksButton.Text = 'Open Bookmarks';
+                app.StatusControls.BookmarksButton.Icon = '';
+            end
+
+            if isStageViewOpen
+                app.StatusControls.StageViewButton.Text = 'Close Stage View';
+                app.StatusControls.StageViewButton.Icon = '';
+            else
+                app.StatusControls.StageViewButton.Text = 'Open Stage View';
+                app.StatusControls.StageViewButton.Icon = '';
+            end
+        end
+        
         function monitorWindowResize(app)
             % Monitor window size changes and adjust UI elements accordingly
+            if ~isa(app.UIFigure, 'matlab.ui.Figure')
+                warning('foilview:UIFigureType', 'UIFigure is not a handle! Type: %s, Value: %s', ...
+                    class(app.UIFigure), mat2str(app.UIFigure));
+                return;
+            end
             if ~isvalid(app.UIFigure)
                 return;
             end
             
             % Update window status buttons to catch external window closures
-            UiComponents.updateAllUI(app);
+            app.updateWindowStatusButtons();
             
             currentSize = app.UIFigure.Position;
             
@@ -1038,4 +1064,4 @@ classdef foilview < matlab.apps.AppBase
             end
         end
     end
-end 
+end

@@ -1,30 +1,29 @@
-classdef UiBuilder < handle
+classdef UiBuilder
     % Builds the user interface for the FoilView application.
     % This class creates all the UI components and lays them out in the main window.
 
     methods (Static)
-        function components = build(app)
+        function components = build()
             % Static entry point to construct and return all UI components as a struct.
-            creator = UiBuilder();
             components = struct();
 
             [components.UIFigure, components.MainPanel, components.MainLayout] = ...
-                creator.createMainWindow(app);
+                UiBuilder.createMainWindow();
 
-            components.PositionDisplay = creator.createPositionDisplay(components.MainLayout);
-            components.MetricDisplay = creator.createMetricDisplay(components.MainLayout);
-            components.StatusControls = creator.createStatusBar(components.MainLayout);
-            components.ManualControls = creator.createManualControlContainer(components.MainLayout, app);
-            components.AutoControls = creator.createAutoStepContainer(components.MainLayout, app);
-            components.MetricsPlotControls = creator.createMetricsPlotArea(components.UIFigure, app);
-            components.MetricsPlotControls.ExpandButton = creator.createExpandButton(components.MainLayout, app);
+            components.PositionDisplay = UiBuilder.createPositionDisplay(components.MainLayout);
+            components.MetricDisplay = UiBuilder.createMetricDisplay(components.MainLayout);
+            components.StatusControls = UiBuilder.createStatusBar(components.MainLayout);
+            components.ManualControls = UiBuilder.createManualControlContainer(components.MainLayout);
+            components.AutoControls = UiBuilder.createAutoStepContainer(components.MainLayout);
+            components.MetricsPlotControls = UiBuilder.createMetricsPlotArea(components.UIFigure);
+            components.MetricsPlotControls.ExpandButton = UiBuilder.createExpandButton(components.MainLayout);
 
             components.UIFigure.Visible = 'on';
         end
     end
 
-    methods (Access = private)
-        function [uiFigure, mainPanel, mainLayout] = createMainWindow(~, app)
+    methods (Static, Access = private)
+        function [uiFigure, mainPanel, mainLayout] = createMainWindow()
             % Creates the main figure window, panel, and grid layout.
             uiFigure = uifigure('Visible', 'off');
             uiFigure.Units = 'pixels';
@@ -50,7 +49,7 @@ classdef UiBuilder < handle
             mainLayout.Scrollable = 'on';
         end
 
-        function metricDisplay = createMetricDisplay(~, mainLayout)
+        function metricDisplay = createMetricDisplay(mainLayout)
             % Creates the metric display section with dropdown, value label, and refresh button.
             metricPanel = uigridlayout(mainLayout, [1, 3]);
             metricPanel.ColumnWidth = {'fit', '1x', 'fit'};
@@ -75,7 +74,7 @@ classdef UiBuilder < handle
             metricDisplay.RefreshButton.FontSize = 11;
         end
 
-        function positionDisplay = createPositionDisplay(~, mainLayout)
+        function positionDisplay = createPositionDisplay(mainLayout)
             % Creates the position display with label and status.
             positionPanel = uigridlayout(mainLayout, [2, 1]);
             positionPanel.RowHeight = {'fit', 'fit'};
@@ -99,7 +98,7 @@ classdef UiBuilder < handle
             positionDisplay.Status.FontColor = UiComponents.COLORS.TextMuted;
         end
 
-        function expandButton = createExpandButton(~, mainLayout, ~)
+        function expandButton = createExpandButton(mainLayout)
             % Creates the button to expand/show the metrics plot.
             expandButton = uibutton(mainLayout, 'push');
             expandButton.Layout.Row = 5;
@@ -110,9 +109,9 @@ classdef UiBuilder < handle
             expandButton.FontColor = [1 1 1];
         end
 
-        function statusControls = createStatusBar(~, mainLayout)
+        function statusControls = createStatusBar(mainLayout)
             % Creates the status bar with label and control buttons.
-            statusBar = uigridlayout(mainLayout, [1, 6]);  % Fixed: Expanded to 6 columns for MotorRecoveryButton
+            statusBar = uigridlayout(mainLayout, [1, 6]);
             statusBar.ColumnWidth = {'1x', 'fit', 'fit', 'fit', 'fit', 'fit'};
             statusBar.Layout.Row = 6;
 
@@ -160,7 +159,7 @@ classdef UiBuilder < handle
             statusControls.MotorRecoveryButton.FontColor = [1 1 1];
         end
 
-        function manualControls = createManualControlContainer(obj, mainLayout, ~)
+        function manualControls = createManualControlContainer(mainLayout)
             % Creates the manual control panel with buttons and step size controls.
             manualPanel = uipanel(mainLayout);
             manualPanel.Title = 'Manual Control';
@@ -176,10 +175,9 @@ classdef UiBuilder < handle
 
             manualControls = struct();
 
-            manualControls.UpButton = obj.createStyledButton(grid, 'success', '▲', [], [1, 1]);
+            manualControls.UpButton = UiBuilder.createStyledButton(grid, 'success', '▲', [], [1, 1]);
 
-            % Standardized: Use createStyledButton for step buttons with muted style
-            manualControls.StepDownButton = obj.createStyledButton(grid, 'muted', '◄', 'Decrease step size', [1, 2]);
+            manualControls.StepDownButton = UiBuilder.createStyledButton(grid, 'muted', '◄', 'Decrease step size', [1, 2]);
 
             stepSizePanel = uipanel(grid);
             stepSizePanel.Layout.Row = 1;
@@ -199,12 +197,11 @@ classdef UiBuilder < handle
             manualControls.StepSizeDisplay.FontColor = [0.2 0.2 0.2];
             manualControls.StepSizeDisplay.HorizontalAlignment = 'center';
 
-            manualControls.StepUpButton = obj.createStyledButton(grid, 'muted', '►', 'Increase step size', [1, 4]);
+            manualControls.StepUpButton = UiBuilder.createStyledButton(grid, 'muted', '►', 'Increase step size', [1, 4]);
 
-            manualControls.DownButton = obj.createStyledButton(grid, 'warning', '▼', [], [1, 5]);
-            manualControls.ZeroButton = obj.createStyledButton(grid, 'primary', 'ZERO', [], [1, 6]);
+            manualControls.DownButton = UiBuilder.createStyledButton(grid, 'warning', '▼', [], [1, 5]);
+            manualControls.ZeroButton = UiBuilder.createStyledButton(grid, 'primary', 'ZERO', [], [1, 6]);
 
-            % Fixed: Placed hidden dropdown in column 3 (overlaps stepSizePanel if needed, but visible='off')
             manualControls.StepSizeDropdown = uidropdown(grid);
             manualControls.StepSizeDropdown.Items = FoilviewUtils.formatStepSizeItems(FoilviewController.STEP_SIZES);
             manualControls.StepSizeDropdown.Value = FoilviewUtils.formatPosition(FoilviewController.DEFAULT_STEP_SIZE);
@@ -216,24 +213,26 @@ classdef UiBuilder < handle
             manualControls.CurrentStepIndex = find(manualControls.StepSizes == FoilviewController.DEFAULT_STEP_SIZE, 1);
         end
 
-        function autoControls = createAutoStepContainer(obj, mainLayout, ~)
+        function autoControls = createAutoStepContainer(mainLayout)
             % Creates the auto step control panel with fields, switch, and status.
             autoPanel = uipanel(mainLayout);
             autoPanel.Title = 'Auto Step';
             autoPanel.FontSize = 9;
             autoPanel.FontWeight = 'bold';
             autoPanel.Layout.Row = 4;
+            autoPanel.AutoResizeChildren = 'on';
 
             grid = uigridlayout(autoPanel, [2, 5]);
-            grid.RowHeight = {'fit', 'fit'};
-            grid.ColumnWidth = {'2x', '1x', '1x', '1x', '1x'};
+            grid.RowHeight = {'1x', 'fit'};
+            grid.ColumnWidth = {'fit', '1x', '1x', '1x', 'fit'};
             grid.Padding = [8 6 8 8];
             grid.RowSpacing = 6;
             grid.ColumnSpacing = 8;
 
             autoControls = struct();
 
-            autoControls.StartStopButton = obj.createStyledButton(grid, 'success', 'START ▲', [], [1, 1]);
+            autoControls.StartStopButton = UiBuilder.createStyledButton(grid, 'success', 'START ▲', [], [1, 1]);
+            autoControls.StartStopButton.HorizontalAlignment = 'center';
 
             autoControls.StepField = uieditfield(grid, 'numeric');
             autoControls.StepField.Value = FoilviewController.DEFAULT_AUTO_STEP;
@@ -241,6 +240,7 @@ classdef UiBuilder < handle
             autoControls.StepField.Layout.Row = 1;
             autoControls.StepField.Layout.Column = 2;
             autoControls.StepField.Tooltip = 'Step size (μm)';
+            autoControls.StepField.HorizontalAlignment = 'center';
 
             autoControls.StepsField = uieditfield(grid, 'numeric');
             autoControls.StepsField.Value = FoilviewController.DEFAULT_AUTO_STEPS;
@@ -248,6 +248,7 @@ classdef UiBuilder < handle
             autoControls.StepsField.Layout.Row = 1;
             autoControls.StepsField.Layout.Column = 3;
             autoControls.StepsField.Tooltip = 'Number of steps';
+            autoControls.StepsField.HorizontalAlignment = 'center';
 
             autoControls.DelayField = uieditfield(grid, 'numeric');
             autoControls.DelayField.Value = FoilviewController.DEFAULT_AUTO_DELAY;
@@ -255,39 +256,45 @@ classdef UiBuilder < handle
             autoControls.DelayField.Layout.Row = 1;
             autoControls.DelayField.Layout.Column = 4;
             autoControls.DelayField.Tooltip = 'Delay between steps (seconds)';
+            autoControls.DelayField.HorizontalAlignment = 'center';
 
-            % Direction toggle switch
             directionPanel = uipanel(grid);
             directionPanel.Layout.Row = 1;
             directionPanel.Layout.Column = 5;
             directionPanel.BorderType = 'none';
             directionPanel.BackgroundColor = UiComponents.COLORS.Background;
 
-            directionGrid = uigridlayout(directionPanel, [2, 1]);
-            directionGrid.RowHeight = {'fit', 'fit'};
+            directionGrid = uigridlayout(directionPanel, [1, 2]);
+            directionGrid.RowHeight = {'fit'};
+            directionGrid.ColumnWidth = {'fit', '1x'};
             directionGrid.Padding = [2 2 2 2];
             directionGrid.RowSpacing = 2;
+            directionGrid.ColumnSpacing = 4;
 
             directionLabel = uilabel(directionGrid);
             directionLabel.Text = 'Direction';
             directionLabel.FontSize = 9;
             directionLabel.FontWeight = 'bold';
-            directionLabel.HorizontalAlignment = 'center';
+            directionLabel.HorizontalAlignment = 'right';
+            directionLabel.Layout.Row = 1;
+            directionLabel.Layout.Column = 1;
 
             autoControls.DirectionSwitch = uiswitch(directionGrid, 'toggle');
             autoControls.DirectionSwitch.Items = {'Down', 'Up'};
             autoControls.DirectionSwitch.Value = 'Up';
             autoControls.DirectionSwitch.FontSize = 9;
             autoControls.DirectionSwitch.Tooltip = 'Toggle direction (Up/Down)';
+            autoControls.DirectionSwitch.Layout.Row = 1;
+            autoControls.DirectionSwitch.Layout.Column = 2;
 
-            % Hidden direction button (alternative UI?)
-            autoControls.DirectionButton = obj.createStyledButton(grid, 'success', '▲', 'Toggle direction (Up/Down)', [2, 4]);
+            autoControls.DirectionButton = UiBuilder.createStyledButton(grid, 'success', '▲', 'Toggle direction (Up/Down)', [2, 4]);
             autoControls.DirectionButton.Visible = 'off';
 
             statusGrid = uigridlayout(grid, [1, 3]);
             statusGrid.Layout.Row = 2;
             statusGrid.Layout.Column = [1 4];
             statusGrid.ColumnWidth = {'fit', '1x', 'fit'};
+            statusGrid.RowHeight = {'fit'};
             statusGrid.Padding = [0 0 0 0];
             statusGrid.ColumnSpacing = 4;
 
@@ -296,19 +303,28 @@ classdef UiBuilder < handle
             statusLabel.FontSize = 10;
             statusLabel.FontWeight = 'bold';
             statusLabel.FontColor = [0.3 0.3 0.3];
+            statusLabel.HorizontalAlignment = 'right';
+            statusLabel.Layout.Row = 1;
+            statusLabel.Layout.Column = 1;
 
             autoControls.StatusDisplay = uilabel(statusGrid);
-            autoControls.StatusDisplay.Text = '100.0 μm upward (5.0s)';
+            autoControls.StatusDisplay.Text = 'Ready';
             autoControls.StatusDisplay.FontSize = 10;
             autoControls.StatusDisplay.FontColor = [0.4 0.4 0.4];
+            autoControls.StatusDisplay.HorizontalAlignment = 'left';
+            autoControls.StatusDisplay.Layout.Row = 1;
+            autoControls.StatusDisplay.Layout.Column = 2;
 
             unitsLabel = uilabel(statusGrid);
             unitsLabel.Text = 'μm × steps @ s';
             unitsLabel.FontSize = 9;
             unitsLabel.FontColor = [0.6 0.6 0.6];
+            unitsLabel.HorizontalAlignment = 'left';
+            unitsLabel.Layout.Row = 1;
+            unitsLabel.Layout.Column = 3;
         end
 
-        function metricsPlotControls = createMetricsPlotArea(obj, uiFigure, ~)
+        function metricsPlotControls = createMetricsPlotArea(uiFigure)
             % Creates the metrics plot panel with axes and buttons (initially hidden).
             metricsPlotControls = struct();
 
@@ -338,15 +354,15 @@ classdef UiBuilder < handle
             ylabel(metricsPlotControls.Axes, 'Normalized Metric Value');
             title(metricsPlotControls.Axes, 'Metrics vs Z Position');
 
-            metricsPlotControls.ClearButton = obj.createStyledButton(grid, 'warning', 'CLEAR', [], [2, 1]);
-            metricsPlotControls.ExportButton = obj.createStyledButton(grid, 'primary', 'EXPORT', [], [2, 2]);
+            metricsPlotControls.ClearButton = UiBuilder.createStyledButton(grid, 'warning', 'CLEAR', [], [2, 1]);
+            metricsPlotControls.ExportButton = UiBuilder.createStyledButton(grid, 'primary', 'EXPORT', [], [2, 2]);
         end
 
-        function button = createStyledButton(~, parent, style, text, tooltip, layoutPosition)
+        function button = createStyledButton(parent, style, text, tooltip, layoutPosition)
             % Helper to create and style a button consistently.
             button = uibutton(parent, 'push');
             button.Text = text;
-            button.FontSize = 11;  % Default font size, override in apply if needed
+            button.FontSize = 11;
             button.FontWeight = 'bold';
 
             if ~isempty(tooltip)
@@ -358,8 +374,6 @@ classdef UiBuilder < handle
                 button.Layout.Column = layoutPosition(2);
             end
 
-            % Assume UiComponents.applyButtonStyle handles style-specific properties
-            % Added 'muted' style handling if not present (e.g., in UiComponents)
             if strcmp(style, 'muted')
                 button.BackgroundColor = UiComponents.COLORS.TextMuted;
                 button.FontColor = [1 1 1];

@@ -70,6 +70,7 @@ classdef UiComponents
         
         function adjustControlFonts(controlStruct, scale)
             % Helper to scale font sizes in a control struct, clamping between 8-16.
+            % Only operates on UI handle fields; skips non-handle fields for robustness.
             if ~isstruct(controlStruct) || scale == 1.0
                 return;
             end
@@ -77,11 +78,17 @@ classdef UiComponents
             fields = fieldnames(controlStruct);
             for i = 1:length(fields)
                 obj = controlStruct.(fields{i});
-                if isvalid(obj) && isprop(obj, 'FontSize')
+                % Only operate on valid handle objects
+                if isa(obj, 'handle') && ~isempty(obj) && isvalid(obj) && isprop(obj, 'FontSize')
                     newSize = max(round(obj.FontSize * scale), 8);
                     newSize = min(newSize, 16);
                     obj.FontSize = newSize;
                 end
+                % If obj is a struct (e.g., nested controls), recurse
+                if isstruct(obj)
+                    UiComponents.adjustControlFonts(obj, scale);
+                end
+                % Non-handle, non-struct fields are skipped
             end
         end
         
@@ -118,9 +125,10 @@ classdef UiComponents
                 lastUpdateTime = posixtime(datetime('now'));
 
                 success = FoilviewUtils.batchUIUpdate(updateFunctions);
+                % Add direction button update
                 UiComponents.updateDirectionButtons(app);
-                UiComponents.updateWindowStatusButtons(app);
-                % Step size display update is only called when needed (not every updateAllUI)
+                % Add auto step status display update
+                UiComponents.updateAutoStepStatusDisplay(app);
             end
         end
 
@@ -376,42 +384,18 @@ classdef UiComponents
             app.AutoControls.StartStopButton.FontWeight = 'bold';
         end
 
-        function updateWindowStatusButtons(app)
-            isBookmarksOpen = ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp.UIFigure);
-            isStageViewOpen = ~isempty(app.StageViewApp) && isvalid(app.StageViewApp) && isvalid(app.StageViewApp.UIFigure);
-
-            if isBookmarksOpen
-                app.StatusControls.BookmarksButton.Text = 'Close Bookmarks';
-                app.StatusControls.BookmarksButton.Icon = '';
+        function updateAutoStepStatusDisplay(app)
+            % Updates the status display for auto step controls based on current settings
+            direction = app.Controller.AutoDirection;
+            step = app.AutoControls.StepField.Value;
+            steps = app.AutoControls.StepsField.Value;
+            delay = app.AutoControls.DelayField.Value;
+            if direction > 0
+                dirStr = 'upward';
             else
-                app.StatusControls.BookmarksButton.Text = 'Open Bookmarks';
-                app.StatusControls.BookmarksButton.Icon = '';
+                dirStr = 'downward';
             end
-
-            if isStageViewOpen
-                app.StatusControls.StageViewButton.Text = 'Close Stage View';
-                app.StatusControls.StageViewButton.Icon = '';
-            else
-                app.StatusControls.StageViewButton.Text = 'Open Stage View';
-                app.StatusControls.StageViewButton.Icon = '';
-            end
-        end
-
-        function updateStepSizeDisplay(app, newIndex, newStepSize)
-            % Update step size display and sync controls
-            if nargin < 3 || isempty(newIndex) || isempty(newStepSize)
-                return;
-            end
-            app.ManualControls.CurrentStepIndex = newIndex;
-            % Update display label
-            app.ManualControls.StepSizeDisplay.Text = sprintf('%.1fμm', newStepSize);
-            % Update hidden dropdown for compatibility
-            formattedValue = FoilviewUtils.formatPosition(newStepSize);
-            if ismember(formattedValue, app.ManualControls.StepSizeDropdown.Items)
-                app.ManualControls.StepSizeDropdown.Value = formattedValue;
-            end
-            % Sync with auto controls
-            app.AutoControls.StepField.Value = newStepSize;
+            app.AutoControls.StatusDisplay.Text = sprintf('%.1f μm %s (%ds × %d)', step, dirStr, delay, steps);
         end
     end
 end

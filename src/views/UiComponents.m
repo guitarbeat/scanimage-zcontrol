@@ -118,8 +118,8 @@ classdef UiComponents
                 lastUpdateTime = posixtime(datetime('now'));
 
                 success = FoilviewUtils.batchUIUpdate(updateFunctions);
-                % Add direction button update
                 UiComponents.updateDirectionButtons(app);
+                UiComponents.updateWindowStatusButtons(app);
             end
         end
 
@@ -373,6 +373,27 @@ classdef UiComponents
             app.AutoControls.StartStopButton.FontColor = [1 1 1];  % white text
             app.AutoControls.StartStopButton.FontSize = 10;
             app.AutoControls.StartStopButton.FontWeight = 'bold';
+        end
+
+        function updateWindowStatusButtons(app)
+            isBookmarksOpen = ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp.UIFigure);
+            isStageViewOpen = ~isempty(app.StageViewApp) && isvalid(app.StageViewApp) && isvalid(app.StageViewApp.UIFigure);
+
+            if isBookmarksOpen
+                app.StatusControls.BookmarksButton.Text = 'Close Bookmarks';
+                app.StatusControls.BookmarksButton.Icon = '';
+            else
+                app.StatusControls.BookmarksButton.Text = 'Open Bookmarks';
+                app.StatusControls.BookmarksButton.Icon = '';
+            end
+
+            if isStageViewOpen
+                app.StatusControls.StageViewButton.Text = 'Close Stage View';
+                app.StatusControls.StageViewButton.Icon = '';
+            else
+                app.StatusControls.StageViewButton.Text = 'Open Stage View';
+                app.StatusControls.StageViewButton.Icon = '';
+            end
         end
     end
 end

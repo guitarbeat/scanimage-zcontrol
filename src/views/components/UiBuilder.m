@@ -308,7 +308,7 @@ classdef UiBuilder < handle
             unitsLabel.FontColor = [0.6 0.6 0.6];
         end
 
-        function metricsPlotControls = createMetricsPlotArea(~, uiFigure, ~)
+        function metricsPlotControls = createMetricsPlotArea(obj, uiFigure, ~)
             % Creates the metrics plot panel with axes and buttons (initially hidden).
             metricsPlotControls = struct();
 
@@ -338,8 +338,8 @@ classdef UiBuilder < handle
             ylabel(metricsPlotControls.Axes, 'Normalized Metric Value');
             title(metricsPlotControls.Axes, 'Metrics vs Z Position');
 
-            metricsPlotControls.ClearButton = createStyledButton(grid, 'warning', 'CLEAR', [], [2, 1]);
-            metricsPlotControls.ExportButton = createStyledButton(grid, 'primary', 'EXPORT', [], [2, 2]);
+            metricsPlotControls.ClearButton = obj.createStyledButton(grid, 'warning', 'CLEAR', [], [2, 1]);
+            metricsPlotControls.ExportButton = obj.createStyledButton(grid, 'primary', 'EXPORT', [], [2, 2]);
         end
 
         function button = createStyledButton(~, parent, style, text, tooltip, layoutPosition)

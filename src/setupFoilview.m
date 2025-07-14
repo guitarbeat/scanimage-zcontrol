@@ -1,7 +1,7 @@
 function setupFoilview()
     
     scriptDir = fileparts(mfilename('fullpath'));
-    subdirs = {'app', 'controllers', 'views', 'utils', 'managers'};
+    subdirs = {'app', 'controllers', 'views', 'views/components', 'utils', 'managers'};
     
     for i = 1:length(subdirs)
         subdir = fullfile(scriptDir, subdirs{i});

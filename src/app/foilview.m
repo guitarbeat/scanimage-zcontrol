@@ -177,6 +177,8 @@ classdef foilview < matlab.apps.AppBase
                 createCallbackFcn(app, @app.onAutoStepsChanged, true);
             app.AutoControls.DelayField.ValueChangedFcn = ...
                 createCallbackFcn(app, @app.onAutoDelayChanged, true);
+            app.AutoControls.DirectionSwitch.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onAutoDirectionSwitchChanged, true);
             app.AutoControls.DirectionButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onAutoDirectionToggled, true);
             app.AutoControls.StartStopButton.ButtonPushedFcn = ...
@@ -305,6 +307,21 @@ classdef foilview < matlab.apps.AppBase
         
         function onAutoDelayChanged(app, varargin)
             app.updateAutoStepStatus();
+        end
+        
+        function onAutoDirectionSwitchChanged(app, varargin)
+            % Handle direction toggle switch changes
+            if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
+                event = varargin{1};
+                if strcmp(event.Value, 'Up')
+                    direction = 1;
+                else
+                    direction = -1;
+                end
+                app.Controller.setAutoDirectionWithValidation(app.AutoControls, direction);
+                app.updateAutoStepStatus();
+                app.updateDirectionButtons();
+            end
         end
         
         function onAutoDirectionToggled(app, varargin)
@@ -452,6 +469,15 @@ classdef foilview < matlab.apps.AppBase
         function updateDirectionButtons(app)
             % Update direction button and start button to show current direction
             direction = app.Controller.AutoDirection;
+            
+            % Update toggle switch to match current direction
+            if isfield(app.AutoControls, 'DirectionSwitch') && ~isempty(app.AutoControls.DirectionSwitch)
+                if direction > 0
+                    app.AutoControls.DirectionSwitch.Value = 'Up';
+                else
+                    app.AutoControls.DirectionSwitch.Value = 'Down';
+                end
+            end
             
             % Style direction button based on direction and running state
             if direction > 0

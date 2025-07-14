@@ -423,7 +423,14 @@ classdef FoilviewController < handle
                 stepSize = autoControls.StepField.Value;
                 numSteps = autoControls.StepsField.Value;
                 delay = autoControls.DelayField.Value;
-                direction = obj.AutoDirection;
+                
+                % Get direction from toggle switch
+                if strcmp(autoControls.DirectionSwitch.Value, 'Up')
+                    direction = 1;
+                else
+                    direction = -1;
+                end
+                
                 recordMetrics = true;  % Always record metrics for plotting
                 
                 % Additional safety checks
@@ -647,6 +654,15 @@ classdef FoilviewController < handle
                 end
                 
                 obj.AutoDirection = direction;
+                
+                % Update toggle switch value
+                if isfield(autoControls, 'DirectionSwitch') && ~isempty(autoControls.DirectionSwitch)
+                    if obj.AutoDirection == 1  % Up
+                        autoControls.DirectionSwitch.Value = 'Up';
+                    else  % Down
+                        autoControls.DirectionSwitch.Value = 'Down';
+                    end
+                end
                 
                 % Update direction button styling
                 if obj.AutoDirection == 1  % Up

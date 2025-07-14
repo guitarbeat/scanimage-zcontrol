@@ -258,6 +258,7 @@ classdef UiComponents
                     FoilviewUtils.setControlEnabled(autoControls, false, 'StepField');
                     FoilviewUtils.setControlEnabled(autoControls, false, 'StepsField');
                     FoilviewUtils.setControlEnabled(autoControls, false, 'DelayField');
+                    FoilviewUtils.setControlEnabled(autoControls, false, 'DirectionSwitch');
 
                     FoilviewUtils.setControlEnabled(autoControls, true, 'DirectionButton');
                     FoilviewUtils.setControlEnabled(autoControls, true, 'StartStopButton');
@@ -317,6 +318,15 @@ classdef UiComponents
                     UiComponents.applyButtonStyle(autoControls.DirectionButton, 'Success', '▲ UP');
                 else
                     UiComponents.applyButtonStyle(autoControls.DirectionButton, 'Warning', '▼ DOWN');
+                end
+
+                % Update toggle switch to match direction
+                if isfield(autoControls, 'DirectionSwitch') && ~isempty(autoControls.DirectionSwitch)
+                    if direction == 1
+                        autoControls.DirectionSwitch.Value = 'Up';
+                    else
+                        autoControls.DirectionSwitch.Value = 'Down';
+                    end
                 end
 
                 success = true;

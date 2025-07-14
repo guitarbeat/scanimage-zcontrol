@@ -230,9 +230,9 @@ classdef UiBuilder < handle
             autoPanel.FontWeight = 'bold';
             autoPanel.Layout.Row = 4;
 
-            grid = uigridlayout(autoPanel, [2, 4]);
+            grid = uigridlayout(autoPanel, [2, 5]);
             grid.RowHeight = {'fit', 'fit'};
-            grid.ColumnWidth = {'2x', '1x', '1x', '1x'};
+            grid.ColumnWidth = {'2x', '1x', '1x', '1x', '1x'};
             grid.Padding = [8 6 8 8];
             grid.RowSpacing = 6;
             grid.ColumnSpacing = 8;
@@ -261,6 +261,34 @@ classdef UiBuilder < handle
             autoControls.DelayField.Layout.Row = 1;
             autoControls.DelayField.Layout.Column = 4;
             autoControls.DelayField.Tooltip = 'Delay between steps (seconds)';
+
+            % Add direction toggle switch
+            directionPanel = uipanel(grid);
+            directionPanel.Layout.Row = 1;
+            directionPanel.Layout.Column = 5;
+            directionPanel.BorderType = 'none';
+            directionPanel.BackgroundColor = UiComponents.COLORS.Background;
+            
+            directionGrid = uigridlayout(directionPanel, [2, 1]);
+            directionGrid.RowHeight = {'fit', 'fit'};
+            directionGrid.Padding = [2 2 2 2];
+            directionGrid.RowSpacing = 2;
+            
+            directionLabel = uilabel(directionGrid);
+            directionLabel.Text = 'Direction';
+            directionLabel.FontSize = 9;
+            directionLabel.FontWeight = 'bold';
+            directionLabel.HorizontalAlignment = 'center';
+            directionLabel.Layout.Row = 1;
+            directionLabel.Layout.Column = 1;
+            
+            autoControls.DirectionSwitch = uiswitch(directionGrid, 'toggle');
+            autoControls.DirectionSwitch.Items = {'Down', 'Up'};
+            autoControls.DirectionSwitch.Value = 'Up';
+            autoControls.DirectionSwitch.FontSize = 9;
+            autoControls.DirectionSwitch.Layout.Row = 2;
+            autoControls.DirectionSwitch.Layout.Column = 1;
+            autoControls.DirectionSwitch.Tooltip = 'Toggle direction (Up/Down)';
 
             autoControls.DirectionButton = obj.createStyledButton(grid, 'success', '▲', [], [2, 4]);
             autoControls.DirectionButton.Tooltip = 'Toggle direction (Up/Down)';

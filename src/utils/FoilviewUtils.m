@@ -22,6 +22,8 @@ classdef FoilviewUtils < handle
         
         DROPDOWN_FIELDS = {'StepSizeDropdown', 'TypeDropdown'}
         
+        SWITCH_FIELDS = {'DirectionSwitch'}
+        
         DEFAULT_UPDATE_THROTTLE = 0.05
         DEFAULT_PLOT_THROTTLE = 0.1
         DEFAULT_MAX_DATA_POINTS = 1000
@@ -99,7 +101,8 @@ classdef FoilviewUtils < handle
             % Get all common control field names
             fields = [FoilviewUtils.BUTTON_FIELDS, ...
                      FoilviewUtils.FIELD_FIELDS, ...
-                     FoilviewUtils.DROPDOWN_FIELDS];
+                     FoilviewUtils.DROPDOWN_FIELDS, ...
+                     FoilviewUtils.SWITCH_FIELDS];
         end
         
     

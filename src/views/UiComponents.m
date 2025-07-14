@@ -120,6 +120,7 @@ classdef UiComponents
                 success = FoilviewUtils.batchUIUpdate(updateFunctions);
                 UiComponents.updateDirectionButtons(app);
                 UiComponents.updateWindowStatusButtons(app);
+                % Step size display update is only called when needed (not every updateAllUI)
             end
         end
 
@@ -394,6 +395,23 @@ classdef UiComponents
                 app.StatusControls.StageViewButton.Text = 'Open Stage View';
                 app.StatusControls.StageViewButton.Icon = '';
             end
+        end
+
+        function updateStepSizeDisplay(app, newIndex, newStepSize)
+            % Update step size display and sync controls
+            if nargin < 3 || isempty(newIndex) || isempty(newStepSize)
+                return;
+            end
+            app.ManualControls.CurrentStepIndex = newIndex;
+            % Update display label
+            app.ManualControls.StepSizeDisplay.Text = sprintf('%.1fμm', newStepSize);
+            % Update hidden dropdown for compatibility
+            formattedValue = FoilviewUtils.formatPosition(newStepSize);
+            if ismember(formattedValue, app.ManualControls.StepSizeDropdown.Items)
+                app.ManualControls.StepSizeDropdown.Value = formattedValue;
+            end
+            % Sync with auto controls
+            app.AutoControls.StepField.Value = newStepSize;
         end
     end
 end

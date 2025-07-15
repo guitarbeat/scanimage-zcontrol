@@ -123,12 +123,12 @@ classdef ScanImageManager < handle
             obj.saveImageMetadata(src, evt);
         end
         
-        function onAcquisitionDone(obj, src, evt)
+        function onAcquisitionDone(obj, ~, ~)
             % Handle acquisition done event from ScanImage
             obj.cleanupMetadataLogging();
         end
         
-        function saveImageMetadata(obj, src, evt)
+        function saveImageMetadata(obj, src, ~)
             % saveImageMetadata - Logs metadata for each acquired frame
             % Called by ScanImage for each frame (frameAcquired event)
             
@@ -180,7 +180,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function [hSI, metadataFile] = getHandles(obj, src)
+        function [hSI, metadataFile] = getHandles(~, src)
             % Get handles with minimal overhead
             if isobject(src) && isfield(src, 'hSI')
                 hSI = src.hSI;
@@ -204,12 +204,12 @@ classdef ScanImageManager < handle
             end
         end
         
-        function valid = isValidFrame(obj, hSI)
+        function valid = isValidFrame(~, hSI)
             valid = ~isempty(hSI) && isprop(hSI, 'hScan2D') && ~isempty(hSI.hScan2D) && ...
                     isprop(hSI.hScan2D, 'logFileStem') && ~isempty(hSI.hScan2D.logFileStem);
         end
         
-        function isGrab = isGrabMode(obj, hSI)
+        function isGrab = isGrabMode(~, hSI)
             % Check if we're in GRAB mode vs FOCUS mode
             try
                 acqMode = hSI.acqState;
@@ -260,7 +260,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function scannerType = getScannerType(obj, hSI)
+        function scannerType = getScannerType(~, hSI)
             try
                 if isprop(hSI.hScan2D, 'scannerType')
                     if hSI.hScan2D.scannerType == 1
@@ -276,7 +276,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function value = getNumericProperty(obj, objHandle, propName, defaultValue)
+        function value = getNumericProperty(~, objHandle, propName, defaultValue)
             try
                 if isprop(objHandle, propName)
                     value = double(objHandle.(propName));
@@ -301,7 +301,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function fov = getFOV(obj, hSI)
+        function fov = getFOV(~, hSI)
             try
                 if isprop(hSI.hRoiManager, 'imagingFovUm') && ~isempty(hSI.hRoiManager.imagingFovUm)
                     fovX = hSI.hRoiManager.imagingFovUm(1);
@@ -353,7 +353,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function value = getLutValue(obj, beam, lutName, powerFraction)
+        function value = getLutValue(~, beam, lutName, powerFraction)
             value = 'NA';
             try
                 if isprop(beam, lutName)
@@ -370,7 +370,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function position = getStagePosition(obj, hSI)
+        function position = getStagePosition(~, hSI)
             % Default position
             position = struct('x', 0, 'y', 0, 'z', 0);
             
@@ -400,7 +400,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function writeMetadataToFile(obj, metadata, metadataFile, verbose)
+        function writeMetadataToFile(~, metadata, metadataFile, verbose)
             if isempty(metadataFile) || ~exist(fileparts(metadataFile), 'dir')
                 return;
             end
@@ -692,7 +692,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function axisInfo = getAxisInfo(obj, motorFig, axisName)
+        function axisInfo = getAxisInfo(~, motorFig, axisName)
             % getAxisInfo - Get UI elements for a specific axis
             axisInfo = struct('etPos', [], 'step', [], 'inc', [], 'dec', []);
             
@@ -766,7 +766,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function clearMotorError(obj, motorFig, axisName)
+        function clearMotorError(~, motorFig, axisName)
             % clearMotorError - Attempt to clear motor error state
             try
                 % Look for clear/reset buttons

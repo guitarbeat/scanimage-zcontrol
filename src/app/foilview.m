@@ -619,12 +619,12 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         %% Parse timestamps from metadata lines
-        function timestamps = parseTimestamps(app, lines)
+        function timestamps = parseTimestamps(~, lines)
             timestamps = {};
             try
                 for i = 2:length(lines)
                     parts = strsplit(lines{i}, ',');
-                    if length(parts) > 0 && ~isempty(parts{1})
+                    if ~isempty(parts) && ~isempty(parts{1})
                         timestamps{end+1} = parts{1};
                     end
                 end
@@ -632,7 +632,7 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         %% Calculate duration from timestamps
-        function duration = calculateDuration(app, timestamps)
+        function duration = calculateDuration(~, timestamps)
             try
                 if length(timestamps) >= 2
                     startTime = datenum(timestamps{1}, 'yyyy-mm-dd HH:MM:SS');
@@ -646,7 +646,7 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         %% Display session summary in command window
-        function displaySessionSummary(app, frameCount, duration, avgFrameRate, fileSize, metadataFile)
+        function displaySessionSummary(~, frameCount, duration, avgFrameRate, fileSize, metadataFile)
             fprintf('\n=== Session Summary ===\n');
             fprintf('Frames recorded: %d\n', frameCount);
             if duration >= 60
@@ -765,7 +765,7 @@ classdef foilview < matlab.apps.AppBase
         end
 
         %% Determines the base directory for metadata files
-        function baseDir = getBaseDirectory(app, hSI, config)
+        function baseDir = getBaseDirectory(~, hSI, config)
             if ~isempty(config.baseDir)
                 baseDir = config.baseDir;
             elseif ~isempty(hSI.hScan2D.logFilePath)
@@ -861,7 +861,7 @@ classdef foilview < matlab.apps.AppBase
         end
 
         %% Writes a metadata struct to the metadata file
-        function writeMetadataToFile(app, metadata, metadataFile, verbose)
+        function writeMetadataToFile(~, metadata, metadataFile, verbose)
             if isempty(metadataFile) || ~exist(fileparts(metadataFile), 'dir')
                 return;
             end
@@ -910,7 +910,7 @@ classdef foilview < matlab.apps.AppBase
         end
 
         %% Creates a date-based data directory for metadata
-        function dataDir = createDataDirectory(app, baseDir, config)
+        function dataDir = createDataDirectory(~, baseDir, config)
             todayStr = datestr(now, config.dirFormat);
             dataDir = fullfile(baseDir, todayStr);
             if ~exist(dataDir, 'dir')
@@ -923,7 +923,7 @@ classdef foilview < matlab.apps.AppBase
         end
 
         %% Ensures the metadata file exists and has headers
-        function ensureMetadataFile(app, metadataFile, headers)
+        function ensureMetadataFile(~, metadataFile, headers)
             if ~exist(metadataFile, 'file')
                 try
                     fid = fopen(metadataFile, 'w');
@@ -943,7 +943,7 @@ classdef foilview < matlab.apps.AppBase
         end
 
         %% Diagnostic: checks beam system configuration
-        function checkBeamSystem(app, hSI, verbose)
+        function checkBeamSystem(~, hSI, verbose)
             if nargin < 3
                 verbose = true;
             end

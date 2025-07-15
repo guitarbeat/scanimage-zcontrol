@@ -446,7 +446,7 @@ classdef StageView < handle
             obj.RecordingFileName = fullfile(path, file);
             cam = obj.ActivePreviews{1}.camera;
             try
-                frame = snapshot(cam);
+                snapshot(cam); % Test camera access
                 obj.VideoWriterObj = VideoWriter(obj.RecordingFileName, 'Motion JPEG AVI');
                 obj.VideoWriterObj.FrameRate = 15; % Default, can be parameterized
                 open(obj.VideoWriterObj);

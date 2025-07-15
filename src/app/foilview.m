@@ -437,8 +437,8 @@ classdef foilview < matlab.apps.AppBase
         %% Initialize the application (controllers, listeners, UI, timers)
         function initializeApplication(app)
             app.Controller = FoilviewController();
-            app.PlotManager = PlotManager(app);
-            app.ScanImageManager = ScanImageManager();
+            app.PlotManager = app.PlotManager(app);
+            app.ScanImageManager = app.ScanImageManager();
             app.Controller.setFoilviewApp(app);
             addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
             addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
@@ -581,7 +581,7 @@ classdef foilview < matlab.apps.AppBase
             app.LastWindowSize = currentSize;
         end
         %% Get the metadata file path from workspace
-        function metadataFile = getMetadataFile(app)
+        function metadataFile = getMetadataFile(~)
             try
                 metadataFile = evalin('base', 'metadataFilePath');
                 if ~ischar(metadataFile) || isempty(metadataFile) || ~exist(metadataFile, 'file')
@@ -723,7 +723,6 @@ classdef foilview < matlab.apps.AppBase
         %% Opens dialog to configure metadata file path
         function configureMetadataPath(app)
             try
-                currentDir = '';
                 if ~isempty(app.MetadataConfig) && isfield(app.MetadataConfig, 'baseDir')
                     currentDir = app.MetadataConfig.baseDir;
                 elseif ~isempty(app.DataDir)
@@ -756,7 +755,7 @@ classdef foilview < matlab.apps.AppBase
         end
 
         %% Loads or creates default metadata configuration
-        function config = getConfiguration(app)
+        function config = getConfiguration(~)
             try
                 config = evalin('base', 'metadataConfig');
                 if ~isfield(config, 'baseDir')

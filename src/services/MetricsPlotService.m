@@ -69,7 +69,6 @@ classdef MetricsPlotService < handle
             if isempty(obj.AxesHandle) || isempty(obj.PlotLines)
                 return;
             end
-            axes = obj.AxesHandle;
             positions = metrics.Positions;
             values = metrics.Values;
             if isempty(positions)

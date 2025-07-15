@@ -61,7 +61,6 @@ classdef PlotManager < handle
 
         function success = collapseGUI(~, uiFigure, ~, plotPanel, expandButton, app)
             % Retain collapse logic as UI wiring only
-            success = false;
             if nargin >= 6 && ~isempty(app) && isprop(app, 'IgnoreNextResize')
                 app.IgnoreNextResize = true;
             end

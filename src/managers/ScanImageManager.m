@@ -134,10 +134,10 @@ classdef ScanImageManager < handle
             
             try
                 % Skip frames that are too close together (max 5 frames/sec for metadata logging)
-                if ~isempty(obj.LastFrameTime) && (now - obj.LastFrameTime) < (0.2/86400)
+                if ~isempty(obj.LastFrameTime) && (datetime('now') - obj.LastFrameTime) < seconds(0.2)
                     return;
                 end
-                obj.LastFrameTime = now;
+                obj.LastFrameTime = datetime('now');
                 
                 % Handle simulation mode
                 if obj.SimulationMode
@@ -225,7 +225,7 @@ classdef ScanImageManager < handle
                 metadata = struct();
                 
                 % Basic info
-                metadata.timestamp = datestr(now, 'yyyy-mm-dd HH:MM:SS');
+                metadata.timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
                 [~, lastFile, ext] = fileparts(hSI.hScan2D.logFileStem);
                 metadata.filename = [lastFile ext];
                 
@@ -460,7 +460,7 @@ classdef ScanImageManager < handle
             end
         end
         
-        function cleanupMetadataLogging(obj)
+        function cleanupMetadataLogging(~)
             % This method is called when acquisition ends
             % It will be handled by the main foilview app's cleanup method
         end

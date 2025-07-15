@@ -153,212 +153,23 @@ classdef foilview < matlab.apps.AppBase
 
     end
     
+    % === UI Callback Methods ===
     methods (Access = private)
-        function copyComponentsFromStruct(app, components)
-            fields = fieldnames(components);
-            for i = 1:length(fields)
-                app.(fields{i}) = components.(fields{i});
-            end
-        end
-        
-        function initializeApplication(app)
-            app.Controller = FoilviewController();
-            app.PlotManager = PlotManager(app);
-            app.ScanImageManager = ScanImageManager();
-            
-            % Set up bidirectional references for metadata logging
-            app.Controller.setFoilviewApp(app);
-            
-            addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
-            addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
-            addlistener(app.Controller, 'MetricChanged', @(src,evt) app.onControllerMetricChanged());
-            addlistener(app.Controller, 'AutoStepComplete', @(src,evt) app.onControllerAutoStepComplete());
-            
-            app.PlotManager.initializeMetricsPlot(app.MetricsPlotControls.Axes);
-            UiComponents.updateAllUI(app);
-            app.updateAutoStepStatus();
-            % Direction buttons now updated via updateAllUI
-            app.launchStageView();
-            app.launchBookmarksView();
-            app.updateWindowStatusButtons();
-            app.startRefreshTimer();
-            app.startMetricTimer();
-            app.startResizeMonitorTimer();
-            
-            % Initialize ScanImage integration after metadata setup
-            app.ScanImageManager.initialize(app);
-        end
-        
-        function startRefreshTimer(app)
-            app.RefreshTimer = FoilviewUtils.createTimer('fixedRate', ...
-                app.Controller.POSITION_REFRESH_PERIOD, ...
-                @(~,~) app.Controller.refreshPosition());
-            start(app.RefreshTimer);
-        end
-        
-        function startMetricTimer(app)
-            app.MetricTimer = FoilviewUtils.createTimer('fixedRate', ...
-                app.Controller.METRIC_REFRESH_PERIOD, ...
-                @(~,~) app.Controller.updateMetric());
-            start(app.MetricTimer);
-        end
-        
-        function startResizeMonitorTimer(app)
-            % Monitor window size changes and adjust UI responsively
-            app.ResizeMonitorTimer = FoilviewUtils.createTimer('fixedRate', ...
-                0.5, ...  % Check every 0.5 seconds
-                @(~,~) app.monitorWindowResize());
-            
-            % Initialize the last window size
-            if isvalid(app.UIFigure)
-                app.LastWindowSize = app.UIFigure.Position;
-            end
-            
-            start(app.ResizeMonitorTimer);
-        end
-        
-        function launchStageView(app)
-            % Launch the stage view window
-            if isempty(app.StageViewApp) || ~isvalid(app.StageViewApp) || ~isvalid(app.StageViewApp.UIFigure)
-                try
-                    app.StageViewApp = StageView();
-                catch ME
-                    warning('foilview:StageViewLaunch', 'Failed to launch Stage View: %s', ME.message);
-                    app.StageViewApp = [];
-                end
-            else
-                app.StageViewApp.bringToFront();
-            end
-        end
-        
-        function launchBookmarksView(app)
-            % Launch the Bookmarks View window automatically
-            if isempty(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp.UIFigure)
-                try
-                    app.BookmarksViewApp = BookmarksView(app.Controller);
-                catch ME
-                    warning('foilview:BookmarksViewLaunch', 'Failed to launch Bookmarks View: %s', ME.message);
-                    app.BookmarksViewApp = [];
-                end
-            else
-                figure(app.BookmarksViewApp.UIFigure);
-            end
-        end
-        
-        function setupCallbacks(app)
-            % Set up all UI callback functions
-            
-            % Main window
-            app.UIFigure.CloseRequestFcn = createCallbackFcn(app, @app.onWindowClose, true);
-            
-            % Manual control callbacks
-            app.ManualControls.StepSizeDropdown.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onStepSizeChanged, true);
-            app.ManualControls.UpButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onUpButtonPushed, true);
-            app.ManualControls.DownButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onDownButtonPushed, true);
-            app.ManualControls.ZeroButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onZeroButtonPushed, true);
-            app.ManualControls.StepUpButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onStepUpButtonPushed, true);
-            app.ManualControls.StepDownButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onStepDownButtonPushed, true);
-            
-            % Auto step callbacks
-            app.AutoControls.StepField.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onAutoStepSizeChanged, true);
-            app.AutoControls.StepsField.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onAutoStepsChanged, true);
-            app.AutoControls.DelayField.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onAutoDelayChanged, true);
-            app.AutoControls.DirectionSwitch.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onAutoDirectionSwitchChanged, true);
-            app.AutoControls.DirectionButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onAutoDirectionToggled, true);
-            app.AutoControls.StartStopButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onStartStopButtonPushed, true);
-            
-
-            
-            % Metric callbacks
-            app.MetricDisplay.TypeDropdown.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onMetricTypeChanged, true);
-            app.MetricDisplay.RefreshButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onMetricRefreshButtonPushed, true);
-            
-            % Status callbacks
-            app.StatusControls.RefreshButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onRefreshButtonPushed, true);
-            app.StatusControls.BookmarksButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onBookmarksButtonPushed, true);
-            app.StatusControls.StageViewButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onStageViewButtonPushed, true);
-            app.StatusControls.MetadataButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onMetadataButtonPushed, true);
-            app.StatusControls.MotorRecoveryButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onMotorRecoveryButtonPushed, true);
-            
-            % Plot control callbacks
-            app.MetricsPlotControls.ExpandButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onExpandButtonPushed, true);
-            app.MetricsPlotControls.ClearButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onClearPlotButtonPushed, true);
-            app.MetricsPlotControls.ExportButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onExportPlotButtonPushed, true);
-        end
-    end
-    
-
-    methods (Access = private)
-        function onControllerStatusChanged(app)
-            UiComponents.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller);
-        end
-        
-        function onControllerPositionChanged(app)
-            UiComponents.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller);
-        end
-        
-        function onControllerMetricChanged(app)
-            UiComponents.updateMetricDisplay(app.MetricDisplay, app.Controller);
-        end
-        
-        function onControllerAutoStepComplete(app)
-            UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
-            % If metrics were recorded, update the plot and expand the GUI
-            if app.Controller.RecordMetrics
-                metrics = app.Controller.getAutoStepMetrics();
-                if ~isempty(metrics.Positions)
-                    app.PlotManager.updateMetricsPlot(app.MetricsPlotControls.Axes, app.Controller);
-                    % Expand the GUI to show the plot
-                    if ~app.PlotManager.getIsPlotExpanded()
-                        app.PlotManager.expandGUI(app.UIFigure, app.MainPanel, ...
-                            app.MetricsPlotControls.Panel, app.MetricsPlotControls.ExpandButton, app);
-                    end
-                end
-            end
-        end
-    end
-    
-
-    methods (Access = private)
-
+        %% Manual control: Up button pressed
         function onUpButtonPushed(app, varargin)
-            % Extract step size from ManualControls and pass to moveStageManual
             stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
             app.Controller.moveStageManual(stepSize, 1);
         end
-        
+        %% Manual control: Down button pressed
         function onDownButtonPushed(app, varargin)
-            % Extract step size from ManualControls and pass to moveStageManual
             stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
             app.Controller.moveStageManual(stepSize, -1);
         end
-        
+        %% Manual control: Zero button pressed
         function onZeroButtonPushed(app, varargin)
             app.Controller.resetPosition();
         end
-        
+        %% Manual control: Step size dropdown changed
         function onStepSizeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
@@ -366,9 +177,8 @@ classdef foilview < matlab.apps.AppBase
                 app.updateStepSizeDisplay();
             end
         end
-        
+        %% Manual control: Step up button pressed
         function onStepUpButtonPushed(app, varargin)
-            % Cycle to next larger step size
             currentIndex = app.ManualControls.CurrentStepIndex;
             if currentIndex < length(app.ManualControls.StepSizes)
                 newIndex = currentIndex + 1;
@@ -376,9 +186,8 @@ classdef foilview < matlab.apps.AppBase
                 app.updateStepSizeDisplay(newIndex, newStepSize);
             end
         end
-        
+        %% Manual control: Step down button pressed
         function onStepDownButtonPushed(app, varargin)
-            % Cycle to next smaller step size
             currentIndex = app.ManualControls.CurrentStepIndex;
             if currentIndex > 1
                 newIndex = currentIndex - 1;
@@ -386,8 +195,7 @@ classdef foilview < matlab.apps.AppBase
                 app.updateStepSizeDisplay(newIndex, newStepSize);
             end
         end
-        
-
+        %% Auto control: Step size field changed
         function onAutoStepSizeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
@@ -395,17 +203,16 @@ classdef foilview < matlab.apps.AppBase
                 app.updateAutoStepStatus();
             end
         end
-        
+        %% Auto control: Steps field changed
         function onAutoStepsChanged(app, varargin)
             app.updateAutoStepStatus();
         end
-        
+        %% Auto control: Delay field changed
         function onAutoDelayChanged(app, varargin)
             app.updateAutoStepStatus();
         end
-        
+        %% Auto control: Direction switch changed
         function onAutoDirectionSwitchChanged(app, varargin)
-            % Handle direction toggle switch changes
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
                 if strcmp(event.Value, 'Up')
@@ -418,19 +225,17 @@ classdef foilview < matlab.apps.AppBase
                 UiComponents.updateAllUI(app);
             end
         end
-        
+        %% Auto control: Direction button toggled
         function onAutoDirectionToggled(app, varargin)
-            % Toggle between up and down directions
             currentDirection = app.Controller.AutoDirection;
-            newDirection = -currentDirection;  % Toggle: 1 -> -1, -1 -> 1
+            newDirection = -currentDirection;
             app.Controller.setAutoDirectionWithValidation(app.AutoControls, newDirection);
             app.updateAutoStepStatus();
             UiComponents.updateAllUI(app);
         end
-        
+        %% Auto control: Start/Stop button pressed
         function onStartStopButtonPushed(app, varargin)
             fprintf('DEBUG: onStartStopButtonPushed ENTRY - IsAutoRunning: %d\n', app.Controller.IsAutoRunning);
-            
             if app.Controller.IsAutoRunning
                 fprintf('DEBUG: Stopping auto-stepping from UI\n');
                 app.Controller.stopAutoStepping();
@@ -438,34 +243,27 @@ classdef foilview < matlab.apps.AppBase
                 fprintf('DEBUG: Starting auto-stepping from UI\n');
                 app.Controller.startAutoSteppingWithValidation(app, app.AutoControls, app.PlotManager);
             end
-            
             fprintf('DEBUG: Updating UI after start/stop operation\n');
             UiComponents.updateAllUI(app);
             app.updateAutoStepStatus();
-            % Direction buttons now updated via updateAllUI
             fprintf('DEBUG: onStartStopButtonPushed EXIT - IsAutoRunning: %d\n', app.Controller.IsAutoRunning);
         end
-        
-
-        
-
+        %% Status: Refresh button pressed
         function onRefreshButtonPushed(app, ~, ~)
             app.Controller.refreshPosition();
         end
-        
+        %% Status: Motor recovery button pressed
         function onMotorRecoveryButtonPushed(app, ~, ~)
-            % Attempt to recover from motor error state
             fprintf('Attempting motor error recovery...\n');
             success = app.Controller.recoverFromMotorError();
             if success
                 fprintf('Motor error recovery completed successfully\n');
-                % Refresh position after recovery
                 app.Controller.refreshPosition();
             else
                 fprintf('Motor error recovery failed. Please check ScanImage Motor Controls manually.\n');
             end
         end
-        
+        %% Status: Bookmarks button pressed
         function onBookmarksButtonPushed(app, ~, ~)
             if isempty(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp.UIFigure)
                 app.launchBookmarksView();
@@ -475,7 +273,7 @@ classdef foilview < matlab.apps.AppBase
             end
             app.updateWindowStatusButtons();
         end
-        
+        %% Status: Stage view button pressed
         function onStageViewButtonPushed(app, ~, ~)
             if isempty(app.StageViewApp) || ~isvalid(app.StageViewApp) || ~isvalid(app.StageViewApp.UIFigure)
                 app.launchStageView();
@@ -485,42 +283,32 @@ classdef foilview < matlab.apps.AppBase
             end
             app.updateWindowStatusButtons();
         end
-        
+        %% Window close event
         function onWindowClose(app, varargin)
-            % This function is called when the main window is closed.
-            % The delete() method will handle all cleanup.
             delete(app);
         end
-        
-
+        %% Metric: Type dropdown changed
         function onMetricTypeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
                 app.Controller.setMetricTypeWithValidation(event.Value);
             end
-            
-            % Close any child windows
             if ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp)
                 delete(app.BookmarksViewApp);
             end
             app.BookmarksViewApp = [];
-            
             if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp)
                 delete(app.StageViewApp);
             end
             app.StageViewApp = [];
-            
             FoilviewUtils.safeStopTimer(app.ResizeMonitorTimer);
             app.ResizeMonitorTimer = [];
         end
-        
+        %% Metric: Refresh button pressed
         function onMetricRefreshButtonPushed(app, ~, ~)
             app.Controller.updateMetric();
         end
-        
-
-        
-
+        %% Plot: Expand/collapse button pressed
         function onExpandButtonPushed(app, ~, ~)
             isExpanded = app.PlotManager.getIsPlotExpanded();
             if isExpanded
@@ -531,47 +319,40 @@ classdef foilview < matlab.apps.AppBase
                     app.MetricsPlotControls.Panel, app.MetricsPlotControls.ExpandButton, app);
             end
         end
-        
+        %% Plot: Clear button pressed
         function onClearPlotButtonPushed(app, varargin)
             app.PlotManager.clearMetricsPlot(app.MetricsPlotControls.Axes);
         end
-        
+        %% Plot: Export button pressed
         function onExportPlotButtonPushed(app, varargin)
             app.PlotManager.exportPlotData(app.UIFigure, app.Controller);
         end
     end
-    
 
+    % === UI Update Methods ===
     methods (Access = private)
+        %% Update step size display and sync controls
         function updateStepSizeDisplay(app, newIndex, newStepSize)
-            % Update step size display and sync controls
             app.ManualControls.CurrentStepIndex = newIndex;
-            
-            % Update display label
             app.ManualControls.StepSizeDisplay.Text = sprintf('%.1fμm', newStepSize);
-            
-            % Update hidden dropdown for compatibility
             formattedValue = FoilviewUtils.formatPosition(newStepSize);
             if ismember(formattedValue, app.ManualControls.StepSizeDropdown.Items)
                 app.ManualControls.StepSizeDropdown.Value = formattedValue;
             end
-            
-            % Sync with auto controls
             app.AutoControls.StepField.Value = newStepSize;
         end
-        
+        %% Update all UI components
         function updateAllUI(app)
             UiComponents.updateAllUI(app);
         end
-
+        %% Update auto step status controls
         function updateAutoStepStatus(app)
             UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
         end
-        
+        %% Update window status buttons (Bookmarks/StageView)
         function updateWindowStatusButtons(app)
             isBookmarksOpen = ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp.UIFigure);
             isStageViewOpen = ~isempty(app.StageViewApp) && isvalid(app.StageViewApp) && isvalid(app.StageViewApp.UIFigure);
-
             if isBookmarksOpen
                 app.StatusControls.BookmarksButton.Text = 'Close Bookmarks';
                 app.StatusControls.BookmarksButton.Icon = '';
@@ -579,7 +360,6 @@ classdef foilview < matlab.apps.AppBase
                 app.StatusControls.BookmarksButton.Text = 'Open Bookmarks';
                 app.StatusControls.BookmarksButton.Icon = '';
             end
-
             if isStageViewOpen
                 app.StatusControls.StageViewButton.Text = 'Close Stage View';
                 app.StatusControls.StageViewButton.Icon = '';
@@ -588,130 +368,67 @@ classdef foilview < matlab.apps.AppBase
                 app.StatusControls.StageViewButton.Icon = '';
             end
         end
-        
-        function monitorWindowResize(app)
-            % Monitor window size changes and adjust UI elements accordingly
-            if ~isa(app.UIFigure, 'matlab.ui.Figure')
-                warning('foilview:UIFigureType', 'UIFigure is not a handle! Type: %s, Value: %s', ...
-                    class(app.UIFigure), mat2str(app.UIFigure));
-                return;
-            end
-            if ~isvalid(app.UIFigure)
-                return;
-            end
-            
-            % Update window status buttons to catch external window closures
-            app.updateWindowStatusButtons();
-            
-            currentSize = app.UIFigure.Position;
-            
-            % Skip monitoring if we're ignoring programmatic resizes
-            if app.IgnoreNextResize
-                app.IgnoreNextResize = false;
-                app.LastWindowSize = currentSize;
-                return;
-            end
-            
-            % Check if window size has changed significantly
-            sizeDiff = abs(currentSize - app.LastWindowSize);
-            threshold = 30; % Pixel threshold for user-initiated changes
-            
-            % For font scaling, only consider HEIGHT changes (ignore width changes from plot)
-            % This way, plot expand/collapse (width changes) won't trigger font scaling
-            heightChanged = sizeDiff(4) > threshold;
-            
-            if heightChanged % Only adjust fonts based on height changes
-                % Window height changed significantly (likely user resize)
-                try
-                    % Collect all UI components for font adjustment
-                    components = struct();
-                    components.PositionDisplay = app.PositionDisplay;
-                    components.AutoControls = app.AutoControls;
-                    components.ManualControls = app.ManualControls;
-                    components.MetricDisplay = app.MetricDisplay;
-                    components.StatusControls = app.StatusControls;
-                    
-                    % Calculate scaling based on height change only
-                    heightBasedSize = [currentSize(1:2), app.LastWindowSize(3), currentSize(4)];
-                    UiComponents.adjustFontSizes(components, heightBasedSize);
-                    
-                catch ME
-                    % Log errors for debugging but don't crash
-                    warning('foilview:ResizeError', 'Error during font resize: %s', ME.message);
-                end
-            end
-            
-            % Handle plot repositioning separately (for any significant size change)
-            if any(sizeDiff(3:4) > threshold)
-                try
-                    % If plot is expanded, adjust its position with extra validation
-                    if app.PlotManager.getIsPlotExpanded() && ...
-                       isvalid(app.MetricsPlotControls.Panel) && ...
-                       strcmp(app.MetricsPlotControls.Panel.Visible, 'on')
-                        
-                        % Only adjust if we have reasonable window dimensions
-                        if currentSize(3) > 400 && currentSize(4) > 200
-                            UiComponents.adjustPlotPosition(app.UIFigure, ...
-                                app.MetricsPlotControls.Panel, 400);
-                            
-                            % Ensure plot panel stays visible
-                            app.MetricsPlotControls.Panel.Visible = 'on';
-                        end
-                    end
-                    
-                catch ME
-                    % Log errors for debugging but don't crash
-                    warning('foilview:ResizeError', 'Error during plot resize: %s', ME.message);
-                end
-            end
-            
-            % Update last known size
-            app.LastWindowSize = currentSize;
+    end
+
+    % === Timer Management Methods ===
+    methods (Access = private)
+        %% Start the refresh timer for position updates
+        function startRefreshTimer(app)
+            app.RefreshTimer = FoilviewUtils.createTimer('fixedRate', ...
+                app.Controller.POSITION_REFRESH_PERIOD, ...
+                @(~,~) app.Controller.refreshPosition());
+            start(app.RefreshTimer);
         end
-        
+        %% Start the metric timer for metric updates
+        function startMetricTimer(app)
+            app.MetricTimer = FoilviewUtils.createTimer('fixedRate', ...
+                app.Controller.METRIC_REFRESH_PERIOD, ...
+                @(~,~) app.Controller.updateMetric());
+            start(app.MetricTimer);
+        end
+        %% Start the resize monitor timer
+        function startResizeMonitorTimer(app)
+            app.ResizeMonitorTimer = FoilviewUtils.createTimer('fixedRate', ...
+                0.5, ...
+                @(~,~) app.monitorWindowResize());
+            if isvalid(app.UIFigure)
+                app.LastWindowSize = app.UIFigure.Position;
+            end
+            start(app.ResizeMonitorTimer);
+        end
+        %% Stop and delete all timers
         function stopTimers(app)
-            % Stop and delete all timers
             FoilviewUtils.safeStopTimer(app.RefreshTimer);
             app.RefreshTimer = [];
-            
             FoilviewUtils.safeStopTimer(app.MetricTimer);
             app.MetricTimer = [];
-            
             FoilviewUtils.safeStopTimer(app.ResizeMonitorTimer);
             app.ResizeMonitorTimer = [];
         end
-        
+    end
+
+    % === Resource Cleanup Methods ===
+    methods (Access = private)
+        %% Clean up all application resources
         function cleanup(app)
-            % Clean up all application resources.
-            
-            % Stop timers
             app.stopTimers();
-            
-            % Clean up metadata logging
             app.cleanupMetadataLogging();
-            
-            % Clean up ScanImage manager
             if ~isempty(app.ScanImageManager) && isvalid(app.ScanImageManager)
                 app.ScanImageManager.cleanup();
             end
-            
-            % Clean up controller
             if ~isempty(app.Controller) && isvalid(app.Controller)
                 app.Controller.cleanup();
             end
-            
-            % Close any child windows by deleting their app objects.
             if ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp)
                 delete(app.BookmarksViewApp);
                 app.BookmarksViewApp = [];
             end
-            
             if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp)
                 delete(app.StageViewApp);
                 app.StageViewApp = [];
             end
         end
-
+        %% Clean up metadata logging and generate session stats
         function cleanupMetadataLogging(app)
             try
                 metadataFile = app.getMetadataFile();
@@ -723,7 +440,164 @@ classdef foilview < matlab.apps.AppBase
                 warning('%s: %s', ME.identifier, ME.message);
             end
         end
+    end
 
+    % === Utility/Helper Methods ===
+    methods (Access = private)
+        %% Copy UI components from struct
+        function copyComponentsFromStruct(app, components)
+            fields = fieldnames(components);
+            for i = 1:length(fields)
+                app.(fields{i}) = components.(fields{i});
+            end
+        end
+        %% Initialize the application (controllers, listeners, UI, timers)
+        function initializeApplication(app)
+            app.Controller = FoilviewController();
+            app.PlotManager = PlotManager(app);
+            app.ScanImageManager = ScanImageManager();
+            app.Controller.setFoilviewApp(app);
+            addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
+            addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
+            addlistener(app.Controller, 'MetricChanged', @(src,evt) app.onControllerMetricChanged());
+            addlistener(app.Controller, 'AutoStepComplete', @(src,evt) app.onControllerAutoStepComplete());
+            app.PlotManager.initializeMetricsPlot(app.MetricsPlotControls.Axes);
+            UiComponents.updateAllUI(app);
+            app.updateAutoStepStatus();
+            app.launchStageView();
+            app.launchBookmarksView();
+            app.updateWindowStatusButtons();
+            app.startRefreshTimer();
+            app.startMetricTimer();
+            app.startResizeMonitorTimer();
+            app.ScanImageManager.initialize(app);
+        end
+        %% Launch the stage view window
+        function launchStageView(app)
+            if isempty(app.StageViewApp) || ~isvalid(app.StageViewApp) || ~isvalid(app.StageViewApp.UIFigure)
+                try
+                    app.StageViewApp = StageView();
+                catch ME
+                    warning('foilview:StageViewLaunch', 'Failed to launch Stage View: %s', ME.message);
+                    app.StageViewApp = [];
+                end
+            else
+                app.StageViewApp.bringToFront();
+            end
+        end
+        %% Launch the bookmarks view window
+        function launchBookmarksView(app)
+            if isempty(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp.UIFigure)
+                try
+                    app.BookmarksViewApp = BookmarksView(app.Controller);
+                catch ME
+                    warning('foilview:BookmarksViewLaunch', 'Failed to launch Bookmarks View: %s', ME.message);
+                    app.BookmarksViewApp = [];
+                end
+            else
+                figure(app.BookmarksViewApp.UIFigure);
+            end
+        end
+        %% Set up all UI callback functions
+        function setupCallbacks(app)
+            app.UIFigure.CloseRequestFcn = createCallbackFcn(app, @app.onWindowClose, true);
+            app.ManualControls.StepSizeDropdown.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onStepSizeChanged, true);
+            app.ManualControls.UpButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onUpButtonPushed, true);
+            app.ManualControls.DownButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onDownButtonPushed, true);
+            app.ManualControls.ZeroButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onZeroButtonPushed, true);
+            app.ManualControls.StepUpButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onStepUpButtonPushed, true);
+            app.ManualControls.StepDownButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onStepDownButtonPushed, true);
+            app.AutoControls.StepField.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onAutoStepSizeChanged, true);
+            app.AutoControls.StepsField.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onAutoStepsChanged, true);
+            app.AutoControls.DelayField.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onAutoDelayChanged, true);
+            app.AutoControls.DirectionSwitch.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onAutoDirectionSwitchChanged, true);
+            app.AutoControls.DirectionButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onAutoDirectionToggled, true);
+            app.AutoControls.StartStopButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onStartStopButtonPushed, true);
+            app.MetricDisplay.TypeDropdown.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onMetricTypeChanged, true);
+            app.MetricDisplay.RefreshButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onMetricRefreshButtonPushed, true);
+            app.StatusControls.RefreshButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onRefreshButtonPushed, true);
+            app.StatusControls.BookmarksButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onBookmarksButtonPushed, true);
+            app.StatusControls.StageViewButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onStageViewButtonPushed, true);
+            app.StatusControls.MetadataButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onMetadataButtonPushed, true);
+            app.StatusControls.MotorRecoveryButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onMotorRecoveryButtonPushed, true);
+            app.MetricsPlotControls.ExpandButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onExpandButtonPushed, true);
+            app.MetricsPlotControls.ClearButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onClearPlotButtonPushed, true);
+            app.MetricsPlotControls.ExportButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onExportPlotButtonPushed, true);
+        end
+        %% Monitor window size changes and adjust UI responsively
+        function monitorWindowResize(app)
+            if ~isa(app.UIFigure, 'matlab.ui.Figure')
+                warning('foilview:UIFigureType', 'UIFigure is not a handle! Type: %s, Value: %s', ...
+                    class(app.UIFigure), mat2str(app.UIFigure));
+                return;
+            end
+            if ~isvalid(app.UIFigure)
+                return;
+            end
+            app.updateWindowStatusButtons();
+            currentSize = app.UIFigure.Position;
+            if app.IgnoreNextResize
+                app.IgnoreNextResize = false;
+                app.LastWindowSize = currentSize;
+                return;
+            end
+            sizeDiff = abs(currentSize - app.LastWindowSize);
+            threshold = 30;
+            heightChanged = sizeDiff(4) > threshold;
+            if heightChanged
+                try
+                    components = struct();
+                    components.PositionDisplay = app.PositionDisplay;
+                    components.AutoControls = app.AutoControls;
+                    components.ManualControls = app.ManualControls;
+                    components.MetricDisplay = app.MetricDisplay;
+                    components.StatusControls = app.StatusControls;
+                    heightBasedSize = [currentSize(1:2), app.LastWindowSize(3), currentSize(4)];
+                    UiComponents.adjustFontSizes(components, heightBasedSize);
+                catch ME
+                    warning('foilview:ResizeError', 'Error during font resize: %s', ME.message);
+                end
+            end
+            if any(sizeDiff(3:4) > threshold)
+                try
+                    if app.PlotManager.getIsPlotExpanded() && ...
+                       isvalid(app.MetricsPlotControls.Panel) && ...
+                       strcmp(app.MetricsPlotControls.Panel.Visible, 'on')
+                        if currentSize(3) > 400 && currentSize(4) > 200
+                            UiComponents.adjustPlotPosition(app.UIFigure, ...
+                                app.MetricsPlotControls.Panel, 400);
+                            app.MetricsPlotControls.Panel.Visible = 'on';
+                        end
+                    end
+                catch ME
+                    warning('foilview:ResizeError', 'Error during plot resize: %s', ME.message);
+                end
+            end
+            app.LastWindowSize = currentSize;
+        end
+        %% Get the metadata file path from workspace
         function metadataFile = getMetadataFile(app)
             try
                 metadataFile = evalin('base', 'metadataFilePath');
@@ -734,7 +608,7 @@ classdef foilview < matlab.apps.AppBase
                 metadataFile = '';
             end
         end
-
+        %% Generate session statistics from metadata file
         function generateSessionStats(app, metadataFile)
             try
                 content = fileread(metadataFile);
@@ -761,7 +635,7 @@ classdef foilview < matlab.apps.AppBase
                 warning('%s: %s', ME.identifier, ME.message);
             end
         end
-
+        %% Parse timestamps from metadata lines
         function timestamps = parseTimestamps(app, lines)
             timestamps = {};
             try
@@ -772,10 +646,9 @@ classdef foilview < matlab.apps.AppBase
                     end
                 end
             catch
-                % Return whatever we've collected
             end
         end
-
+        %% Calculate duration from timestamps
         function duration = calculateDuration(app, timestamps)
             try
                 if length(timestamps) >= 2
@@ -789,7 +662,7 @@ classdef foilview < matlab.apps.AppBase
                 duration = 0;
             end
         end
-
+        %% Display session summary in command window
         function displaySessionSummary(app, frameCount, duration, avgFrameRate, fileSize, metadataFile)
             fprintf('\n=== Session Summary ===\n');
             fprintf('Frames recorded: %d\n', frameCount);
@@ -806,22 +679,47 @@ classdef foilview < matlab.apps.AppBase
             fprintf('Metadata file: %s\n', metadataFile);
             fprintf('File size: %.1f KB\n', fileSize);
         end
+        %% Controller event: Status changed
+        function onControllerStatusChanged(app)
+            UiComponents.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller);
+        end
+        %% Controller event: Position changed
+        function onControllerPositionChanged(app)
+            UiComponents.updatePositionDisplay(app.UIFigure, app.PositionDisplay, app.Controller);
+        end
+        %% Controller event: Metric changed
+        function onControllerMetricChanged(app)
+            UiComponents.updateMetricDisplay(app.MetricDisplay, app.Controller);
+        end
+        %% Controller event: Auto step complete
+        function onControllerAutoStepComplete(app)
+            UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
+            if app.Controller.RecordMetrics
+                metrics = app.Controller.getAutoStepMetrics();
+                if ~isempty(metrics.Positions)
+                    app.PlotManager.updateMetricsPlot(app.MetricsPlotControls.Axes, app.Controller);
+                    if ~app.PlotManager.getIsPlotExpanded()
+                        app.PlotManager.expandGUI(app.UIFigure, app.MainPanel, ...
+                            app.MetricsPlotControls.Panel, app.MetricsPlotControls.ExpandButton, app);
+                    end
+                end
+            end
+        end
     end
 
+    % === Metadata Management Methods ===
     methods (Access = private)
+        %% Handles the Metadata button press, initializes logging and simulation entry
         function onMetadataButtonPushed(app, ~, ~)
             % Check if Controller exists and is valid
             if isempty(app.Controller) || ~isvalid(app.Controller)
                 return;
             end
-            
             % Configure metadata path if not already set
             if isempty(app.MetadataConfig) || ~isfield(app.MetadataConfig, 'baseDir') || isempty(app.MetadataConfig.baseDir)
                 app.configureMetadataPath();
             end
-            
             app.initializeMetadataLogging();
-            
             % In simulation mode, also collect a sample metadata entry for testing
             if app.Controller.SimulationMode
                 app.collectSimulatedMetadata();
@@ -829,37 +727,25 @@ classdef foilview < matlab.apps.AppBase
             end
         end
 
+        %% Opens dialog to configure metadata file path
         function configureMetadataPath(app)
-            % Open dialog to configure metadata file path
             try
-                % Get current base directory if available
                 currentDir = '';
                 if ~isempty(app.MetadataConfig) && isfield(app.MetadataConfig, 'baseDir')
                     currentDir = app.MetadataConfig.baseDir;
                 elseif ~isempty(app.DataDir)
                     currentDir = fileparts(app.DataDir);
                 else
-                    % Default to user's Documents folder
                     currentDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Documents');
                 end
-                
-                % Open folder selection dialog
                 selectedDir = uigetdir(currentDir, 'Select Base Directory for Metadata Files');
-                
-                if selectedDir ~= 0  % User didn't cancel
-                    % Initialize or update configuration
+                if selectedDir ~= 0
                     if isempty(app.MetadataConfig)
                         app.MetadataConfig = app.getConfiguration();
                     end
-                    
                     app.MetadataConfig.baseDir = selectedDir;
-                    
-                    % Store in workspace for persistence
                     assignin('base', 'metadataConfig', app.MetadataConfig);
-                    
                     fprintf('Metadata base directory set to: %s\n', selectedDir);
-                    
-                    % Show confirmation
                     uialert(app.UIFigure, ...
                         sprintf('Metadata base directory set to:\n%s\n\nFiles will be saved in date-based subdirectories.', selectedDir), ...
                         'Configuration Updated', ...
@@ -867,7 +753,6 @@ classdef foilview < matlab.apps.AppBase
                 else
                     fprintf('Metadata path configuration cancelled\n');
                 end
-                
             catch ME
                 warning('%s: %s', ME.identifier, ME.message);
                 uialert(app.UIFigure, ...
@@ -877,17 +762,14 @@ classdef foilview < matlab.apps.AppBase
             end
         end
 
+        %% Loads or creates default metadata configuration
         function config = getConfiguration(app)
-            % Try to get configuration from workspace or use defaults
             try
                 config = evalin('base', 'metadataConfig');
-                
-                % If found but missing fields, add defaults
                 if ~isfield(config, 'baseDir')
                     config.baseDir = '';
                 end
             catch
-                % Create default configuration
                 config = struct();
                 config.baseDir = '';
                 config.dirFormat = 'yyyy-mm-dd';
@@ -899,38 +781,28 @@ classdef foilview < matlab.apps.AppBase
             end
         end
 
+        %% Determines the base directory for metadata files
         function baseDir = getBaseDirectory(app, hSI, config)
-            % Determine base directory with priority:
-            % 1. Config setting if provided
-            % 2. ScanImage's current path if set
-            % 3. Default Box directory
-            
             if ~isempty(config.baseDir)
                 baseDir = config.baseDir;
             elseif ~isempty(hSI.hScan2D.logFilePath)
                 baseDir = fileparts(hSI.hScan2D.logFilePath);
             else
-                % Default to user's Box directory
                 baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Box', 'FOIL', 'Aaron');
-                
-                % Verify the directory exists, if not, fallback to Documents
                 if ~exist(baseDir, 'dir')
                     baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Documents');
                 end
             end
         end
 
+        %% Creates metadata file for simulation mode
         function createSimulationMetadataFile(app)
-            % Create metadata file for simulation mode
             config = app.getConfiguration();
-            
-            % Use configured base directory if available, otherwise use simulation directory
             if ~isempty(config.baseDir)
                 baseDir = config.baseDir;
             else
                 baseDir = fullfile('C:', 'Users', getenv('USERNAME'), 'Documents', 'FoilView_Simulation');
             end
-            
             app.DataDir = app.createDataDirectory(baseDir, config);
             app.MetadataFile = fullfile(app.DataDir, config.metadataFileName);
             app.ensureMetadataFile(app.MetadataFile, config.headers);
@@ -938,33 +810,27 @@ classdef foilview < matlab.apps.AppBase
             assignin('base', 'metadataConfig', config);
         end
 
+        %% Initializes metadata logging (real or simulation)
         function initializeMetadataLogging(app)
             try
                 if ~isempty(app.LastSetupTime) && (now - app.LastSetupTime) < (5/86400)
                     return;
                 end
                 app.LastSetupTime = now;
-                
-                % Check if we're in simulation mode
                 isSimulation = app.Controller.SimulationMode;
-                
                 if isSimulation
-                    % Create simulation metadata file
                     app.createSimulationMetadataFile();
                     fprintf('Metadata logging initialized in simulation mode\n');
                     return;
                 end
-                
                 try
                     hSI = evalin('base', 'hSI');
                 catch ME
                     warning('%s: %s', ME.identifier, ME.message);
-                    % Fall back to simulation mode
                     app.createSimulationMetadataFile();
                     fprintf('Metadata logging initialized in simulation mode (ScanImage not available)\n');
                     return;
                 end
-                
                 app.checkBeamSystem(hSI, false);
                 config = app.getConfiguration();
                 baseDir = app.getBaseDirectory(hSI, config);
@@ -977,65 +843,49 @@ classdef foilview < matlab.apps.AppBase
                 fprintf('Metadata logging initialized successfully\n');
             catch ME
                 warning('%s: %s', ME.identifier, ME.message);
-                % Fall back to simulation mode
                 app.createSimulationMetadataFile();
                 fprintf('Metadata logging initialized in simulation mode due to error\n');
             end
         end
 
+        %% Collects a simulated metadata entry for testing
         function collectSimulatedMetadata(app)
-            % Collect simulated metadata for testing
             try
                 metadata = struct();
-                
-                % Basic info
                 metadata.timestamp = datestr(now, 'yyyy-mm-dd HH:MM:SS');
                 metadata.filename = sprintf('sim_%s.tif', datestr(now, 'yyyymmdd_HHMMSS'));
-                
-                % Simulated scanner and imaging parameters
                 metadata.scanner = 'Simulation';
                 metadata.zoom = 1.0;
                 metadata.frameRate = 30.0;
                 metadata.averaging = 1;
                 metadata.resolution = '512x512';
                 metadata.fov = '100.0x100.0';
-                
-                % Simulated laser power info
                 metadata.powerPercent = 50.0;
                 metadata.pockelsValue = 0.5;
                 metadata.feedbackValue = struct('modulation', '2.5', 'feedback', '1.2', 'power', '0.025');
-                
-                % Current stage position from controller
                 metadata.xPos = app.Controller.CurrentXPosition;
                 metadata.yPos = app.Controller.CurrentYPosition;
                 metadata.zPos = app.Controller.CurrentPosition;
-                
-                % Add empty bookmark fields for regular metadata entries
                 metadata.bookmarkLabel = '';
                 metadata.bookmarkMetricType = '';
                 metadata.bookmarkMetricValue = '';
-                
-                % Write to file
                 if ~isempty(app.MetadataFile) && exist(fileparts(app.MetadataFile), 'dir')
                     app.writeMetadataToFile(metadata, app.MetadataFile, false);
                 end
-                
             catch ME
                 warning('%s: %s', ME.identifier, ME.message);
             end
         end
 
+        %% Writes a metadata struct to the metadata file
         function writeMetadataToFile(app, metadata, metadataFile, verbose)
             if isempty(metadataFile) || ~exist(fileparts(metadataFile), 'dir')
                 return;
             end
-            
             try
-                % Handle bookmark fields - use empty strings if not present
                 bookmarkLabel = '';
                 bookmarkMetricType = '';
                 bookmarkMetricValue = '';
-                
                 if isfield(metadata, 'bookmarkLabel')
                     bookmarkLabel = metadata.bookmarkLabel;
                 end
@@ -1045,8 +895,6 @@ classdef foilview < matlab.apps.AppBase
                 if isfield(metadata, 'bookmarkMetricValue')
                     bookmarkMetricValue = metadata.bookmarkMetricValue;
                 end
-                
-                % Format the metadata string
                 if isstruct(metadata.feedbackValue)
                     metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
                         metadata.timestamp, metadata.filename, metadata.scanner, ...
@@ -1056,53 +904,43 @@ classdef foilview < matlab.apps.AppBase
                         metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
                         metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
                 else
-                    % Handle case where feedbackValue is not a struct
                     metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
                         metadata.timestamp, metadata.filename, metadata.scanner, ...
                         metadata.zoom, metadata.frameRate, metadata.averaging,...
                         metadata.resolution, metadata.fov, metadata.powerPercent, ...
                         metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
                 end
-                
                 if verbose
                     fprintf('Writing to file: %s\n', metadataFile);
                 end
-                
-                % Use a simple fopen/fprintf approach for speed
                 fid = fopen(metadataFile, 'a');
                 if fid == -1
-                    return; % Silently fail if file can't be opened
+                    return;
                 end
-                
-                % Write and close quickly
                 fprintf(fid, metadataStr);
                 fclose(fid);
             catch
-                % Silently fail for performance reasons
                 if exist('fid', 'var') && fid ~= -1
                     fclose(fid);
                 end
             end
         end
 
+        %% Creates a date-based data directory for metadata
         function dataDir = createDataDirectory(app, baseDir, config)
-            % Create directory using specified date format
             todayStr = datestr(now, config.dirFormat);
             dataDir = fullfile(baseDir, todayStr);
-            
-            % Create directory if it doesn't exist
             if ~exist(dataDir, 'dir')
                 [success, msg] = mkdir(dataDir);
                 if ~success
                     warning('Failed to create directory: %s\nError: %s', dataDir, msg);
-                    % Fallback to base directory if needed
                     dataDir = baseDir;
                 end
             end
         end
 
+        %% Ensures the metadata file exists and has headers
         function ensureMetadataFile(app, metadataFile, headers)
-            % Create CSV file with headers if it doesn't exist
             if ~exist(metadataFile, 'file')
                 try
                     fid = fopen(metadataFile, 'w');
@@ -1121,43 +959,34 @@ classdef foilview < matlab.apps.AppBase
             end
         end
 
+        %% Diagnostic: checks beam system configuration
         function checkBeamSystem(app, hSI, verbose)
-            % Diagnostic function to check beam system configuration
             if nargin < 3
-                verbose = true; % Default to verbose output
+                verbose = true;
             end
-            
             try
                 if verbose
                     fprintf('\n--- Beam System Diagnostics ---\n');
                 end
-                
-                % Check if beam control exists
                 if ~isprop(hSI, 'hBeams') || isempty(hSI.hBeams)
                     if verbose
                         fprintf('❌ No beam control system found\n');
                     end
                     return;
                 end
-                
                 if verbose
                     fprintf('✓ Beam control system detected\n');
                 end
-                
-                % Check beam controller type
                 if isprop(hSI.hBeams, 'hBeams') && ~isempty(hSI.hBeams.hBeams)
                     beam = hSI.hBeams.hBeams{1};
                     if verbose
                         fprintf('✓ Beam controller type: %s\n', class(beam));
                     end
-                    
-                    % Check for timing properties
                     if isprop(beam, 'beamBufferSize')
                         if verbose
                             fprintf('✓ Beam buffer size: %d\n', beam.beamBufferSize);
                         end
                     end
-                    
                     if isprop(beam, 'beamBufferTimeout')
                         if verbose
                             fprintf('✓ Beam buffer timeout: %f seconds\n', beam.beamBufferTimeout);
@@ -1165,20 +994,16 @@ classdef foilview < matlab.apps.AppBase
                         end
                     end
                 end
-                
-                % Check for Pockels cell
                 if verbose
                     if isprop(hSI.hBeams, 'hPockels') && ~isempty(hSI.hBeams.hPockels)
                         fprintf('✓ Pockels cell controller found\n');
                     else
                         fprintf('❌ No Pockels cell controller found\n');
                     end
-                    
                     if verbose
                         fprintf('--- End Beam Diagnostics ---\n\n');
                     end
                 end
-                
             catch ME
                 if verbose
                     fprintf('Error during beam diagnostics: %s\n', ME.message);

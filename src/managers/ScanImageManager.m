@@ -249,6 +249,11 @@ classdef ScanImageManager < handle
                 metadata.yPos = stagePos.y;
                 metadata.zPos = stagePos.z;
                 
+                % Add empty bookmark fields for regular metadata entries
+                metadata.bookmarkLabel = '';
+                metadata.bookmarkMetricType = '';
+                metadata.bookmarkMetricValue = '';
+                
             catch ME
                 warning('%s: %s', ME.identifier, ME.message);
                 metadata = [];
@@ -401,22 +406,37 @@ classdef ScanImageManager < handle
             end
             
             try
+                % Handle bookmark fields - use empty strings if not present
+                bookmarkLabel = '';
+                bookmarkMetricType = '';
+                bookmarkMetricValue = '';
+                
+                if isfield(metadata, 'bookmarkLabel')
+                    bookmarkLabel = metadata.bookmarkLabel;
+                end
+                if isfield(metadata, 'bookmarkMetricType')
+                    bookmarkMetricType = metadata.bookmarkMetricType;
+                end
+                if isfield(metadata, 'bookmarkMetricValue')
+                    bookmarkMetricValue = metadata.bookmarkMetricValue;
+                end
+                
                 % Format the metadata string
                 if isstruct(metadata.feedbackValue)
-                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,\n',...
+                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
                         metadata.timestamp, metadata.filename, metadata.scanner, ...
                         metadata.zoom, metadata.frameRate, metadata.averaging,...
                         metadata.resolution, metadata.fov, metadata.powerPercent, ...
                         metadata.pockelsValue, metadata.feedbackValue.modulation,...
                         metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
-                        metadata.zPos, metadata.xPos, metadata.yPos);
+                        metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
                 else
                     % Handle case where feedbackValue is not a struct
-                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,\n',...
+                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
                         metadata.timestamp, metadata.filename, metadata.scanner, ...
                         metadata.zoom, metadata.frameRate, metadata.averaging,...
                         metadata.resolution, metadata.fov, metadata.powerPercent, ...
-                        metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos);
+                        metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
                 end
                 
                 if verbose
@@ -544,7 +564,7 @@ classdef ScanImageManager < handle
                         try
                             axisInfo.step.Callback(axisInfo.step, []);
                         catch ME
-                            warning('ScanImageManager: Error setting step size: %s', ME.message);
+                            warning('ScanImageManager:ErrorSettingStepSize', 'Error setting step size: %s', ME.message);
                         end
                     end
                 end
@@ -553,8 +573,10 @@ classdef ScanImageManager < handle
                 buttonToPress = [];
                 if microns > 0 && ~isempty(axisInfo.inc)
                     buttonToPress = axisInfo.inc;
+                    fprintf('DEBUG: Selecting increment button (Zinc) for %.1f μm movement\n', microns);
                 elseif microns < 0 && ~isempty(axisInfo.dec)
                     buttonToPress = axisInfo.dec;
+                    fprintf('DEBUG: Selecting decrement button (Zdec) for %.1f μm movement\n', microns);
                 end
                 
                 if isempty(buttonToPress)
@@ -643,6 +665,10 @@ classdef ScanImageManager < handle
                     end
                 end
                 
+                if ~isempty(pixelData)
+                    sz = size(pixelData);
+                    fprintf('Image acquired: %s\n', mat2str(sz));
+                end
             catch ME
                 warning('%s: %s', ME.identifier, ME.message);
             end
@@ -671,6 +697,18 @@ classdef ScanImageManager < handle
             axisInfo = struct('etPos', [], 'step', [], 'inc', [], 'dec', []);
             
             try
+                % Debug: List all available tags for troubleshooting
+                allTags = findall(motorFig, 'Tag', '.*');
+                if ~isempty(allTags)
+                    fprintf('DEBUG: Available tags in motor controls: ');
+                    for i = 1:min(10, length(allTags))  % Show first 10 tags
+                        if isprop(allTags(i), 'Tag') && ~isempty(allTags(i).Tag)
+                            fprintf('%s ', allTags(i).Tag);
+                        end
+                    end
+                    fprintf('\n');
+                end
+                
                 switch upper(axisName)
                     case 'X'
                         axisInfo.etPos = findall(motorFig, 'Tag', 'etXPos');
@@ -687,6 +725,8 @@ classdef ScanImageManager < handle
                         axisInfo.step = findall(motorFig, 'Tag', 'Zstep');
                         axisInfo.inc = findall(motorFig, 'Tag', 'Zinc');
                         axisInfo.dec = findall(motorFig, 'Tag', 'Zdec');
+                        fprintf('DEBUG: Z axis buttons - inc found: %s, dec found: %s\n', ...
+                            ~isempty(axisInfo.inc), ~isempty(axisInfo.dec));
                 end
             catch ME
                 warning('ScanImageManager:GetAxisInfoError', 'Error getting axis info for %s: %s', axisName, ME.message);

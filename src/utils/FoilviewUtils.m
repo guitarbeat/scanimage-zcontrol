@@ -37,6 +37,8 @@ classdef FoilviewUtils < handle
             % Centralized error logging with consistent formatting
             if ischar(error)
                 fprintf(FoilviewUtils.ERROR_PREFIX, context, error);
+            elseif isa(error, 'MException')
+                fprintf(FoilviewUtils.ERROR_PREFIX, context, error.message);
             elseif isstruct(error) && isfield(error, 'message')
                 fprintf(FoilviewUtils.ERROR_PREFIX, context, error.message);
             else

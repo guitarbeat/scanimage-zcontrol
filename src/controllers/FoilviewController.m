@@ -98,6 +98,13 @@ classdef FoilviewController < handle
             obj.connectToScanImage();
         end
         
+        function setFoilviewApp(obj, foilviewApp)
+            % Set reference to the main foilview app for metadata logging
+            if ~isempty(obj.BookmarkManager)
+                obj.BookmarkManager.setFoilviewApp(foilviewApp);
+            end
+        end
+        
         function delete(obj)
             obj.cleanup();
         end
@@ -324,8 +331,17 @@ classdef FoilviewController < handle
         end
         
         function startAutoStepping(obj, stepSize, numSteps, delay, direction, recordMetrics)
+            % Validate timer state first
+            obj.isValidTimerState();
+            
             if obj.IsAutoRunning
                 return;
+            end
+            
+            % Clear any existing timer first
+            if ~isempty(obj.AutoTimer) && isvalid(obj.AutoTimer)
+                FoilviewUtils.safeStopTimer(obj.AutoTimer);
+                obj.AutoTimer = [];
             end
             
             obj.IsAutoRunning = true;
@@ -339,22 +355,40 @@ classdef FoilviewController < handle
                 obj.AutoStepMetrics = struct('Positions', [], 'Values', struct());
             end
             
-            obj.AutoTimer = FoilviewUtils.createTimer('fixedRate', delay, ...
-                @(~,~) obj.executeAutoStep(stepSize));
-            
-            start(obj.AutoTimer);
-            obj.notifyStatusChanged();
-            
-            fprintf('Auto-stepping started: %d steps of %.1f μm\n', numSteps, stepSize);
+            try
+                obj.AutoTimer = FoilviewUtils.createTimer('fixedRate', delay, ...
+                    @(~,~) obj.executeAutoStep(stepSize));
+                
+                start(obj.AutoTimer);
+                obj.notifyStatusChanged();
+                
+                fprintf('Auto-stepping started: %d steps of %.1f μm\n', numSteps, stepSize);
+            catch ME
+                fprintf('ERROR: Failed to start auto-stepping: %s\n', ME.message);
+                % Clean up on failure
+                obj.IsAutoRunning = false;
+                if ~isempty(obj.AutoTimer) && isvalid(obj.AutoTimer)
+                    FoilviewUtils.safeStopTimer(obj.AutoTimer);
+                    obj.AutoTimer = [];
+                end
+                rethrow(ME);
+            end
         end
         
         function stopAutoStepping(obj)
+            % Validate timer state first
+            obj.isValidTimerState();
+            
             FoilviewUtils.safeExecute(@() doStop(), 'stopAutoStepping');
             
             function doStop()
-                FoilviewUtils.safeStopTimer(obj.AutoTimer);
+                if ~isempty(obj.AutoTimer) && isvalid(obj.AutoTimer)
+                    FoilviewUtils.safeStopTimer(obj.AutoTimer);
+                end
+                
                 obj.AutoTimer = [];
                 obj.IsAutoRunning = false;
+                
                 obj.notifyStatusChanged();
                 
                 fprintf('Auto-stepping completed at position %.1f μm\n', obj.CurrentPosition);
@@ -725,7 +759,17 @@ classdef FoilviewController < handle
                 
                 obj.CurrentStep = obj.CurrentStep + 1;
                 % Apply direction at execution time
-                obj.moveStage(stepSize * obj.AutoDirection);
+                actualStep = stepSize * obj.AutoDirection;
+                
+                try
+                    obj.moveStage(actualStep);
+                    fprintf('Auto-step %d/%d: moved %.2f μm (direction %d)\n', obj.CurrentStep, obj.TotalSteps, actualStep, obj.AutoDirection);
+                catch ME
+                    fprintf('ERROR: Failed to execute step %d/%d: %s\n', obj.CurrentStep, obj.TotalSteps, ME.message);
+                    % Stop auto-stepping on movement error
+                    obj.stopAutoStepping();
+                    return;
+                end
                 
                 if obj.CurrentStep >= obj.TotalSteps
                     obj.stopAutoStepping();
@@ -808,7 +852,59 @@ classdef FoilviewController < handle
             obj.AutoTimer = [];
         end
         
-
+        function resetTimerState(obj)
+            % Safely reset timer state to prevent race conditions
+            
+            % Stop and clear timer if it exists
+            if ~isempty(obj.AutoTimer) && isvalid(obj.AutoTimer)
+                FoilviewUtils.safeStopTimer(obj.AutoTimer);
+            end
+            
+            % Reset state
+            obj.AutoTimer = [];
+            obj.IsAutoRunning = false;
+            obj.CurrentStep = 0;
+            obj.TotalSteps = 0;
+        end
+        
+        function stateConsistent = isValidTimerState(obj)
+            % Check if timer state is consistent
+            timerValid = ~isempty(obj.AutoTimer) && isvalid(obj.AutoTimer);
+            stateConsistent = (obj.IsAutoRunning && timerValid) || (~obj.IsAutoRunning && ~timerValid);
+            
+            if ~stateConsistent
+                fprintf('WARNING: Timer state inconsistency detected - IsAutoRunning: %d, Timer valid: %d\n', ...
+                    obj.IsAutoRunning, timerValid);
+                % Auto-correct the state
+                if obj.IsAutoRunning && ~timerValid
+                    fprintf('WARNING: Auto-correcting - clearing IsAutoRunning flag\n');
+                    obj.IsAutoRunning = false;
+                elseif ~obj.IsAutoRunning && timerValid
+                    fprintf('WARNING: Auto-correcting - clearing invalid timer\n');
+                    FoilviewUtils.safeStopTimer(obj.AutoTimer);
+                    obj.AutoTimer = [];
+                end
+            end
+        end
+    end
+    
+    methods (Access = public)
+        function timerState = getTimerState(obj)
+            % Public method to get timer state for debugging
+            timerState = struct();
+            timerState.IsAutoRunning = obj.IsAutoRunning;
+            timerState.HasTimer = ~isempty(obj.AutoTimer);
+            timerState.TimerValid = ~isempty(obj.AutoTimer) && isvalid(obj.AutoTimer);
+            timerState.CurrentStep = obj.CurrentStep;
+            timerState.TotalSteps = obj.TotalSteps;
+            timerState.AutoDirection = obj.AutoDirection;
+        end
+        
+        function cleanup(obj)
+            % Public wrapper to clean up controller resources
+            obj.cleanupInternal();
+        end
+        
         function notifyStatusChanged(obj)
             notify(obj, 'StatusChanged');
         end
@@ -823,82 +919,6 @@ classdef FoilviewController < handle
         
         function notifyAutoStepComplete(obj)
             notify(obj, 'AutoStepComplete');
-        end
-        
-        function success = validateMovement(obj, microns)
-            success = true;
-            if obj.SimulationMode
-                if microns == 0
-                    fprintf('Movement is zero\n');
-                    success = false;
-                end
-            else
-                if abs(microns) > obj.MAX_STEP_SIZE
-                    fprintf('Movement exceeds maximum step size of %.1f μm\n', obj.MAX_STEP_SIZE);
-                    success = false;
-                end
-            end
-        end
-        
-        function success = validatePosition(obj, position)
-            % Use centralized validation utilities
-            success = FoilviewUtils.validateNumericRange(position, obj.MIN_POSITION, obj.MAX_POSITION, 'Position');
-        end
-        
-        function handleMovementError(obj, e, microns)
-            obj.SimulationMode = true;
-            obj.setSimulationMode(true, ['Error: ' e.message]);
-            fprintf('Movement error: %.1f μm\n', microns);
-        end
-        
-        % ===== VALIDATION METHODS (consolidated from foilview_logic) =====
-        
-        function [valid, errorMsg] = validateAutoStepParameters(obj, autoControls)
-            % Enhanced parameter validation with detailed error messages
-            valid = true;
-            errorMsg = '';
-            
-            stepSize = autoControls.StepField.Value;
-            numSteps = autoControls.StepsField.Value;
-            delay = autoControls.DelayField.Value;
-            
-            % Validate step size using utility
-            if ~FoilviewUtils.validateNumericRange(stepSize, obj.MIN_STEP_SIZE, obj.MAX_STEP_SIZE, 'Step size')
-                valid = false;
-                errorMsg = sprintf('Step size must be between %.3f and %.1f μm', ...
-                    obj.MIN_STEP_SIZE, obj.MAX_STEP_SIZE);
-                return;
-            end
-            
-            % Validate number of steps using utility
-            if ~FoilviewUtils.validateInteger(numSteps, obj.MIN_AUTO_STEPS, obj.MAX_AUTO_STEPS, 'Number of steps')
-                valid = false;
-                errorMsg = sprintf('Number of steps must be between %d and %d', ...
-                    obj.MIN_AUTO_STEPS, obj.MAX_AUTO_STEPS);
-                return;
-            end
-            
-            % Validate delay using utility
-            if ~FoilviewUtils.validateNumericRange(delay, obj.MIN_AUTO_DELAY, obj.MAX_AUTO_DELAY, 'Delay')
-                valid = false;
-                errorMsg = sprintf('Delay must be between %.1f and %.1f seconds', ...
-                    obj.MIN_AUTO_DELAY, obj.MAX_AUTO_DELAY);
-                return;
-            end
-        end
-        
-        function [valid, errorMsg] = validateLabel(obj, label)
-            % Use centralized string validation
-            [valid, errorMsg] = FoilviewUtils.validateStringInput(label, ...
-                obj.MIN_LABEL_LENGTH, obj.MAX_LABEL_LENGTH, ...
-                obj.LABEL_INVALID_CHARS, 'Label');
-        end
-    end
-    
-    methods (Access = public)
-        function cleanup(obj)
-            % Public wrapper to clean up controller resources
-            obj.cleanupInternal();
         end
     end
 end 

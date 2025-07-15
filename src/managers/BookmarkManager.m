@@ -2,10 +2,19 @@ classdef BookmarkManager < handle
     properties (Access = public)
         MarkedPositions = struct('Labels', {{}}, 'XPositions', [], 'YPositions', [], 'ZPositions', [], 'Metrics', {{}})
     end
+    
+    properties (Access = private)
+        FoilviewApp
+    end
 
     methods (Access = public)
         function obj = BookmarkManager()
             % Constructor
+        end
+        
+        function setFoilviewApp(obj, foilviewApp)
+            % Set reference to the main foilview app for metadata logging
+            obj.FoilviewApp = foilviewApp;
         end
 
         function add(obj, label, xPos, yPos, zPos, metricStruct)
@@ -30,6 +39,15 @@ classdef BookmarkManager < handle
             obj.MarkedPositions.YPositions(end+1) = yPos;
             obj.MarkedPositions.ZPositions(end+1) = zPos;
             obj.MarkedPositions.Metrics{end+1} = metricStruct;
+            
+            % Save bookmark to metadata if foilview app is available
+            if ~isempty(obj.FoilviewApp) && isvalid(obj.FoilviewApp)
+                try
+                    obj.FoilviewApp.saveBookmarkToMetadata(label, xPos, yPos, zPos, metricStruct);
+                catch ME
+                    warning('%s: %s', ME.identifier, ME.message);
+                end
+            end
         end
 
         function remove(obj, index)

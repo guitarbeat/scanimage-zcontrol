@@ -184,8 +184,6 @@ classdef UiBuilder
             stepSizePanel.Layout.Column = 3;
             stepSizePanel.BorderType = 'line';
             stepSizePanel.BackgroundColor = UiComponents.COLORS.Light;
-            stepSizePanel.BorderWidth = 1;
-            stepSizePanel.HighlightColor = [0.8 0.8 0.8];
 
             stepSizeGrid = uigridlayout(stepSizePanel, [1, 1]);
             stepSizeGrid.Padding = [4 2 4 2];

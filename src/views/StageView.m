@@ -19,6 +19,13 @@ classdef StageView < handle
         ActivePreviews = {} % Cell array of structs, each holding {name, camera, figure}
         AvailableCameras = {}
         IsPreviewActive = false
+        
+        % Video Recording State
+        IsRecording = false;
+        VideoWriterObj = [];
+        VideoRecordTimer = [];
+        RecordingStartTime = [];
+        RecordingFileName = '';
     end
 
     methods
@@ -117,10 +124,32 @@ classdef StageView < handle
             obj.SnapshotAllButton.Layout.Column = 1;
             obj.SnapshotAllButton.BackgroundColor = [0.2 0.6 0.8];
             
+            % Video Recording Buttons
+            obj.StartRecordingButton = uibutton(controlLayout, 'push');
+            obj.StartRecordingButton.Text = 'Start Recording';
+            obj.StartRecordingButton.Layout.Row = 7;
+            obj.StartRecordingButton.Layout.Column = 1;
+            obj.StartRecordingButton.BackgroundColor = [0.9 0.6 0.2];
+            
+            obj.StopRecordingButton = uibutton(controlLayout, 'push');
+            obj.StopRecordingButton.Text = 'Stop Recording';
+            obj.StopRecordingButton.Layout.Row = 8;
+            obj.StopRecordingButton.Layout.Column = 1;
+            obj.StopRecordingButton.BackgroundColor = [0.8 0.2 0.2];
+            obj.StopRecordingButton.Enable = 'off';
+            
+            % Recording Status Label
+            obj.RecordingStatusLabel = uilabel(controlLayout);
+            obj.RecordingStatusLabel.Text = 'Not recording';
+            obj.RecordingStatusLabel.Layout.Row = 9;
+            obj.RecordingStatusLabel.Layout.Column = 1;
+            obj.RecordingStatusLabel.FontColor = [0.5 0.5 0.5];
+            obj.RecordingStatusLabel.FontWeight = 'bold';
+            
             % Instructions
             instructionLabel = uilabel(controlLayout);
             instructionLabel.Text = 'Select a camera and click Start';
-            instructionLabel.Layout.Row = 8;
+            instructionLabel.Layout.Row = 10;
             instructionLabel.Layout.Column = 1;
             instructionLabel.FontSize = 10;
             instructionLabel.FontColor = [0.5 0.5 0.5];
@@ -140,6 +169,8 @@ classdef StageView < handle
             obj.StartAllButton.ButtonPushedFcn = @(~,~) obj.onStartAllButtonPushed();
             obj.StopAllButton.ButtonPushedFcn = @(~,~) obj.onStopAllButtonPushed();
             obj.SnapshotAllButton.ButtonPushedFcn = @(~,~) obj.onSnapshotAllButtonPushed();
+            obj.StartRecordingButton.ButtonPushedFcn = @(~,~) obj.onStartRecordingButtonPushed();
+            obj.StopRecordingButton.ButtonPushedFcn = @(~,~) obj.onStopRecordingButtonPushed();
         end
 
         function initialize(obj)
@@ -159,6 +190,8 @@ classdef StageView < handle
             obj.StartAllButton.Enable = hasCamerasAvailable;
             obj.StopAllButton.Enable = hasActiveCameras;
             obj.SnapshotAllButton.Enable = hasActiveCameras;
+            obj.StartRecordingButton.Enable = obj.IsPreviewActive && ~obj.IsRecording;
+            obj.StopRecordingButton.Enable = obj.IsRecording;
         end
 
         % Camera Operations
@@ -279,6 +312,7 @@ classdef StageView < handle
             obj.IsPreviewActive = false;
             obj.updateStatusLabel();
             obj.updateUI();
+            obj.cleanupRecording();
         end
         
         function closeSingleCamera(obj, camName)
@@ -318,6 +352,7 @@ classdef StageView < handle
                 
                 obj.updateStatusLabel();
                 obj.updateUI();
+                obj.cleanupRecording();
             end
         end
 
@@ -390,6 +425,86 @@ classdef StageView < handle
         
         function onSnapshotAllButtonPushed(obj)
             obj.captureSnapshot();
+        end
+
+        function onStartRecordingButtonPushed(obj)
+            % Start video recording for the currently previewed camera
+            if obj.IsRecording
+                return;
+            end
+            if isempty(obj.ActivePreviews) || ~isvalid(obj.ActivePreviews{1}.camera)
+                uialert(obj.UIFigure, 'No active camera to record from.', 'No Camera');
+                return;
+            end
+            [file, path] = uiputfile('*.avi', 'Save Video As');
+            if isequal(file,0)
+                return;
+            end
+            obj.RecordingFileName = fullfile(path, file);
+            cam = obj.ActivePreviews{1}.camera;
+            try
+                frame = snapshot(cam);
+                obj.VideoWriterObj = VideoWriter(obj.RecordingFileName, 'Motion JPEG AVI');
+                obj.VideoWriterObj.FrameRate = 15; % Default, can be parameterized
+                open(obj.VideoWriterObj);
+                obj.IsRecording = true;
+                obj.RecordingStartTime = datetime('now');
+                obj.RecordingStatusLabel.Text = sprintf('Recording: %s', file);
+                obj.RecordingStatusLabel.FontColor = [0.9 0.6 0.2];
+                obj.StartRecordingButton.Enable = 'off';
+                obj.StopRecordingButton.Enable = 'on';
+                % Start timer to grab frames
+                obj.VideoRecordTimer = timer('ExecutionMode','fixedRate', ...
+                    'Period', 1/obj.VideoWriterObj.FrameRate, ...
+                    'TimerFcn', @(~,~) obj.recordFrame(), ...
+                    'ErrorFcn', @(~,e) disp(e.Data));
+                start(obj.VideoRecordTimer);
+            catch ME
+                uialert(obj.UIFigure, sprintf('Failed to start recording: %s', ME.message), 'Recording Error');
+                obj.cleanupRecording();
+            end
+        end
+
+        function onStopRecordingButtonPushed(obj)
+            % Stop video recording
+            obj.cleanupRecording();
+        end
+
+        function recordFrame(obj)
+            % Timer callback to record a frame from the camera
+            if ~obj.IsRecording || isempty(obj.ActivePreviews) || ~isvalid(obj.ActivePreviews{1}.camera)
+                obj.cleanupRecording();
+                return;
+            end
+            try
+                cam = obj.ActivePreviews{1}.camera;
+                frame = snapshot(cam);
+                writeVideo(obj.VideoWriterObj, frame);
+            catch ME
+                warning('StageView:RecordFrameError', 'Failed to record frame: %s', ME.message);
+                obj.cleanupRecording();
+            end
+        end
+
+        function cleanupRecording(obj)
+            % Clean up video recording resources
+            if ~isempty(obj.VideoRecordTimer) && isvalid(obj.VideoRecordTimer)
+                stop(obj.VideoRecordTimer);
+                delete(obj.VideoRecordTimer);
+            end
+            obj.VideoRecordTimer = [];
+            if ~isempty(obj.VideoWriterObj)
+                try
+                    close(obj.VideoWriterObj);
+                catch
+                end
+            end
+            obj.VideoWriterObj = [];
+            obj.IsRecording = false;
+            obj.RecordingStatusLabel.Text = 'Not recording';
+            obj.RecordingStatusLabel.FontColor = [0.5 0.5 0.5];
+            obj.StartRecordingButton.Enable = obj.IsPreviewActive;
+            obj.StopRecordingButton.Enable = 'off';
         end
     end
 end 

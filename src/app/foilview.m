@@ -155,38 +155,11 @@ classdef foilview < matlab.apps.AppBase
     
     % === UI Callback Methods ===
     methods (Access = private)
-        %% Manual control: Up button pressed
-        function onUpButtonPushed(app, varargin)
-            stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
-            app.Controller.moveStageManual(stepSize, 1);
-        end
-        %% Manual control: Down button pressed
+        % -- Manual Controls Callbacks --
         function onDownButtonPushed(app, varargin)
             stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
             app.Controller.moveStageManual(stepSize, -1);
         end
-        %% Manual control: Zero button pressed
-        function onZeroButtonPushed(app, varargin)
-            app.Controller.resetPosition();
-        end
-        %% Manual control: Step size dropdown changed
-        function onStepSizeChanged(app, varargin)
-            if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
-                event = varargin{1};
-                app.Controller.setStepSize(event.Value);
-                app.updateStepSizeDisplay();
-            end
-        end
-        %% Manual control: Step up button pressed
-        function onStepUpButtonPushed(app, varargin)
-            currentIndex = app.ManualControls.CurrentStepIndex;
-            if currentIndex < length(app.ManualControls.StepSizes)
-                newIndex = currentIndex + 1;
-                newStepSize = app.ManualControls.StepSizes(newIndex);
-                app.updateStepSizeDisplay(newIndex, newStepSize);
-            end
-        end
-        %% Manual control: Step down button pressed
         function onStepDownButtonPushed(app, varargin)
             currentIndex = app.ManualControls.CurrentStepIndex;
             if currentIndex > 1
@@ -195,23 +168,32 @@ classdef foilview < matlab.apps.AppBase
                 app.updateStepSizeDisplay(newIndex, newStepSize);
             end
         end
-        %% Auto control: Step size field changed
-        function onAutoStepSizeChanged(app, varargin)
+        function onStepSizeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
-                app.Controller.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, false);
-                app.updateAutoStepStatus();
+                app.Controller.setStepSize(event.Value);
+                app.updateStepSizeDisplay();
             end
         end
-        %% Auto control: Steps field changed
-        function onAutoStepsChanged(app, varargin)
-            app.updateAutoStepStatus();
+        function onStepUpButtonPushed(app, varargin)
+            currentIndex = app.ManualControls.CurrentStepIndex;
+            if currentIndex < length(app.ManualControls.StepSizes)
+                newIndex = currentIndex + 1;
+                newStepSize = app.ManualControls.StepSizes(newIndex);
+                app.updateStepSizeDisplay(newIndex, newStepSize);
+            end
         end
-        %% Auto control: Delay field changed
+        function onUpButtonPushed(app, varargin)
+            stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
+            app.Controller.moveStageManual(stepSize, 1);
+        end
+        function onZeroButtonPushed(app, varargin)
+            app.Controller.resetPosition();
+        end
+        % -- Auto Controls Callbacks --
         function onAutoDelayChanged(app, varargin)
             app.updateAutoStepStatus();
         end
-        %% Auto control: Direction switch changed
         function onAutoDirectionSwitchChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
@@ -225,7 +207,6 @@ classdef foilview < matlab.apps.AppBase
                 UiComponents.updateAllUI(app);
             end
         end
-        %% Auto control: Direction button toggled
         function onAutoDirectionToggled(app, varargin)
             currentDirection = app.Controller.AutoDirection;
             newDirection = -currentDirection;
@@ -233,7 +214,16 @@ classdef foilview < matlab.apps.AppBase
             app.updateAutoStepStatus();
             UiComponents.updateAllUI(app);
         end
-        %% Auto control: Start/Stop button pressed
+        function onAutoStepSizeChanged(app, varargin)
+            if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
+                event = varargin{1};
+                app.Controller.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, false);
+                app.updateAutoStepStatus();
+            end
+        end
+        function onAutoStepsChanged(app, varargin)
+            app.updateAutoStepStatus();
+        end
         function onStartStopButtonPushed(app, varargin)
             fprintf('DEBUG: onStartStopButtonPushed ENTRY - IsAutoRunning: %d\n', app.Controller.IsAutoRunning);
             if app.Controller.IsAutoRunning
@@ -248,11 +238,16 @@ classdef foilview < matlab.apps.AppBase
             app.updateAutoStepStatus();
             fprintf('DEBUG: onStartStopButtonPushed EXIT - IsAutoRunning: %d\n', app.Controller.IsAutoRunning);
         end
-        %% Status: Refresh button pressed
-        function onRefreshButtonPushed(app, ~, ~)
-            app.Controller.refreshPosition();
+        % -- Status Controls Callbacks --
+        function onBookmarksButtonPushed(app, ~, ~)
+            if isempty(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp.UIFigure)
+                app.launchBookmarksView();
+            else
+                delete(app.BookmarksViewApp);
+                app.BookmarksViewApp = [];
+            end
+            app.updateWindowStatusButtons();
         end
-        %% Status: Motor recovery button pressed
         function onMotorRecoveryButtonPushed(app, ~, ~)
             fprintf('Attempting motor error recovery...\n');
             success = app.Controller.recoverFromMotorError();
@@ -263,17 +258,9 @@ classdef foilview < matlab.apps.AppBase
                 fprintf('Motor error recovery failed. Please check ScanImage Motor Controls manually.\n');
             end
         end
-        %% Status: Bookmarks button pressed
-        function onBookmarksButtonPushed(app, ~, ~)
-            if isempty(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp) || ~isvalid(app.BookmarksViewApp.UIFigure)
-                app.launchBookmarksView();
-            else
-                delete(app.BookmarksViewApp);
-                app.BookmarksViewApp = [];
-            end
-            app.updateWindowStatusButtons();
+        function onRefreshButtonPushed(app, ~, ~)
+            app.Controller.refreshPosition();
         end
-        %% Status: Stage view button pressed
         function onStageViewButtonPushed(app, ~, ~)
             if isempty(app.StageViewApp) || ~isvalid(app.StageViewApp) || ~isvalid(app.StageViewApp.UIFigure)
                 app.launchStageView();
@@ -283,11 +270,13 @@ classdef foilview < matlab.apps.AppBase
             end
             app.updateWindowStatusButtons();
         end
-        %% Window close event
         function onWindowClose(app, varargin)
             delete(app);
         end
-        %% Metric: Type dropdown changed
+        % -- Metric Controls Callbacks --
+        function onMetricRefreshButtonPushed(app, ~, ~)
+            app.Controller.updateMetric();
+        end
         function onMetricTypeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
                 event = varargin{1};
@@ -304,11 +293,10 @@ classdef foilview < matlab.apps.AppBase
             FoilviewUtils.safeStopTimer(app.ResizeMonitorTimer);
             app.ResizeMonitorTimer = [];
         end
-        %% Metric: Refresh button pressed
-        function onMetricRefreshButtonPushed(app, ~, ~)
-            app.Controller.updateMetric();
+        % -- Plot Controls Callbacks --
+        function onClearPlotButtonPushed(app, varargin)
+            app.PlotManager.clearMetricsPlot(app.MetricsPlotControls.Axes);
         end
-        %% Plot: Expand/collapse button pressed
         function onExpandButtonPushed(app, ~, ~)
             isExpanded = app.PlotManager.getIsPlotExpanded();
             if isExpanded
@@ -319,11 +307,6 @@ classdef foilview < matlab.apps.AppBase
                     app.MetricsPlotControls.Panel, app.MetricsPlotControls.ExpandButton, app);
             end
         end
-        %% Plot: Clear button pressed
-        function onClearPlotButtonPushed(app, varargin)
-            app.PlotManager.clearMetricsPlot(app.MetricsPlotControls.Axes);
-        end
-        %% Plot: Export button pressed
         function onExportPlotButtonPushed(app, varargin)
             app.PlotManager.exportPlotData(app.UIFigure, app.Controller);
         end

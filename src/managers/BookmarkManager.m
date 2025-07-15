@@ -45,7 +45,7 @@ classdef BookmarkManager < handle
                 try
                     obj.FoilviewApp.saveBookmarkToMetadata(label, xPos, yPos, zPos, metricStruct);
                 catch ME
-                    warning('%s: %s', ME.identifier, ME.message);
+                    FoilviewUtils.logException('BookmarkManager', ME);
                 end
             end
         end

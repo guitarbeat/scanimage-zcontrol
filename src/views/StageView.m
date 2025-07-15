@@ -215,7 +215,7 @@ classdef StageView < handle
                 obj.CameraListBox.Items = {'Error detecting cameras'};
                 obj.StatusLabel.Text = 'Camera detection failed';
                 obj.StatusLabel.FontColor = [0.8 0.2 0.2];
-                warning('stageview:CameraDetection', 'Failed to detect cameras: %s', ME.message);
+                FoilviewUtils.logException('StageView', ME, 'Failed to detect cameras');
             end
         end
         
@@ -296,7 +296,7 @@ classdef StageView < handle
                         clear previewData.camera;
                     end
                 catch ME
-                    warning('StageView:CleanupError', 'Error closing camera preview: %s', ME.message);
+                    FoilviewUtils.logException('StageView', ME, 'Error closing camera preview');
                 end
                 
                 try
@@ -307,7 +307,7 @@ classdef StageView < handle
                         delete(previewData.figure);
                     end
                 catch ME
-                    warning('StageView:CleanupError', 'Error deleting figure: %s', ME.message);
+                    FoilviewUtils.logException('StageView', ME, 'Error deleting figure');
                 end
             end
             
@@ -338,7 +338,7 @@ classdef StageView < handle
                         clear previewData.camera;
                     end
                 catch ME
-                    warning('StageView:CleanupError', 'Error closing single camera preview: %s', ME.message);
+                    FoilviewUtils.logException('StageView', ME, 'Error closing single camera preview');
                 end
 
                 % Figure is closing, but we need to delete its handle to prevent memory leaks
@@ -399,8 +399,7 @@ classdef StageView < handle
                     success = true;
                 end
             catch ME
-                warning('stageview:SnapshotError', ...
-                       'Failed to capture snapshot from camera %s: %s', feed.name, ME.message);
+                FoilviewUtils.logException('StageView', ME, 'Snapshot error');
             end
             
             if success
@@ -484,7 +483,7 @@ classdef StageView < handle
                 frame = snapshot(cam);
                 writeVideo(obj.VideoWriterObj, frame);
             catch ME
-                warning('StageView:RecordFrameError', 'Failed to record frame: %s', ME.message);
+                FoilviewUtils.logException('StageView', ME, 'Failed to record frame');
                 obj.cleanupRecording();
             end
         end

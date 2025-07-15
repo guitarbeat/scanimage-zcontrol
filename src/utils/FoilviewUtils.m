@@ -3,6 +3,21 @@ classdef FoilviewUtils < handle
     properties (Constant, Access = public)
         ERROR_PREFIX = 'Error in %s: %s\n'
         
+        % Logging levels
+        LOG_LEVEL_DEBUG = 0
+        LOG_LEVEL_INFO = 1
+        LOG_LEVEL_WARN = 2
+        LOG_LEVEL_ERROR = 3
+        
+        % Logging configuration
+        LOG_LEVEL = FoilviewUtils.LOG_LEVEL_WARN  % Default to warning level
+        LOG_TO_CONSOLE = true
+        LOG_TO_FILE = false
+        LOG_FILE_PATH = 'foilview.log'
+        
+        % Log level names for output
+        LOG_LEVEL_NAMES = {'DEBUG', 'INFO', 'WARN', 'ERROR'}
+        
         UI_STYLE = struct(...
             'FONT_SIZE_SMALL', 9, ...
             'FONT_SIZE_NORMAL', 10, ...
@@ -32,17 +47,127 @@ classdef FoilviewUtils < handle
     end
     
     methods (Static)
-    
-        function logError(context, error)
-            % Centralized error logging with consistent formatting
-            if ischar(error)
-                fprintf(FoilviewUtils.ERROR_PREFIX, context, error);
-            elseif isa(error, 'MException')
-                fprintf(FoilviewUtils.ERROR_PREFIX, context, error.message);
-            elseif isstruct(error) && isfield(error, 'message')
-                fprintf(FoilviewUtils.ERROR_PREFIX, context, error.message);
+        
+        %% Logging System Methods
+        
+        function log(level, context, message, varargin)
+            % Centralized logging method
+            % level: LOG_LEVEL_DEBUG, LOG_LEVEL_INFO, LOG_LEVEL_WARN, LOG_LEVEL_ERROR
+            % context: Component/module name (e.g., 'ScanImageManager', 'FoilviewApp')
+            % message: Log message (can include format specifiers)
+            % varargin: Format arguments for message
+            
+            if level < FoilviewUtils.LOG_LEVEL
+                return; % Skip logging if below current level
+            end
+            
+            % Format the message
+            if nargin > 3
+                formattedMessage = sprintf(message, varargin{:});
             else
-                fprintf('Error in %s: Unknown error\n', context);
+                formattedMessage = message;
+            end
+            
+            % Create timestamp
+            timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss.SSS'));
+            
+            % Create log entry
+            levelName = FoilviewUtils.LOG_LEVEL_NAMES{level + 1};
+            logEntry = sprintf('[%s] %s: %s - %s\n', timestamp, levelName, context, formattedMessage);
+            
+            % Output to console
+            if FoilviewUtils.LOG_TO_CONSOLE
+                fprintf(logEntry);
+            end
+            
+            % Output to file
+            if FoilviewUtils.LOG_TO_FILE
+                FoilviewUtils.writeToLogFile(logEntry);
+            end
+        end
+        
+        function debug(context, message, varargin)
+            % Log debug message
+            FoilviewUtils.log(FoilviewUtils.LOG_LEVEL_DEBUG, context, message, varargin{:});
+        end
+        
+        function info(context, message, varargin)
+            % Log info message
+            FoilviewUtils.log(FoilviewUtils.LOG_LEVEL_INFO, context, message, varargin{:});
+        end
+        
+        function warn(context, message, varargin)
+            % Log warning message
+            FoilviewUtils.log(FoilviewUtils.LOG_LEVEL_WARN, context, message, varargin{:});
+        end
+        
+        function error(context, message, varargin)
+            % Log error message
+            FoilviewUtils.log(FoilviewUtils.LOG_LEVEL_ERROR, context, message, varargin{:});
+        end
+        
+        function logException(context, exception, additionalMessage)
+            % Log exception with optional additional message
+            if nargin < 3
+                additionalMessage = '';
+            end
+            
+            if isa(exception, 'MException')
+                if ~isempty(additionalMessage)
+                    FoilviewUtils.error(context, '%s: %s (ID: %s)', additionalMessage, exception.message, exception.identifier);
+                else
+                    FoilviewUtils.error(context, '%s (ID: %s)', exception.message, exception.identifier);
+                end
+            else
+                FoilviewUtils.error(context, 'Unknown exception: %s', char(exception));
+            end
+        end
+        
+        function writeToLogFile(logEntry)
+            % Write log entry to file
+            try
+                fid = fopen(FoilviewUtils.LOG_FILE_PATH, 'a');
+                if fid ~= -1
+                    fprintf(fid, logEntry);
+                    fclose(fid);
+                end
+            catch
+                % Silently fail if file logging fails
+            end
+        end
+        
+        function setLogLevel(level)
+            % Set the logging level
+            if isnumeric(level) && level >= 0 && level <= 3
+                FoilviewUtils.LOG_LEVEL = level;
+            end
+        end
+        
+        function setLogging(console, file, filePath)
+            % Configure logging output
+            if nargin >= 1
+                FoilviewUtils.LOG_TO_CONSOLE = logical(console);
+            end
+            if nargin >= 2
+                FoilviewUtils.LOG_TO_FILE = logical(file);
+            end
+            if nargin >= 3
+                FoilviewUtils.LOG_FILE_PATH = filePath;
+            end
+        end
+        
+        %% Legacy Error Logging (for backward compatibility)
+        
+        function logError(context, error)
+            % Centralized error logging with consistent formatting (legacy method)
+            if ischar(error)
+                FoilviewUtils.error(context, '%s', error);
+            elseif isa(error, 'MException')
+                FoilviewUtils.logException(context, error);
+            elseif isstruct(error) && isfield(error, 'message')
+                FoilviewUtils.error(context, '%s', error.message);
+            else
+                FoilviewUtils.error(context, 'Unknown error');
             end
         end
         
@@ -55,7 +180,7 @@ classdef FoilviewUtils < handle
                 success = true;
             catch e
                 if ~suppressErrors
-                    FoilviewUtils.logError(context, e);
+                    FoilviewUtils.logException(context, e);
                 end
             end
         end
@@ -65,7 +190,7 @@ classdef FoilviewUtils < handle
             try
                 output = func();
             catch ME
-                fprintf('Error in %s: %s\n', functionName, ME.message);
+                FoilviewUtils.logException(functionName, ME);
                 output = defaultValue;
             end
         end
@@ -440,7 +565,7 @@ classdef FoilviewUtils < handle
                 drawnow;
                 
             catch e
-                FoilviewUtils.logError('batchUIUpdate', e);
+                FoilviewUtils.logException('batchUIUpdate', e);
                 success = false;
             end
         end

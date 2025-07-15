@@ -49,7 +49,7 @@ classdef ScanImageManager < handle
                 % as these events may not be available in all ScanImage versions
                 % The application will still function without automatic metadata logging
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('ScanImageManager', ME, 'Initialization failed');
                 obj.SimulationMode = true;
                 obj.IsInitialized = false;
             end
@@ -64,7 +64,7 @@ classdef ScanImageManager < handle
                     % They will be cleaned up when the object is deleted
                 end
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('ScanImageManager', ME, 'Cleanup failed');
             end
         end
         
@@ -255,7 +255,7 @@ classdef ScanImageManager < handle
                 metadata.bookmarkMetricValue = '';
                 
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('ScanImageManager', ME, 'Metadata collection failed');
                 metadata = [];
             end
         end
@@ -502,7 +502,7 @@ classdef ScanImageManager < handle
                 end
                 
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('ScanImageManager', ME, 'getPositions failed');
                 % Return default zeros on error
             end
         end
@@ -521,7 +521,7 @@ classdef ScanImageManager < handle
                 end
                 
                 if isempty(obj.HSI)
-                    warning('ScanImageManager: No ScanImage handle available');
+                    FoilviewUtils.warn('ScanImageManager', 'No ScanImage handle available');
                     newPosition = 0;
                     return;
                 end
@@ -553,7 +553,7 @@ classdef ScanImageManager < handle
                 % Check current position before movement
                 currentPos = str2double(axisInfo.etPos.String);
                 if isnan(currentPos)
-                    warning('ScanImageManager: Could not read current position for %s axis', axisName);
+                    FoilviewUtils.warn('ScanImageManager', 'Could not read current position for %s axis', axisName);
                     currentPos = 0;
                 end
                 
@@ -564,7 +564,7 @@ classdef ScanImageManager < handle
                         try
                             axisInfo.step.Callback(axisInfo.step, []);
                         catch ME
-                            warning('ScanImageManager:ErrorSettingStepSize', 'Error setting step size: %s', ME.message);
+                            FoilviewUtils.logException('ScanImageManager', ME, 'Error setting step size');
                         end
                     end
                 end
@@ -609,7 +609,7 @@ classdef ScanImageManager < handle
                 pause(0.2); % Wait for movement
                 newPosition = str2double(axisInfo.etPos.String);
                 if isnan(newPosition)
-                    warning('ScanImageManager: Could not read new position for %s axis, using current position', axisName);
+                    FoilviewUtils.warn('ScanImageManager', 'Could not read new position for %s axis, using current position', axisName);
                     newPosition = obj.getCurrentPosition(axisName);
                 end
                 
@@ -617,7 +617,7 @@ classdef ScanImageManager < handle
                 
             catch ME
                 errorMsg = sprintf('Movement error for %s axis: %s', axisName, ME.message);
-                warning('ScanImageManager:MovementError', '%s', errorMsg);
+                FoilviewUtils.warn('ScanImageManager', '%s', errorMsg);
                 newPosition = obj.getCurrentPosition(axisName);
             end
         end
@@ -670,7 +670,7 @@ classdef ScanImageManager < handle
                     fprintf('Image acquired: %s\n', mat2str(sz));
                 end
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('ScanImageManager', ME, 'getImageData failed');
             end
         end
         
@@ -729,7 +729,7 @@ classdef ScanImageManager < handle
                             ~isempty(axisInfo.inc), ~isempty(axisInfo.dec));
                 end
             catch ME
-                warning('ScanImageManager:GetAxisInfoError', 'Error getting axis info for %s: %s', axisName, ME.message);
+                FoilviewUtils.logException('ScanImageManager', ME, sprintf('Error getting axis info for %s', axisName));
             end
         end
         
@@ -761,7 +761,7 @@ classdef ScanImageManager < handle
                 end
                 
             catch ME
-                warning('ScanImageManager:CheckMotorErrorError', 'Error checking motor error state: %s', ME.message);
+                FoilviewUtils.logException('ScanImageManager', ME, 'Error checking motor error state');
                 isError = true; % Assume error if we can't check
             end
         end
@@ -798,7 +798,7 @@ classdef ScanImageManager < handle
                 fprintf('ScanImageManager: No clear/reset buttons found for %s axis\n', axisName);
                 
             catch ME
-                warning('ScanImageManager:ClearMotorErrorError', 'Error clearing motor error: %s', ME.message);
+                FoilviewUtils.logException('ScanImageManager', ME, 'Error clearing motor error');
             end
         end
     end

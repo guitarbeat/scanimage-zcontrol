@@ -147,7 +147,7 @@ classdef foilview < matlab.apps.AppBase
                     label, xPos, yPos, zPos);
                 
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('FoilviewApp', ME);
             end
         end
 
@@ -420,7 +420,7 @@ classdef foilview < matlab.apps.AppBase
                 end
                 app.generateSessionStats(metadataFile);
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('FoilviewApp', ME);
             end
         end
     end
@@ -461,7 +461,7 @@ classdef foilview < matlab.apps.AppBase
                 try
                     app.StageViewApp = StageView();
                 catch ME
-                    warning('foilview:StageViewLaunch', 'Failed to launch Stage View: %s', ME.message);
+                    FoilviewUtils.warn('FoilviewApp', 'Failed to launch Stage View: %s', ME.message);
                     app.StageViewApp = [];
                 end
             else
@@ -474,7 +474,7 @@ classdef foilview < matlab.apps.AppBase
                 try
                     app.BookmarksViewApp = BookmarksView(app.Controller);
                 catch ME
-                    warning('foilview:BookmarksViewLaunch', 'Failed to launch Bookmarks View: %s', ME.message);
+                    FoilviewUtils.warn('FoilviewApp', 'Failed to launch Bookmarks View: %s', ME.message);
                     app.BookmarksViewApp = [];
                 end
             else
@@ -532,7 +532,7 @@ classdef foilview < matlab.apps.AppBase
         %% Monitor window size changes and adjust UI responsively
         function monitorWindowResize(app)
             if ~isa(app.UIFigure, 'matlab.ui.Figure')
-                warning('foilview:UIFigureType', 'UIFigure is not a handle! Type: %s, Value: %s', ...
+                FoilviewUtils.warn('FoilviewApp', 'UIFigure is not a handle! Type: %s, Value: %s', ...
                     class(app.UIFigure), mat2str(app.UIFigure));
                 return;
             end
@@ -560,7 +560,7 @@ classdef foilview < matlab.apps.AppBase
                     heightBasedSize = [currentSize(1:2), app.LastWindowSize(3), currentSize(4)];
                     UiComponents.adjustFontSizes(components, heightBasedSize);
                 catch ME
-                    warning('foilview:ResizeError', 'Error during font resize: %s', ME.message);
+                    FoilviewUtils.warn('FoilviewApp', 'Error during font resize: %s', ME.message);
                 end
             end
             if any(sizeDiff(3:4) > threshold)
@@ -575,7 +575,7 @@ classdef foilview < matlab.apps.AppBase
                         end
                     end
                 catch ME
-                    warning('foilview:ResizeError', 'Error during plot resize: %s', ME.message);
+                    FoilviewUtils.warn('FoilviewApp', 'Error during plot resize: %s', ME.message);
                 end
             end
             app.LastWindowSize = currentSize;
@@ -615,7 +615,7 @@ classdef foilview < matlab.apps.AppBase
                     app.displaySessionSummary(frameCount, duration, avgFrameRate, fileSize, metadataFile);
                 end
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('FoilviewApp', ME);
             end
         end
         %% Parse timestamps from metadata lines
@@ -746,7 +746,7 @@ classdef foilview < matlab.apps.AppBase
                     fprintf('Metadata path configuration cancelled\n');
                 end
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('FoilviewApp', ME);
                 uialert(app.UIFigure, ...
                     sprintf('Error configuring metadata path:\n%s', ME.message), ...
                     'Configuration Error', ...
@@ -818,7 +818,7 @@ classdef foilview < matlab.apps.AppBase
                 try
                     hSI = evalin('base', 'hSI');
                 catch ME
-                    warning('%s: %s', ME.identifier, ME.message);
+                    FoilviewUtils.logException('FoilviewApp', ME);
                     app.createSimulationMetadataFile();
                     fprintf('Metadata logging initialized in simulation mode (ScanImage not available)\n');
                     return;
@@ -834,7 +834,7 @@ classdef foilview < matlab.apps.AppBase
                 assignin('base', 'metadataConfig', config);
                 fprintf('Metadata logging initialized successfully\n');
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('FoilviewApp', ME);
                 app.createSimulationMetadataFile();
                 fprintf('Metadata logging initialized in simulation mode due to error\n');
             end
@@ -865,7 +865,7 @@ classdef foilview < matlab.apps.AppBase
                     app.writeMetadataToFile(metadata, app.MetadataFile, false);
                 end
             catch ME
-                warning('%s: %s', ME.identifier, ME.message);
+                FoilviewUtils.logException('FoilviewApp', ME);
             end
         end
 
@@ -925,7 +925,7 @@ classdef foilview < matlab.apps.AppBase
             if ~exist(dataDir, 'dir')
                 [success, msg] = mkdir(dataDir);
                 if ~success
-                    warning('Failed to create directory: %s\nError: %s', dataDir, msg);
+                    FoilviewUtils.warn('FoilviewApp', 'Failed to create directory: %s. Error: %s', dataDir, msg);
                     dataDir = baseDir;
                 end
             end
@@ -937,7 +937,7 @@ classdef foilview < matlab.apps.AppBase
                 try
                     fid = fopen(metadataFile, 'w');
                     if fid == -1
-                        warning('Failed to create metadata file: %s', metadataFile);
+                        FoilviewUtils.warn('FoilviewApp', 'Failed to create metadata file: %s', metadataFile);
                         return;
                     end
                     fprintf(fid, headers);
@@ -946,7 +946,7 @@ classdef foilview < matlab.apps.AppBase
                     if fid ~= -1
                         fclose(fid);
                     end
-                    warning('%s: %s', ME.identifier, ME.message);
+                    FoilviewUtils.logException('FoilviewApp', ME);
                 end
             end
         end

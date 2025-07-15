@@ -12,6 +12,9 @@ classdef StageView < handle
         StartAllButton
         StopAllButton
         SnapshotAllButton
+        StartRecordingButton
+        StopRecordingButton
+        RecordingStatusLabel
     end
 
     properties (Access = private)

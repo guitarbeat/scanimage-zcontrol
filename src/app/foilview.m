@@ -71,8 +71,8 @@ classdef foilview < matlab.apps.AppBase
                 metadata = struct();
                 
                 % Basic info
-                metadata.timestamp = datestr(now, 'yyyy-mm-dd HH:MM:SS');
-                metadata.filename = sprintf('bookmark_%s.tif', datestr(now, 'yyyymmdd_HHMMSS'));
+                metadata.timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
+                metadata.filename = sprintf('bookmark_%s.tif', char(datetime('now', 'Format', 'yyyyMMdd_HHmmss')));
                 
                 % Scanner and imaging parameters (use current values or defaults)
                 if ~isempty(app.Controller) && isvalid(app.Controller)
@@ -89,7 +89,7 @@ classdef foilview < matlab.apps.AppBase
                     else
                         % Try to get real values from ScanImage
                         try
-                            hSI = evalin('base', 'hSI');
+                            evalin('base', 'hSI'); % Check if hSI exists
                             metadata.scanner = 'ScanImage';
                             metadata.zoom = 1.0;
                             metadata.frameRate = 30.0;
@@ -622,22 +622,32 @@ classdef foilview < matlab.apps.AppBase
         function timestamps = parseTimestamps(~, lines)
             timestamps = {};
             try
-                for i = 2:length(lines)
-                    parts = strsplit(lines{i}, ',');
-                    if ~isempty(parts) && ~isempty(parts{1})
-                        timestamps{end+1} = parts{1};
+                % Preallocate array for better performance
+                validLines = lines(~cellfun('isempty', lines));
+                if length(validLines) > 1
+                    timestamps = cell(length(validLines) - 1, 1);
+                    timestampIdx = 1;
+                    for i = 2:length(lines)
+                        parts = strsplit(lines{i}, ',');
+                        if ~isempty(parts) && ~isempty(parts{1})
+                            timestamps{timestampIdx} = parts{1};
+                            timestampIdx = timestampIdx + 1;
+                        end
                     end
+                    % Trim unused cells
+                    timestamps = timestamps(1:timestampIdx-1);
                 end
             catch
+                timestamps = {};
             end
         end
         %% Calculate duration from timestamps
         function duration = calculateDuration(~, timestamps)
             try
                 if length(timestamps) >= 2
-                    startTime = datenum(timestamps{1}, 'yyyy-mm-dd HH:MM:SS');
-                    endTime = datenum(timestamps{end}, 'yyyy-mm-dd HH:MM:SS');
-                    duration = (endTime - startTime) * 86400;
+                    startTime = datetime(timestamps{1}, 'Format', 'yyyy-MM-dd HH:mm:ss');
+                    endTime = datetime(timestamps{end}, 'Format', 'yyyy-MM-dd HH:mm:ss');
+                    duration = seconds(endTime - startTime);
                 else
                     duration = 0;
                 end
@@ -796,10 +806,10 @@ classdef foilview < matlab.apps.AppBase
         %% Initializes metadata logging (real or simulation)
         function initializeMetadataLogging(app)
             try
-                if ~isempty(app.LastSetupTime) && (now - app.LastSetupTime) < (5/86400)
+                if ~isempty(app.LastSetupTime) && (datetime('now') - app.LastSetupTime) < seconds(5)
                     return;
                 end
-                app.LastSetupTime = now;
+                app.LastSetupTime = datetime('now');
                 isSimulation = app.Controller.SimulationMode;
                 if isSimulation
                     app.createSimulationMetadataFile();
@@ -835,8 +845,8 @@ classdef foilview < matlab.apps.AppBase
         function collectSimulatedMetadata(app)
             try
                 metadata = struct();
-                metadata.timestamp = datestr(now, 'yyyy-mm-dd HH:MM:SS');
-                metadata.filename = sprintf('sim_%s.tif', datestr(now, 'yyyymmdd_HHMMSS'));
+                metadata.timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
+                metadata.filename = sprintf('sim_%s.tif', char(datetime('now', 'Format', 'yyyyMMdd_HHmmss')));
                 metadata.scanner = 'Simulation';
                 metadata.zoom = 1.0;
                 metadata.frameRate = 30.0;
@@ -911,7 +921,7 @@ classdef foilview < matlab.apps.AppBase
 
         %% Creates a date-based data directory for metadata
         function dataDir = createDataDirectory(~, baseDir, config)
-            todayStr = datestr(now, config.dirFormat);
+            todayStr = char(datetime('now', 'Format', config.dirFormat));
             dataDir = fullfile(baseDir, todayStr);
             if ~exist(dataDir, 'dir')
                 [success, msg] = mkdir(dataDir);

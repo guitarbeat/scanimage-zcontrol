@@ -886,6 +886,63 @@ classdef FoilviewController < handle
                 end
             end
         end
+        
+        function valid = validateMovement(obj, microns)
+            % Validate movement parameters
+            valid = FoilviewUtils.validateNumericRange(microns, obj.MIN_STEP_SIZE, obj.MAX_STEP_SIZE, 'Movement distance');
+            
+            if valid && obj.IsAutoRunning
+                fprintf('Cannot move stage while auto-stepping is running\n');
+                valid = false;
+            end
+        end
+        
+        function valid = validatePosition(obj, position)
+            % Validate absolute position
+            valid = FoilviewUtils.validateNumericRange(position, obj.MIN_POSITION, obj.MAX_POSITION, 'Position');
+            
+            if valid && obj.IsAutoRunning
+                fprintf('Cannot set position while auto-stepping is running\n');
+                valid = false;
+            end
+        end
+        
+        function [valid, errorMsg] = validateAutoStepParameters(obj, autoControls)
+            % Validate auto-step parameters from UI controls
+            valid = true;
+            errorMsg = '';
+            
+            % Validate step size
+            if ~FoilviewUtils.validateNumericRange(autoControls.StepField.Value, ...
+                    obj.MIN_STEP_SIZE, obj.MAX_STEP_SIZE, 'Step size')
+                valid = false;
+                errorMsg = 'Invalid step size';
+                return;
+            end
+            
+            % Validate number of steps
+            if ~FoilviewUtils.validateInteger(autoControls.StepsField.Value, ...
+                    obj.MIN_AUTO_STEPS, obj.MAX_AUTO_STEPS, 'Number of steps')
+                valid = false;
+                errorMsg = 'Invalid number of steps';
+                return;
+            end
+            
+            % Validate delay
+            if ~FoilviewUtils.validateNumericRange(autoControls.DelayField.Value, ...
+                    obj.MIN_AUTO_DELAY, obj.MAX_AUTO_DELAY, 'Delay')
+                valid = false;
+                errorMsg = 'Invalid delay';
+                return;
+            end
+            
+            % Check if already running
+            if obj.IsAutoRunning
+                valid = false;
+                errorMsg = 'Auto-stepping is already running';
+                return;
+            end
+        end
     end
     
     methods (Access = public)

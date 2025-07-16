@@ -1,7 +1,7 @@
 classdef ScanImageManager < handle
     % ScanImageManager - Manages ScanImage integration and metadata logging
     % This class handles the integration with ScanImage and manages metadata
-    % logging for acquired frames.
+    % logging for acquired frames with robust error handling and retry logic.
     
     properties (Access = private)
         LastFrameTime
@@ -10,6 +10,20 @@ classdef ScanImageManager < handle
         IsInitialized = false
         SimulationMode = false
         FoilviewApp
+        ErrorHandler
+        ConnectionState
+        RetryConfig
+        LastConnectionAttempt
+        RetryCount = 0
+    end
+    
+    properties (Constant)
+        % Connection states
+        DISCONNECTED = 'disconnected'
+        CONNECTING = 'connecting'
+        CONNECTED = 'connected'
+        SIMULATION = 'simulation'
+        ERROR = 'error'
     end
     
     methods (Access = public)

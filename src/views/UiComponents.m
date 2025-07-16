@@ -5,10 +5,10 @@
 classdef UiComponents
     
     properties (Constant, Access = public)
-        MIN_WINDOW_WIDTH = 280
-        MIN_WINDOW_HEIGHT = 380
+        MIN_WINDOW_WIDTH = 400
+        MIN_WINDOW_HEIGHT = 550
         DEFAULT_WINDOW_WIDTH = 320
-        DEFAULT_WINDOW_HEIGHT = 420
+        DEFAULT_WINDOW_HEIGHT = 450
         PLOT_WIDTH = 400
         
         COLORS = struct(...

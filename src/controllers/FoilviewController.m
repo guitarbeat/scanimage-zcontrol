@@ -1,4 +1,4 @@
-classdef FoilviewController < handle
+﻿classdef FoilviewController < handle
 
     properties (Constant, Access = public)
         STEP_SIZES = [0.1, 0.5, 1, 5, 10, 50]
@@ -475,14 +475,13 @@ classdef FoilviewController < handle
         end
 
         function success = recoverFromMotorError(obj)
-            % recoverFromMotorError - Attempt to recover from motor error state
+            % Attempt to recover from motor error state
             success = FoilviewUtils.safeExecuteWithReturn(@() doRecover(), 'recoverFromMotorError', false);
 
             function success = doRecover()
                 success = false;
 
                 if obj.SimulationMode
-                    fprintf('FoilviewController: No motor error recovery needed in simulation mode\n');
                     success = true;
                     return;
                 end
@@ -491,7 +490,6 @@ classdef FoilviewController < handle
                     % Find motor controls window
                     motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
                     if isempty(motorFig)
-                        fprintf('FoilviewController: Motor Controls window not found for error recovery\n');
                         return;
                     end
 
@@ -731,7 +729,7 @@ classdef FoilviewController < handle
         end
 
         function valid = validatePosition(obj, position)
-            % Validate absolute position - now delegates to service  
+            % Validate absolute position - now delegates to service
             [valid, ~] = obj.StageControlService.validateAbsolutePosition(position);
         end
 

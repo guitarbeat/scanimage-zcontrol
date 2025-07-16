@@ -179,16 +179,7 @@ classdef foilview < matlab.apps.AppBase
             end
             app.updateWindowStatusButtons();
         end
-        function onMotorRecoveryButtonPushed(app, ~, ~)
-            fprintf('Attempting motor error recovery...\n');
-            success = app.Controller.recoverFromMotorError();
-            if success
-                fprintf('Motor error recovery completed successfully\n');
-                app.Controller.refreshPosition();
-            else
-                fprintf('Motor error recovery failed. Please check ScanImage Motor Controls manually.\n');
-            end
-        end
+
         function onRefreshButtonPushed(app, ~, ~)
             app.Controller.refreshPosition();
         end
@@ -450,8 +441,6 @@ classdef foilview < matlab.apps.AppBase
             app.PlotManager.initializeMetricsPlot(app.MetricsPlotControls.Axes);
             app.UIController.updateAllUI();
             app.updateAutoStepStatus();
-            app.launchStageView();
-            app.launchBookmarksView();
             app.updateWindowStatusButtons();
             app.startRefreshTimer();
             app.startMetricTimer();
@@ -524,8 +513,7 @@ classdef foilview < matlab.apps.AppBase
                 createCallbackFcn(app, @app.onStageViewButtonPushed, true);
             app.StatusControls.MetadataButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onMetadataButtonPushed, true);
-            app.StatusControls.MotorRecoveryButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onMotorRecoveryButtonPushed, true);
+
             app.MetricsPlotControls.ExpandButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onExpandButtonPushed, true);
             app.MetricsPlotControls.ClearButton.ButtonPushedFcn = ...

@@ -1,0 +1,64 @@
+ENHANCED DEAD CODE ANALYSIS REPORT
+==================================
+Generated: 15-Jul-2025 19:02:55
+
+ANALYSIS SUMMARY
+----------------
+Total functions defined: 304
+Total unique function calls: 460
+Classes detected: 17
+Protected functions: 10
+Suspicious functions: 0
+Potentially unused functions: 2
+
+POTENTIALLY UNUSED FUNCTIONS
+----------------------------
+These functions are defined but no calls were detected:
+
+• clear
+  └─ MetricsPlotService.m (line 107, method in class MetricsPlotService)
+
+• error
+  └─ FoilviewUtils.m (line 110, method in class FoilviewUtils)
+
+PROTECTED FUNCTIONS (Safe from Removal)
+---------------------------------------
+These functions are automatically protected:
+
+• BookmarkManager (Class constructor, File entry point)
+• BookmarksView (Class constructor, File entry point)
+• FoilviewController (Class constructor, File entry point)
+• PlotManager (Class constructor, File entry point)
+• ScanImageManager (Class constructor, File entry point)
+• StageView (Class constructor, File entry point)
+• UIController (Class constructor, File entry point)
+• delete (MATLAB special method)
+• foilview (Class constructor, File entry point)
+• get (MATLAB special method)
+
+CALL PATTERN ANALYSIS
+---------------------
+• callback calls: 31
+• method calls: 525
+• regular calls: 1460
+• static calls: 289
+
+RECOMMENDATIONS
+---------------
+1. SAFE TO REMOVE: Functions in "Potentially Unused" section
+2. REVIEW CAREFULLY: Functions in "Suspicious" section
+3. DO NOT REMOVE: Functions in "Protected" section
+4. Check for dynamic calls using feval() or str2func()
+5. Verify callback functions are not referenced in UI code
+6. Consider if functions are part of public API
+
+NEXT STEPS
+----------
+1. Review each unused function manually
+2. Search codebase for string references to function names
+3. Check if functions are called from external scripts
+4. Remove confirmed dead code in small, testable commits
+5. Run tests after each removal to ensure nothing breaks
+
+NOTE: This enhanced analysis reduces false positives but manual
+verification is still recommended before removing any code.

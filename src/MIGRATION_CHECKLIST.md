@@ -22,29 +22,35 @@ This document tracks the step-by-step migration of the `src/` folder to a modula
 
 ## 3. Extract and Refactor Services
 ### 3.1. Plotting Logic
-- [ ] Create `services/MetricsPlotService.m` (use sample interface)
-- [ ] Move all plotting logic from `PlotManager.m` and `FoilviewController.m` into `MetricsPlotService.m`
-- [ ] Refactor `PlotManager.m` to call `MetricsPlotService` for all plot operations
+- [x] Create `services/MetricsPlotService.m` (COMPLETED)
+- [x] Move all plotting logic from `PlotManager.m` and `FoilviewController.m` into `MetricsPlotService.m` (COMPLETED)
+- [x] Refactor `PlotManager.m` to call `MetricsPlotService` for all plot operations (COMPLETED)
 - [ ] Update all usages in `foilview.m` and elsewhere to use the new service
 
 ### 3.2. Scan Control Logic
-- [ ] Create `services/ScanControlService.m`
+- [x] Create `services/ScanControlService.m` (COMPLETED)
 - [ ] Move scan start/stop, parameter validation, and related logic from `FoilviewController.m` and `ScanImageManager.m` into `ScanControlService.m`
 - [ ] Refactor `FoilviewController.m` to delegate scan operations to the service
 
-### 3.3. Config Loader
-- [ ] Create `services/ConfigLoaderService.m`
-- [ ] Move config load/save logic from `FoilviewUtils.m` or other files into this service
+### 3.3. Metadata Service
+- [x] Create `services/MetadataService.m` (COMPLETED)
+- [ ] Move metadata logging logic from `foilview.m` into `MetadataService.m`
+- [ ] Update BookmarkManager to use MetadataService
 
 ---
 
 ## 4. Shrink and Split Utils
-- [ ] Split `FoilviewUtils.m` into focused modules:
-  - [ ] `ConfigUtils.m`
-  - [ ] `FilePathUtils.m`
-  - [ ] `NumericUtils.m`
+- [x] Split `FoilviewUtils.m` into focused modules:
+  - [x] `ConfigUtils.m` (COMPLETED)
+  - [x] `FilePathUtils.m` (COMPLETED)
+  - [x] `NumericUtils.m` (COMPLETED)
 - [ ] Move each function to the appropriate new file
 - [ ] Update all imports/usages across the codebase
+
+## 4.1. New Controllers
+- [x] Create `controllers/UIController.m` (COMPLETED)
+- [ ] Move UI update logic from `foilview.m` to `UIController.m`
+- [ ] Refactor `FoilviewController.m` to focus on business logic only
 
 ---
 

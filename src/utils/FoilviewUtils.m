@@ -9,12 +9,6 @@ classdef FoilviewUtils < handle
         LOG_LEVEL_WARN = 2
         LOG_LEVEL_ERROR = 3
         
-        % Logging configuration
-        LOG_LEVEL = FoilviewUtils.LOG_LEVEL_WARN  % Default to warning level
-        LOG_TO_CONSOLE = true
-        LOG_TO_FILE = false
-        LOG_FILE_PATH = 'foilview.log'
-        
         % Log level names for output
         LOG_LEVEL_NAMES = {'DEBUG', 'INFO', 'WARN', 'ERROR'}
         
@@ -46,6 +40,8 @@ classdef FoilviewUtils < handle
         POSITION_PRECISION_THRESHOLD = 0.1
     end
     
+
+    
     methods (Static)
         
         %% Logging System Methods
@@ -57,7 +53,17 @@ classdef FoilviewUtils < handle
             % message: Log message (can include format specifiers)
             % varargin: Format arguments for message
             
-            if level < FoilviewUtils.LOG_LEVEL
+            persistent logLevel logToConsole logToFile logFilePath 
+            
+            % Initialize persistent variables
+            if isempty(logLevel)
+                logLevel = FoilviewUtils.LOG_LEVEL_WARN;
+                logToConsole = true;
+                logToFile = false;
+                logFilePath = 'foilview.log';
+            end
+            
+            if level < logLevel
                 return; % Skip logging if below current level
             end
             
@@ -76,13 +82,13 @@ classdef FoilviewUtils < handle
             logEntry = sprintf('[%s] %s: %s - %s\n', timestamp, levelName, context, formattedMessage);
             
             % Output to console
-            if FoilviewUtils.LOG_TO_CONSOLE
+            if logToConsole
                 fprintf(logEntry);
             end
             
             % Output to file
-            if FoilviewUtils.LOG_TO_FILE
-                FoilviewUtils.writeToLogFile(logEntry);
+            if logToFile
+                FoilviewUtils.writeToLogFile(logEntry, logFilePath);
             end
         end
         
@@ -123,10 +129,13 @@ classdef FoilviewUtils < handle
             end
         end
         
-        function writeToLogFile(logEntry)
+        function writeToLogFile(logEntry, filePath)
             % Write log entry to file
+            if nargin < 2
+                filePath = 'foilview.log';
+            end
             try
-                fid = fopen(FoilviewUtils.LOG_FILE_PATH, 'a');
+                fid = fopen(filePath, 'a');
                 if fid ~= -1
                     fprintf(fid, logEntry);
                     fclose(fid);
@@ -138,21 +147,31 @@ classdef FoilviewUtils < handle
         
         function setLogLevel(level)
             % Set the logging level
+            persistent logLevel 
+            if isempty(logLevel)
+                logLevel = FoilviewUtils.LOG_LEVEL_WARN;
+            end
             if isnumeric(level) && level >= 0 && level <= 3
-                FoilviewUtils.LOG_LEVEL = level;
+                logLevel = level;
             end
         end
         
         function setLogging(console, file, filePath)
             % Configure logging output
+            persistent logToConsole   
+            if isempty(logToConsole)
+                logToConsole = true;
+                logToFile = false;
+                logFilePath = 'foilview.log';
+            end
             if nargin >= 1
-                FoilviewUtils.LOG_TO_CONSOLE = logical(console);
+                logToConsole = logical(console);
             end
             if nargin >= 2
-                FoilviewUtils.LOG_TO_FILE = logical(file);
+                logToFile = logical(file);
             end
             if nargin >= 3
-                FoilviewUtils.LOG_FILE_PATH = filePath;
+                logFilePath = filePath;
             end
         end
         

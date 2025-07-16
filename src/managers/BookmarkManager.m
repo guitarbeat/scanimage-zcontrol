@@ -40,12 +40,16 @@ classdef BookmarkManager < handle
             obj.MarkedPositions.ZPositions(end+1) = zPos;
             obj.MarkedPositions.Metrics{end+1} = metricStruct;
             
-            % Save bookmark to metadata if foilview app is available
+            % Save bookmark to metadata using MetadataService
             if ~isempty(obj.FoilviewApp) && isvalid(obj.FoilviewApp)
                 try
-                    obj.FoilviewApp.saveBookmarkToMetadata(label, xPos, yPos, zPos, metricStruct);
+                    % Use MetadataService directly for better separation of concerns
+                    if ~isempty(obj.FoilviewApp.MetadataFile)
+                        MetadataService.saveBookmarkMetadata(label, xPos, yPos, zPos, metricStruct, ...
+                            obj.FoilviewApp.MetadataFile, obj.FoilviewApp.Controller);
+                    end
                 catch ME
-                    FoilviewUtils.logException('BookmarkManager', ME);
+                    FoilviewUtils.logException('BookmarkManager.add', ME);
                 end
             end
         end

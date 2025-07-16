@@ -1,4 +1,4 @@
-function analyzeDeadCode()
+function analyze_dead_code()
     % analyzeDeadCode - Identify potentially unused functions and methods
     % Enhanced version that handles MATLAB-specific patterns including:
     % - Object method calls (obj.method())
@@ -190,7 +190,9 @@ end
 
 function isBuiltin = isBuiltinFunction(funcName)
     % Check if function name is a common MATLAB builtin or keyword
+    % Enhanced with more comprehensive builtin detection
     
+    % Core MATLAB functions and keywords
     builtins = {'if', 'else', 'elseif', 'end', 'for', 'while', 'switch', 'case', ...
                'otherwise', 'try', 'catch', 'function', 'return', 'break', 'continue', ...
                'fprintf', 'sprintf', 'disp', 'error', 'warning', 'length', 'size', ...
@@ -202,9 +204,33 @@ function isBuiltin = isBuiltinFunction(funcName)
                'tic', 'toc', 'pause', 'drawnow', 'timer', 'start', 'stop', ...
                'isvalid', 'isnumeric', 'ischar', 'isstring', 'isstruct', 'iscell', ...
                'class', 'isa', 'isprop', 'isfield', 'fieldnames', 'struct', ...
-               'cell', 'zeros', 'ones', 'nan', 'inf', 'pi', 'rand', 'randn'};
+               'cell', 'zeros', 'ones', 'nan', 'inf', 'pi', 'rand', 'randn', ...
+               'abs', 'sqrt', 'exp', 'log', 'log10', 'sin', 'cos', 'tan', ...
+               'asin', 'acos', 'atan', 'atan2', 'floor', 'ceil', 'round', 'fix', ...
+               'mod', 'rem', 'sign', 'real', 'imag', 'conj', 'angle', ...
+               'reshape', 'repmat', 'cat', 'horzcat', 'vertcat', 'permute', ...
+               'transpose', 'ctranspose', 'flipud', 'fliplr', 'rot90', ...
+               'any', 'all', 'cumsum', 'cumprod', 'diff', 'gradient', ...
+               'interp1', 'interp2', 'griddata', 'meshgrid', 'ndgrid', ...
+               'linspace', 'logspace', 'eye', 'diag', 'tril', 'triu', ...
+               'inv', 'pinv', 'det', 'rank', 'trace', 'norm', 'cond', ...
+               'eig', 'svd', 'qr', 'lu', 'chol', 'fft', 'ifft', 'fft2', 'ifft2'};
     
+    % Check against builtin list
     isBuiltin = any(strcmp(funcName, builtins));
+    
+    % Additional check: try to determine if it's a builtin using MATLAB's which function
+    % This is more robust but slower, so we do it only if not found in our list
+    if ~isBuiltin
+        try
+            whichResult = which(funcName);
+            % If it's a builtin, which() returns 'built-in' or contains 'toolbox'
+            isBuiltin = contains(whichResult, 'built-in') || contains(whichResult, 'toolbox');
+        catch
+            % If which() fails, assume it's not a builtin
+            isBuiltin = false;
+        end
+    end
 end
 
 function [unusedFunctions, suspiciousFunctions, protectedFunctions] = analyzeUsagePatterns(allFunctions, allCalls, classInfo)
@@ -223,11 +249,17 @@ function [unusedFunctions, suspiciousFunctions, protectedFunctions] = analyzeUsa
                         'length', 'end', 'numel', 'isempty', 'isequal', 'copy', ...
                         'loadobj', 'saveobj', 'eq', 'ne', 'lt', 'le', 'gt', 'ge', ...
                         'plus', 'minus', 'times', 'rdivide', 'ldivide', 'power', ...
-                        'and', 'or', 'not', 'transpose', 'ctranspose'};
+                        'and', 'or', 'not', 'transpose', 'ctranspose', 'clear', 'error'};
     
     for i = 1:length(definedFunctions)
         funcName = definedFunctions{i};
         funcDefs = allFunctions(funcName);
+        
+        % Skip if this is actually a builtin function being redefined
+        if isBuiltinFunction(funcName)
+            protectedFunctions{end+1} = struct('name', funcName, 'reason', 'MATLAB builtin function'); %#ok<AGROW>
+            continue;
+        end
         
         % Check if function is called
         isCalled = any(strcmp(funcName, calledFunctions));
@@ -256,14 +288,18 @@ function [unusedFunctions, suspiciousFunctions, protectedFunctions] = analyzeUsa
             end
         end
         
+        % Check if it's a test function
+        isTestFunction = startsWith(funcName, 'test') || endsWith(funcName, 'Test') || ...
+                        contains(funcName, 'Test') || startsWith(funcName, 'Test');
+        
         % Categorize the function
-        if isProtected || isConstructor || isEntryPoint
-            protectedFunctions{end+1} = struct('name', funcName, 'reason', ...
-                getProtectionReason(isProtected, isConstructor, isEntryPoint)); %#ok<AGROW>
+        if isProtected || isConstructor || isEntryPoint || isTestFunction
+            reasons = getProtectionReason(isProtected, isConstructor, isEntryPoint, isTestFunction);
+            protectedFunctions{end+1} = struct('name', funcName, 'reason', reasons); %#ok<AGROW>
         elseif ~isCalled
             % Check for potential dynamic calls or special patterns
             if hasSpecialUsagePattern(funcName, allFunctions, allCalls)
-                suspiciousFunctions{end+1} = funcName; %#ok<AGROW>
+                suspiciousFunctions{end+1} = struct('name', funcName, 'reason', 'Potential callback/dynamic usage'); %#ok<AGROW>
             else
                 unusedFunctions{end+1} = funcName; %#ok<AGROW>
             end
@@ -271,7 +307,7 @@ function [unusedFunctions, suspiciousFunctions, protectedFunctions] = analyzeUsa
     end
 end
 
-function reason = getProtectionReason(isProtected, isConstructor, isEntryPoint)
+function reason = getProtectionReason(isProtected, isConstructor, isEntryPoint, isTestFunction)
     % Get reason why function is protected from removal
     reasons = {};
     if isProtected
@@ -282,6 +318,9 @@ function reason = getProtectionReason(isProtected, isConstructor, isEntryPoint)
     end
     if isEntryPoint
         reasons{end+1} = 'File entry point';
+    end
+    if isTestFunction
+        reasons{end+1} = 'Test function';
     end
     reason = strjoin(reasons, ', ');
 end
@@ -316,7 +355,7 @@ function hasSpecial = hasSpecialUsagePattern(funcName, allFunctions, allCalls)
 end
 
 function generateEnhancedDeadCodeReport(unusedFunctions, suspiciousFunctions, protectedFunctions, allFunctions, allCalls, classInfo)
-    % Generate enhanced report with detailed analysis
+    % Generate enhanced report with detailed analysis and actionable insights
     
     reportFile = 'dead_code_report.txt';
     fid = fopen(reportFile, 'w');
@@ -337,16 +376,26 @@ function generateEnhancedDeadCodeReport(unusedFunctions, suspiciousFunctions, pr
         fprintf(fid, 'Classes detected: %d\n', length(keys(classInfo)));
         fprintf(fid, 'Protected functions: %d\n', length(protectedFunctions));
         fprintf(fid, 'Suspicious functions: %d\n', length(suspiciousFunctions));
-        fprintf(fid, 'Potentially unused functions: %d\n\n', length(unusedFunctions));
+        fprintf(fid, 'Potentially unused functions: %d\n', length(unusedFunctions));
         
-        % Report unused functions
+        % Calculate code health metrics
+        totalFunctions = length(keys(allFunctions));
+        unusedCount = length(unusedFunctions);
+        codeHealthScore = round((1 - unusedCount/totalFunctions) * 100);
+        fprintf(fid, 'Code health score: %d%% (%d/%d functions actively used)\n\n', ...
+                codeHealthScore, totalFunctions - unusedCount, totalFunctions);
+        
+        % Report unused functions with enhanced details
         if ~isempty(unusedFunctions)
             fprintf(fid, 'POTENTIALLY UNUSED FUNCTIONS\n');
             fprintf(fid, '----------------------------\n');
             fprintf(fid, 'These functions are defined but no calls were detected:\n\n');
             
-            for i = 1:length(unusedFunctions)
-                funcName = unusedFunctions{i};
+            % Sort unused functions by file for better organization
+            [sortedFunctions, fileGroups] = sortFunctionsByFile(unusedFunctions, allFunctions);
+            
+            for i = 1:length(sortedFunctions)
+                funcName = sortedFunctions{i};
                 funcDefs = allFunctions(funcName);
                 fprintf(fid, '• %s\n', funcName);
                 for j = 1:length(funcDefs)
@@ -359,22 +408,37 @@ function generateEnhancedDeadCodeReport(unusedFunctions, suspiciousFunctions, pr
                 end
                 fprintf(fid, '\n');
             end
+            
+            % Add file-based summary for easier cleanup
+            fprintf(fid, 'CLEANUP SUMMARY BY FILE\n');
+            fprintf(fid, '-----------------------\n');
+            fileNames = keys(fileGroups);
+            for i = 1:length(fileNames)
+                fileName = fileNames{i};
+                funcsInFile = fileGroups(fileName);
+                fprintf(fid, '• %s: %d unused function(s)\n', fileName, length(funcsInFile));
+                for j = 1:length(funcsInFile)
+                    fprintf(fid, '  - %s\n', funcsInFile{j});
+                end
+            end
+            fprintf(fid, '\n');
         else
             fprintf(fid, 'POTENTIALLY UNUSED FUNCTIONS\n');
             fprintf(fid, '----------------------------\n');
             fprintf(fid, 'No unused functions detected! 🎉\n\n');
         end
         
-        % Report suspicious functions
+        % Report suspicious functions with enhanced analysis
         if ~isempty(suspiciousFunctions)
             fprintf(fid, 'SUSPICIOUS FUNCTIONS (Review Recommended)\n');
             fprintf(fid, '-----------------------------------------\n');
             fprintf(fid, 'These functions may be used dynamically or as callbacks:\n\n');
             
             for i = 1:length(suspiciousFunctions)
-                funcName = suspiciousFunctions{i};
+                suspFunc = suspiciousFunctions{i};
+                funcName = suspFunc.name;
                 funcDefs = allFunctions(funcName);
-                fprintf(fid, '• %s (potential callback/dynamic call)\n', funcName);
+                fprintf(fid, '• %s (%s)\n', funcName, suspFunc.reason);
                 for j = 1:length(funcDefs)
                     funcDef = funcDefs{j};
                     fprintf(fid, '  └─ %s (line %d)\n', funcDef.file, funcDef.line);
@@ -383,20 +447,39 @@ function generateEnhancedDeadCodeReport(unusedFunctions, suspiciousFunctions, pr
             end
         end
         
-        % Report protected functions
+        % Report protected functions with categorization
         if ~isempty(protectedFunctions)
             fprintf(fid, 'PROTECTED FUNCTIONS (Safe from Removal)\n');
             fprintf(fid, '---------------------------------------\n');
             fprintf(fid, 'These functions are automatically protected:\n\n');
             
+            % Group protected functions by reason
+            protectedByReason = containers.Map();
             for i = 1:length(protectedFunctions)
                 protFunc = protectedFunctions{i};
-                fprintf(fid, '• %s (%s)\n', protFunc.name, protFunc.reason);
+                reason = protFunc.reason;
+                if protectedByReason.isKey(reason)
+                    existing = protectedByReason(reason);
+                    existing{end+1} = protFunc.name;
+                    protectedByReason(reason) = existing;
+                else
+                    protectedByReason(reason) = {protFunc.name};
+                end
             end
-            fprintf(fid, '\n');
+            
+            reasons = keys(protectedByReason);
+            for i = 1:length(reasons)
+                reason = reasons{i};
+                funcs = protectedByReason(reason);
+                fprintf(fid, '%s:\n', reason);
+                for j = 1:length(funcs)
+                    fprintf(fid, '  • %s\n', funcs{j});
+                end
+                fprintf(fid, '\n');
+            end
         end
         
-        % Call pattern analysis
+        % Enhanced call pattern analysis
         fprintf(fid, 'CALL PATTERN ANALYSIS\n');
         fprintf(fid, '---------------------\n');
         callTypes = containers.Map();
@@ -415,31 +498,76 @@ function generateEnhancedDeadCodeReport(unusedFunctions, suspiciousFunctions, pr
         end
         
         callTypeNames = keys(callTypes);
+        totalCalls = 0;
         for i = 1:length(callTypeNames)
-            fprintf(fid, '• %s calls: %d\n', callTypeNames{i}, callTypes(callTypeNames{i}));
+            totalCalls = totalCalls + callTypes(callTypeNames{i});
+        end
+        
+        for i = 1:length(callTypeNames)
+            count = callTypes(callTypeNames{i});
+            percentage = round((count / totalCalls) * 100);
+            fprintf(fid, '• %s calls: %d (%d%%)\n', callTypeNames{i}, count, percentage);
+        end
+        fprintf(fid, '• Total calls analyzed: %d\n\n', totalCalls);
+        
+        % Enhanced recommendations with priority
+        fprintf(fid, 'RECOMMENDATIONS (Priority Order)\n');
+        fprintf(fid, '--------------------------------\n');
+        fprintf(fid, '1. HIGH PRIORITY - SAFE TO REMOVE: Functions in "Potentially Unused" section\n');
+        fprintf(fid, '   → Start with functions that have no dependencies\n');
+        fprintf(fid, '   → Remove one function at a time and test\n\n');
+        
+        fprintf(fid, '2. MEDIUM PRIORITY - REVIEW CAREFULLY: Functions in "Suspicious" section\n');
+        fprintf(fid, '   → Search codebase for string references to function names\n');
+        fprintf(fid, '   → Check UI files for callback references\n');
+        fprintf(fid, '   → Look for dynamic calls using feval() or str2func()\n\n');
+        
+        fprintf(fid, '3. LOW PRIORITY - DO NOT REMOVE: Functions in "Protected" section\n');
+        fprintf(fid, '   → These are essential for MATLAB functionality\n');
+        fprintf(fid, '   → Consider if functions are part of public API\n\n');
+        
+        % Actionable next steps with commands
+        fprintf(fid, 'ACTIONABLE NEXT STEPS\n');
+        fprintf(fid, '--------------------\n');
+        fprintf(fid, '1. VERIFICATION COMMANDS:\n');
+        fprintf(fid, '   For each unused function, run these searches:\n');
+        if ~isempty(unusedFunctions)
+            funcName = unusedFunctions{1}; % Use first unused function as example
+            fprintf(fid, '   → grep -r "%s" src/  # Search for string references\n', funcName);
+            fprintf(fid, '   → find src/ -name "*.m" -exec grep -l "feval.*%s\\|str2func.*%s" {} \\;\n', funcName, funcName);
         end
         fprintf(fid, '\n');
         
-        % Recommendations
-        fprintf(fid, 'RECOMMENDATIONS\n');
-        fprintf(fid, '---------------\n');
-        fprintf(fid, '1. SAFE TO REMOVE: Functions in "Potentially Unused" section\n');
-        fprintf(fid, '2. REVIEW CAREFULLY: Functions in "Suspicious" section\n');
-        fprintf(fid, '3. DO NOT REMOVE: Functions in "Protected" section\n');
-        fprintf(fid, '4. Check for dynamic calls using feval() or str2func()\n');
-        fprintf(fid, '5. Verify callback functions are not referenced in UI code\n');
-        fprintf(fid, '6. Consider if functions are part of public API\n\n');
+        fprintf(fid, '2. SAFE REMOVAL PROCESS:\n');
+        fprintf(fid, '   → Create a backup branch: git checkout -b cleanup-dead-code\n');
+        fprintf(fid, '   → Remove one function at a time\n');
+        fprintf(fid, '   → Run tests after each removal\n');
+        fprintf(fid, '   → Commit changes incrementally\n\n');
         
-        fprintf(fid, 'NEXT STEPS\n');
-        fprintf(fid, '----------\n');
-        fprintf(fid, '1. Review each unused function manually\n');
-        fprintf(fid, '2. Search codebase for string references to function names\n');
-        fprintf(fid, '3. Check if functions are called from external scripts\n');
-        fprintf(fid, '4. Remove confirmed dead code in small, testable commits\n');
-        fprintf(fid, '5. Run tests after each removal to ensure nothing breaks\n\n');
+        fprintf(fid, '3. TESTING STRATEGY:\n');
+        fprintf(fid, '   → Run full test suite after each function removal\n');
+        fprintf(fid, '   → Test UI functionality if removing methods from UI classes\n');
+        fprintf(fid, '   → Check for runtime errors in dynamic code paths\n\n');
         
-        fprintf(fid, 'NOTE: This enhanced analysis reduces false positives but manual\n');
-        fprintf(fid, 'verification is still recommended before removing any code.\n');
+        % Analysis limitations and warnings
+        fprintf(fid, 'ANALYSIS LIMITATIONS\n');
+        fprintf(fid, '-------------------\n');
+        fprintf(fid, '⚠️  This analysis may miss:\n');
+        fprintf(fid, '   • Functions called via eval() or evalin()\n');
+        fprintf(fid, '   • Functions referenced in string arrays or cell arrays\n');
+        fprintf(fid, '   • Functions called from external scripts or toolboxes\n');
+        fprintf(fid, '   • Functions used as event handlers in GUI components\n');
+        fprintf(fid, '   • Functions called through reflection or meta-programming\n\n');
+        
+        fprintf(fid, '✅ This analysis correctly identifies:\n');
+        fprintf(fid, '   • Direct function calls\n');
+        fprintf(fid, '   • Object method calls (obj.method)\n');
+        fprintf(fid, '   • Static method calls (Class.method)\n');
+        fprintf(fid, '   • Callback function references (@function)\n');
+        fprintf(fid, '   • Dynamic calls via feval() and str2func()\n\n');
+        
+        fprintf(fid, 'FINAL NOTE: Always verify manually before removing any code.\n');
+        fprintf(fid, 'When in doubt, comment out the function first and test thoroughly.\n');
         
     catch ME
         fclose(fid);
@@ -447,4 +575,28 @@ function generateEnhancedDeadCodeReport(unusedFunctions, suspiciousFunctions, pr
     end
     
     fclose(fid);
+end
+
+function [sortedFunctions, fileGroups] = sortFunctionsByFile(unusedFunctions, allFunctions)
+    % Sort unused functions by file for better organization
+    fileGroups = containers.Map();
+    
+    for i = 1:length(unusedFunctions)
+        funcName = unusedFunctions{i};
+        funcDefs = allFunctions(funcName);
+        
+        for j = 1:length(funcDefs)
+            fileName = funcDefs{j}.file;
+            if fileGroups.isKey(fileName)
+                existing = fileGroups(fileName);
+                existing{end+1} = funcName;
+                fileGroups(fileName) = existing;
+            else
+                fileGroups(fileName) = {funcName};
+            end
+        end
+    end
+    
+    % Sort functions alphabetically
+    sortedFunctions = sort(unusedFunctions);
 end

@@ -115,6 +115,11 @@ classdef ScanImageManager < handle
                 fprintf('ScanImageManager: %s\n', message);
             end
         end
+        
+        function simMode = isSimulationMode(obj)
+            % isSimulationMode - Returns true if in simulation mode
+            simMode = obj.SimulationMode;
+        end
     end
     
     methods (Access = private)

@@ -98,5 +98,88 @@ classdef ScanControlService < handle
                 params.errorMessage = errorMsg;
             end
         end
+        
+        function executionPlan = createAutoStepExecutionPlan(stepSize, numSteps, direction)
+            % Create execution plan for auto-stepping sequence
+            executionPlan = struct();
+            executionPlan.steps = [];
+            executionPlan.totalDistance = 0;
+            executionPlan.estimatedDuration = 0;
+            
+            % Validate inputs first
+            [valid, errorMsg] = ScanControlService.validateAutoStepParameters(stepSize, numSteps, 0.5);
+            if ~valid
+                executionPlan.isValid = false;
+                executionPlan.errorMessage = errorMsg;
+                return;
+            end
+            
+            % Parse direction
+            parsedDirection = ScanControlService.parseDirection(direction);
+            
+            % Calculate step sequence
+            actualStepSize = stepSize * parsedDirection;
+            executionPlan.steps = (1:numSteps) * actualStepSize;
+            executionPlan.totalDistance = numSteps * stepSize;
+            executionPlan.direction = parsedDirection;
+            executionPlan.isValid = true;
+        end
+        
+        function metrics = initializeMetricsCollection()
+            % Initialize structure for collecting auto-step metrics
+            metrics = struct();
+            metrics.Positions = [];
+            metrics.Values = struct();
+            metrics.StartTime = datetime('now');
+            metrics.StepCount = 0;
+        end
+        
+        function metrics = recordMetricStep(metrics, position, metricValues)
+            % Record a single step's metrics
+            if nargin < 3
+                metricValues = struct();
+            end
+            
+            % Record position
+            metrics.Positions(end+1) = position;
+            metrics.StepCount = metrics.StepCount + 1;
+            
+            % Record metric values
+            metricFields = fieldnames(metricValues);
+            for i = 1:length(metricFields)
+                fieldName = metricFields{i};
+                if ~isfield(metrics.Values, fieldName)
+                    metrics.Values.(fieldName) = [];
+                end
+                metrics.Values.(fieldName)(end+1) = metricValues.(fieldName);
+            end
+        end
+        
+        function summary = summarizeAutoStepSession(metrics, params)
+            % Create summary of completed auto-step session
+            summary = struct();
+            summary.TotalSteps = length(metrics.Positions);
+            summary.Duration = seconds(datetime('now') - metrics.StartTime);
+            summary.AverageStepRate = summary.TotalSteps / max(summary.Duration, 0.1);
+            
+            if ~isempty(metrics.Positions)
+                summary.StartPosition = metrics.Positions(1);
+                summary.EndPosition = metrics.Positions(end);
+                summary.TotalDistance = abs(summary.EndPosition - summary.StartPosition);
+                summary.ActualStepSize = summary.TotalDistance / max(summary.TotalSteps - 1, 1);
+            else
+                summary.StartPosition = 0;
+                summary.EndPosition = 0;
+                summary.TotalDistance = 0;
+                summary.ActualStepSize = 0;
+            end
+            
+            % Include original parameters
+            if nargin > 1
+                summary.RequestedStepSize = params.stepSize;
+                summary.RequestedSteps = params.numSteps;
+                summary.Direction = params.direction;
+            end
+        end
     end
 end

@@ -18,6 +18,7 @@ classdef foilview < matlab.apps.AppBase
     
     properties (Access = public)
         Controller                  FoilviewController
+        UIController                UIController
         PlotManager                 PlotManager
         StageViewApp
         BookmarksViewApp
@@ -61,93 +62,11 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function saveBookmarkToMetadata(app, label, xPos, yPos, zPos, metricStruct)
-            % Save bookmark information to the metadata file
+            % Save bookmark information to the metadata file - now delegates to MetadataService
             try
-                if isempty(app.MetadataFile) || ~exist(fileparts(app.MetadataFile), 'dir')
-                    return;
-                end
-                
-                % Create metadata structure for bookmark
-                metadata = struct();
-                
-                % Basic info
-                metadata.timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
-                metadata.filename = sprintf('bookmark_%s.tif', char(datetime('now', 'Format', 'yyyyMMdd_HHmmss')));
-                
-                % Scanner and imaging parameters (use current values or defaults)
-                if ~isempty(app.Controller) && isvalid(app.Controller)
-                    if app.Controller.SimulationMode
-                        metadata.scanner = 'Simulation';
-                        metadata.zoom = 1.0;
-                        metadata.frameRate = 30.0;
-                        metadata.averaging = 1;
-                        metadata.resolution = '512x512';
-                        metadata.fov = '100.0x100.0';
-                        metadata.powerPercent = 50.0;
-                        metadata.pockelsValue = 0.5;
-                        metadata.feedbackValue = struct('modulation', '2.5', 'feedback', '1.2', 'power', '0.025');
-                    else
-                        % Try to get real values from ScanImage
-                        try
-                            evalin('base', 'hSI'); % Check if hSI exists
-                            metadata.scanner = 'ScanImage';
-                            metadata.zoom = 1.0;
-                            metadata.frameRate = 30.0;
-                            metadata.averaging = 1;
-                            metadata.resolution = '512x512';
-                            metadata.fov = '100.0x100.0';
-                            metadata.powerPercent = 50.0;
-                            metadata.pockelsValue = 0.5;
-                            metadata.feedbackValue = struct('modulation', 'NA', 'feedback', 'NA', 'power', 'NA');
-                        catch
-                            % Fallback to simulation values
-                            metadata.scanner = 'Unknown';
-                            metadata.zoom = 1.0;
-                            metadata.frameRate = 30.0;
-                            metadata.averaging = 1;
-                            metadata.resolution = '512x512';
-                            metadata.fov = '100.0x100.0';
-                            metadata.powerPercent = 50.0;
-                            metadata.pockelsValue = 0.5;
-                            metadata.feedbackValue = struct('modulation', 'NA', 'feedback', 'NA', 'power', 'NA');
-                        end
-                    end
-                else
-                    % Default values if controller not available
-                    metadata.scanner = 'Unknown';
-                    metadata.zoom = 1.0;
-                    metadata.frameRate = 30.0;
-                    metadata.averaging = 1;
-                    metadata.resolution = '512x512';
-                    metadata.fov = '100.0x100.0';
-                    metadata.powerPercent = 50.0;
-                    metadata.pockelsValue = 0.5;
-                    metadata.feedbackValue = struct('modulation', 'NA', 'feedback', 'NA', 'power', 'NA');
-                end
-                
-                % Bookmark position
-                metadata.xPos = xPos;
-                metadata.yPos = yPos;
-                metadata.zPos = zPos;
-                
-                % Bookmark information
-                metadata.bookmarkLabel = label;
-                if ~isempty(metricStruct) && isstruct(metricStruct)
-                    metadata.bookmarkMetricType = metricStruct.Type;
-                    metadata.bookmarkMetricValue = num2str(metricStruct.Value);
-                else
-                    metadata.bookmarkMetricType = '';
-                    metadata.bookmarkMetricValue = '';
-                end
-                
-                % Write to file
-                app.writeMetadataToFile(metadata, app.MetadataFile, false);
-                
-                fprintf('Bookmark metadata saved: %s at X:%.1f, Y:%.1f, Z:%.1f μm\n', ...
-                    label, xPos, yPos, zPos);
-                
+                MetadataService.saveBookmarkMetadata(label, xPos, yPos, zPos, metricStruct, app.MetadataFile, app.Controller);
             catch ME
-                FoilviewUtils.logException('FoilviewApp', ME);
+                FoilviewUtils.logException('FoilviewApp.saveBookmarkToMetadata', ME);
             end
         end
 
@@ -204,7 +123,7 @@ classdef foilview < matlab.apps.AppBase
                 end
                 app.Controller.setAutoDirectionWithValidation(app.AutoControls, direction);
                 app.updateAutoStepStatus();
-                UiComponents.updateAllUI(app);
+                app.UIController.updateAllUI();
             end
         end
         function onAutoDirectionToggled(app, varargin)
@@ -212,7 +131,7 @@ classdef foilview < matlab.apps.AppBase
             newDirection = -currentDirection;
             app.Controller.setAutoDirectionWithValidation(app.AutoControls, newDirection);
             app.updateAutoStepStatus();
-            UiComponents.updateAllUI(app);
+            app.UIController.updateAllUI();
         end
         function onAutoStepSizeChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
@@ -234,7 +153,7 @@ classdef foilview < matlab.apps.AppBase
                 app.Controller.startAutoSteppingWithValidation(app, app.AutoControls, app.PlotManager);
             end
             fprintf('DEBUG: Updating UI after start/stop operation\n');
-            UiComponents.updateAllUI(app);
+            app.UIController.updateAllUI();
             app.updateAutoStepStatus();
             fprintf('DEBUG: onStartStopButtonPushed EXIT - IsAutoRunning: %d\n', app.Controller.IsAutoRunning);
         end
@@ -326,7 +245,7 @@ classdef foilview < matlab.apps.AppBase
         end
         %% Update all UI components
         function updateAllUI(app)
-            UiComponents.updateAllUI(app);
+            app.UIController.updateAllUI();
         end
         %% Update auto step status controls
         function updateAutoStepStatus(app)
@@ -437,15 +356,16 @@ classdef foilview < matlab.apps.AppBase
         %% Initialize the application (controllers, listeners, UI, timers)
         function initializeApplication(app)
             app.Controller = FoilviewController();
-            app.PlotManager = app.PlotManager(app);
-            app.ScanImageManager = app.ScanImageManager();
+            app.UIController = UIController(app);
+            app.PlotManager = PlotManager(app);
+            app.ScanImageManager = ScanImageManager();
             app.Controller.setFoilviewApp(app);
             addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
             addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
             addlistener(app.Controller, 'MetricChanged', @(src,evt) app.onControllerMetricChanged());
             addlistener(app.Controller, 'AutoStepComplete', @(src,evt) app.onControllerAutoStepComplete());
             app.PlotManager.initializeMetricsPlot(app.MetricsPlotControls.Axes);
-            UiComponents.updateAllUI(app);
+            app.UIController.updateAllUI();
             app.updateAutoStepStatus();
             app.launchStageView();
             app.launchBookmarksView();
@@ -869,54 +789,7 @@ classdef foilview < matlab.apps.AppBase
             end
         end
 
-        %% Writes a metadata struct to the metadata file
-        function writeMetadataToFile(~, metadata, metadataFile, verbose)
-            if isempty(metadataFile) || ~exist(fileparts(metadataFile), 'dir')
-                return;
-            end
-            try
-                bookmarkLabel = '';
-                bookmarkMetricType = '';
-                bookmarkMetricValue = '';
-                if isfield(metadata, 'bookmarkLabel')
-                    bookmarkLabel = metadata.bookmarkLabel;
-                end
-                if isfield(metadata, 'bookmarkMetricType')
-                    bookmarkMetricType = metadata.bookmarkMetricType;
-                end
-                if isfield(metadata, 'bookmarkMetricValue')
-                    bookmarkMetricValue = metadata.bookmarkMetricValue;
-                end
-                if isstruct(metadata.feedbackValue)
-                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
-                        metadata.timestamp, metadata.filename, metadata.scanner, ...
-                        metadata.zoom, metadata.frameRate, metadata.averaging,...
-                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
-                        metadata.pockelsValue, metadata.feedbackValue.modulation,...
-                        metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
-                        metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
-                else
-                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
-                        metadata.timestamp, metadata.filename, metadata.scanner, ...
-                        metadata.zoom, metadata.frameRate, metadata.averaging,...
-                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
-                        metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
-                end
-                if verbose
-                    fprintf('Writing to file: %s\n', metadataFile);
-                end
-                fid = fopen(metadataFile, 'a');
-                if fid == -1
-                    return;
-                end
-                fprintf(fid, metadataStr);
-                fclose(fid);
-            catch
-                if exist('fid', 'var') && fid ~= -1
-                    fclose(fid);
-                end
-            end
-        end
+
 
         %% Creates a date-based data directory for metadata
         function dataDir = createDataDirectory(~, baseDir, config)

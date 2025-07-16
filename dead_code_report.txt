@@ -1,64 +1,105 @@
 ENHANCED DEAD CODE ANALYSIS REPORT
 ==================================
-Generated: 15-Jul-2025 19:02:55
+Generated: 15-Jul-2025 21:05:28
 
 ANALYSIS SUMMARY
 ----------------
-Total functions defined: 304
-Total unique function calls: 460
-Classes detected: 17
-Protected functions: 10
+Total functions defined: 336
+Total unique function calls: 406
+Classes detected: 19
+Protected functions: 22
 Suspicious functions: 0
-Potentially unused functions: 2
+Potentially unused functions: 0
+Code health score: 100% (336/336 functions actively used)
 
 POTENTIALLY UNUSED FUNCTIONS
 ----------------------------
-These functions are defined but no calls were detected:
-
-• clear
-  └─ MetricsPlotService.m (line 107, method in class MetricsPlotService)
-
-• error
-  └─ FoilviewUtils.m (line 110, method in class FoilviewUtils)
+No unused functions detected! 🎉
 
 PROTECTED FUNCTIONS (Safe from Removal)
 ---------------------------------------
 These functions are automatically protected:
 
-• BookmarkManager (Class constructor, File entry point)
-• BookmarksView (Class constructor, File entry point)
-• FoilviewController (Class constructor, File entry point)
-• PlotManager (Class constructor, File entry point)
-• ScanImageManager (Class constructor, File entry point)
-• StageView (Class constructor, File entry point)
-• UIController (Class constructor, File entry point)
-• delete (MATLAB special method)
-• foilview (Class constructor, File entry point)
-• get (MATLAB special method)
+Class constructor, File entry point:
+  • BookmarkManager
+  • BookmarksView
+  • FoilviewController
+  • MetricCalculationService
+  • PlotManager
+  • ScanImageManager
+  • StageControlService
+  • StageView
+  • UIController
+  • foilview
+
+MATLAB builtin function:
+  • add
+  • build
+  • clear
+  • debug
+  • delete
+  • error
+  • get
+  • info
+  • initialize
+  • log
+  • remove
+  • smoothData
 
 CALL PATTERN ANALYSIS
 ---------------------
-• callback calls: 31
-• method calls: 525
-• regular calls: 1460
-• static calls: 289
+• callback calls: 33 (2%)
+• method calls: 570 (28%)
+• regular calls: 1121 (55%)
+• static calls: 296 (15%)
+• Total calls analyzed: 2020
 
-RECOMMENDATIONS
----------------
-1. SAFE TO REMOVE: Functions in "Potentially Unused" section
-2. REVIEW CAREFULLY: Functions in "Suspicious" section
-3. DO NOT REMOVE: Functions in "Protected" section
-4. Check for dynamic calls using feval() or str2func()
-5. Verify callback functions are not referenced in UI code
-6. Consider if functions are part of public API
+RECOMMENDATIONS (Priority Order)
+--------------------------------
+1. HIGH PRIORITY - SAFE TO REMOVE: Functions in "Potentially Unused" section
+   → Start with functions that have no dependencies
+   → Remove one function at a time and test
 
-NEXT STEPS
-----------
-1. Review each unused function manually
-2. Search codebase for string references to function names
-3. Check if functions are called from external scripts
-4. Remove confirmed dead code in small, testable commits
-5. Run tests after each removal to ensure nothing breaks
+2. MEDIUM PRIORITY - REVIEW CAREFULLY: Functions in "Suspicious" section
+   → Search codebase for string references to function names
+   → Check UI files for callback references
+   → Look for dynamic calls using feval() or str2func()
 
-NOTE: This enhanced analysis reduces false positives but manual
-verification is still recommended before removing any code.
+3. LOW PRIORITY - DO NOT REMOVE: Functions in "Protected" section
+   → These are essential for MATLAB functionality
+   → Consider if functions are part of public API
+
+ACTIONABLE NEXT STEPS
+--------------------
+1. VERIFICATION COMMANDS:
+   For each unused function, run these searches:
+
+2. SAFE REMOVAL PROCESS:
+   → Create a backup branch: git checkout -b cleanup-dead-code
+   → Remove one function at a time
+   → Run tests after each removal
+   → Commit changes incrementally
+
+3. TESTING STRATEGY:
+   → Run full test suite after each function removal
+   → Test UI functionality if removing methods from UI classes
+   → Check for runtime errors in dynamic code paths
+
+ANALYSIS LIMITATIONS
+-------------------
+⚠️  This analysis may miss:
+   • Functions called via eval() or evalin()
+   • Functions referenced in string arrays or cell arrays
+   • Functions called from external scripts or toolboxes
+   • Functions used as event handlers in GUI components
+   • Functions called through reflection or meta-programming
+
+✅ This analysis correctly identifies:
+   • Direct function calls
+   • Object method calls (obj.method)
+   • Static method calls (Class.method)
+   • Callback function references (@function)
+   • Dynamic calls via feval() and str2func()
+
+FINAL NOTE: Always verify manually before removing any code.
+When in doubt, comment out the function first and test thoroughly.

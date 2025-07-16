@@ -51,10 +51,10 @@ classdef MetadataService < handle
             end
         end
         
-        function success = writeMetadataToFile(metadata, filePath, append)
-            % Write metadata to CSV file
+        function success = writeMetadataToFile(metadata, filePath, verbose)
+            % Write metadata to CSV file (compatible with original format)
             if nargin < 3
-                append = true;
+                verbose = false;
             end
             
             success = false;
@@ -63,18 +63,131 @@ classdef MetadataService < handle
                     return;
                 end
                 
-                % Convert struct to table for easier CSV writing
-                metadataTable = struct2table(metadata);
-                
-                if append && exist(filePath, 'file')
-                    writetable(metadataTable, filePath, 'WriteMode', 'append');
-                else
-                    writetable(metadataTable, filePath);
+                % Extract bookmark fields with defaults
+                bookmarkLabel = '';
+                bookmarkMetricType = '';
+                bookmarkMetricValue = '';
+                if isfield(metadata, 'bookmarkLabel')
+                    bookmarkLabel = metadata.bookmarkLabel;
+                end
+                if isfield(metadata, 'bookmarkMetricType')
+                    bookmarkMetricType = metadata.bookmarkMetricType;
+                end
+                if isfield(metadata, 'bookmarkMetricValue')
+                    bookmarkMetricValue = metadata.bookmarkMetricValue;
                 end
                 
+                % Format metadata string (compatible with original format)
+                if isstruct(metadata.feedbackValue)
+                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
+                        metadata.timestamp, metadata.filename, metadata.scanner, ...
+                        metadata.zoom, metadata.frameRate, metadata.averaging,...
+                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
+                        metadata.pockelsValue, metadata.feedbackValue.modulation,...
+                        metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
+                        metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
+                else
+                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
+                        metadata.timestamp, metadata.filename, metadata.scanner, ...
+                        metadata.zoom, metadata.frameRate, metadata.averaging,...
+                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
+                        metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
+                end
+                
+                if verbose
+                    fprintf('Writing to file: %s\n', filePath);
+                end
+                
+                % Write to file
+                fid = fopen(filePath, 'a');
+                if fid == -1
+                    return;
+                end
+                fprintf(fid, metadataStr);
+                fclose(fid);
+                
                 success = true;
+                
             catch ME
-                FoilviewUtils.logException('MetadataService', ME);
+                if exist('fid', 'var') && fid ~= -1
+                    fclose(fid);
+                end
+                FoilviewUtils.logException('MetadataService.writeMetadataToFile', ME);
+            end
+        end
+        
+        function success = saveBookmarkMetadata(label, xPos, yPos, zPos, metricStruct, metadataFile, controller)
+            % Save bookmark information to the metadata file
+            % This method combines metadata creation and file writing
+            success = false;
+            
+            try
+                if isempty(metadataFile) || ~exist(fileparts(metadataFile), 'dir')
+                    return;
+                end
+                
+                % Create scanner info from controller
+                scannerInfo = MetadataService.extractScannerInfo(controller);
+                
+                % Create metadata structure
+                metadata = MetadataService.createBookmarkMetadata(label, xPos, yPos, zPos, metricStruct, scannerInfo);
+                
+                % Write to file
+                success = MetadataService.writeMetadataToFile(metadata, metadataFile, false);
+                
+                if success
+                    fprintf('Bookmark metadata saved: %s at X:%.1f, Y:%.1f, Z:%.1f μm\n', ...
+                        label, xPos, yPos, zPos);
+                end
+                
+            catch ME
+                FoilviewUtils.logException('MetadataService.saveBookmarkMetadata', ME);
+            end
+        end
+        
+        function scannerInfo = extractScannerInfo(controller)
+            % Extract scanner information from controller
+            scannerInfo = struct();
+            
+            try
+                if ~isempty(controller) && isvalid(controller)
+                    if controller.SimulationMode
+                        scannerInfo.scanner = 'Simulation';
+                        scannerInfo.zoom = 1.0;
+                        scannerInfo.frameRate = 30.0;
+                        scannerInfo.averaging = 1;
+                        scannerInfo.resolution = '512x512';
+                        scannerInfo.fov = '100.0x100.0';
+                        scannerInfo.powerPercent = 50.0;
+                        scannerInfo.pockelsValue = 0.5;
+                        scannerInfo.feedbackValue = struct('modulation', '2.5', 'feedback', '1.2', 'power', '0.025');
+                    else
+                        % Try to get real values from ScanImage
+                        try
+                            evalin('base', 'hSI'); % Check if hSI exists
+                            scannerInfo.scanner = 'ScanImage';
+                            scannerInfo.zoom = 1.0;
+                            scannerInfo.frameRate = 30.0;
+                            scannerInfo.averaging = 1;
+                            scannerInfo.resolution = '512x512';
+                            scannerInfo.fov = '100.0x100.0';
+                            scannerInfo.powerPercent = 50.0;
+                            scannerInfo.pockelsValue = 0.5;
+                            scannerInfo.feedbackValue = struct('modulation', 'NA', 'feedback', 'NA', 'power', 'NA');
+                        catch
+                            % Fallback to simulation values
+                            scannerInfo = MetadataService.createDefaultScannerInfo(true);
+                        end
+                    end
+                else
+                    % Default values if controller not available
+                    scannerInfo = MetadataService.createDefaultScannerInfo(false);
+                    scannerInfo.scanner = 'Unknown';
+                end
+                
+            catch ME
+                FoilviewUtils.logException('MetadataService.extractScannerInfo', ME);
+                scannerInfo = MetadataService.createDefaultScannerInfo(false);
             end
         end
         

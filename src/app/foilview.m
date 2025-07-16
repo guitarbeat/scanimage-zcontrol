@@ -69,6 +69,18 @@ classdef foilview < matlab.apps.AppBase
                 FoilviewUtils.logException('FoilviewApp.saveBookmarkToMetadata', ME);
             end
         end
+        
+        function writeMetadataToFile(app, metadata, filePath, verbose)
+            % Write metadata to file - delegates to MetadataService
+            if nargin < 4
+                verbose = false;
+            end
+            try
+                MetadataService.writeMetadataToFile(metadata, filePath, verbose);
+            catch ME
+                FoilviewUtils.logException('FoilviewApp.writeMetadataToFile', ME);
+            end
+        end
 
     end
     
@@ -356,9 +368,9 @@ classdef foilview < matlab.apps.AppBase
         %% Initialize the application (controllers, listeners, UI, timers)
         function initializeApplication(app)
             app.Controller = FoilviewController();
-            app.UIController = app.UIController(app);
-            app.PlotManager = app.PlotManager(app);
-            app.ScanImageManager = app.ScanImageManager();
+            app.UIController = UIController(app);
+            app.PlotManager = PlotManager(app);
+            app.ScanImageManager = ScanImageManager();
             app.Controller.setFoilviewApp(app);
             addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
             addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
@@ -684,7 +696,7 @@ classdef foilview < matlab.apps.AppBase
             catch
                 config = struct();
                 config.baseDir = '';
-                config.dirFormat = 'yyyy-mm-dd';
+                config.dirFormat = 'yyyy-MM-dd';
                 config.metadataFileName = 'imaging_metadata.csv';
                 config.headers = ['Timestamp,Filename,Scanner,Zoom,FrameRate,Averaging,',...
                               'Resolution,FOV_um,PowerPercent,PockelsValue,',...

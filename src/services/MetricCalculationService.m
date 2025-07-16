@@ -376,12 +376,12 @@ classdef MetricCalculationService < handle
         function notifyMetricCalculated(obj, metrics)
             % Notify listeners that metrics have been calculated
             try
-                eventData = struct();
-                eventData.metrics = metrics;
-                eventData.position = obj.LastPosition;
-                eventData.timestamp = datetime('now');
-                eventData.metricType = obj.CurrentMetricType;
-
+                % Create a simple event data object
+                eventData = event.EventData();
+                
+                % Store data in the object for listeners to access
+                obj.LastCalculatedMetrics = metrics;
+                
                 notify(obj, 'MetricCalculated', eventData);
             catch ME
                 FoilviewUtils.logException('MetricCalculationService.notifyMetricCalculated', ME);

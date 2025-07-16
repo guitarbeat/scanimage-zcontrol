@@ -327,7 +327,15 @@ classdef FoilviewUtils < handle
     
         function valid = validateUIComponent(component)
             % Centralized UI component validation
-            valid = ~isempty(component) && isvalid(component);
+            if isempty(component)
+                valid = false;
+            elseif isstruct(component)
+                valid = true; % Structs are always valid if not empty
+            elseif isobject(component)
+                valid = isvalid(component);
+            else
+                valid = true; % Other types (numeric, char, etc.) are valid if not empty
+            end
         end
         
         function valid = validateMultipleComponents(varargin)

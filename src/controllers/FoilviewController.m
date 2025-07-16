@@ -725,16 +725,14 @@ classdef FoilviewController < handle
 
         % === VALIDATION METHODS (updated to use services) ===
 
-        function valid = validateMovement(~, microns)
+        function valid = validateMovement(obj, microns)
             % Validate movement parameters - now delegates to service
-            % Note: Calling static method on StageControlService class
-            [valid, ~] = StageControlService.validateStageMovementParameters('Z', microns);
+            [valid, ~] = obj.StageControlService.validateStageMovementParameters('Z', microns);
         end
 
-        function valid = validatePosition(~, position)
+        function valid = validatePosition(obj, position)
             % Validate absolute position - now delegates to service  
-            % Note: Calling static method on StageControlService class
-            [valid, ~] = StageControlService.validateAbsolutePosition(position);
+            [valid, ~] = obj.StageControlService.validateAbsolutePosition(position);
         end
 
         function [valid, errorMsg] = validateAutoStepParameters(~, autoControls)

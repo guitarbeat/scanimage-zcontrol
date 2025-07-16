@@ -44,7 +44,7 @@ classdef UiBuilder
             mainPanel.AutoResizeChildren = 'on';
 
             mainLayout = uigridlayout(mainPanel, [6, 1]);
-            mainLayout.RowHeight = {'fit', '2x', 'fit', '1x', 'fit', 'fit'};
+            mainLayout.RowHeight = {'fit', '1.2x', 'fit', '1.5x', 'fit', 'fit'};
             mainLayout.ColumnWidth = {'1x'};
             mainLayout.Padding = [8 8 8 8];
             mainLayout.RowSpacing = 6;
@@ -85,7 +85,7 @@ classdef UiBuilder
             metricDisplay.Value.FontColor = UiComponents.COLORS.Primary;
 
             metricDisplay.RefreshButton = uibutton(metricPanel, 'push');
-            metricDisplay.RefreshButton.Text = '🔄';
+            metricDisplay.RefreshButton.Text = '';
             metricDisplay.RefreshButton.FontSize = 12;
             metricDisplay.RefreshButton.BackgroundColor = UiComponents.COLORS.Info;
             metricDisplay.RefreshButton.FontColor = [1 1 1];
@@ -133,7 +133,7 @@ classdef UiBuilder
             % Creates the button to expand/show the metrics plot.
             expandButton = uibutton(mainLayout, 'push');
             expandButton.Layout.Row = 5;
-            expandButton.Text = '📊 Show Plot';
+            expandButton.Text = ' Show Plot';
             expandButton.FontSize = 10;
             expandButton.FontWeight = 'bold';
             expandButton.BackgroundColor = UiComponents.COLORS.Primary;
@@ -148,7 +148,7 @@ classdef UiBuilder
             statusCard.BorderWidth = 1;
             statusCard.BorderColor = UiComponents.COLORS.Border;
             statusCard.BackgroundColor = UiComponents.COLORS.Card;
-            statusCard.Title = '🔧 System Status & Tools';
+            statusCard.Title = ' System Status & Tools';
             statusCard.FontSize = 10;
             statusCard.FontWeight = 'bold';
             
@@ -165,7 +165,7 @@ classdef UiBuilder
             statusControls.Label.FontWeight = 'bold';
 
             statusControls.BookmarksButton = uibutton(statusBar, 'push');
-            statusControls.BookmarksButton.Text = '📌';
+            statusControls.BookmarksButton.Text = '';
             statusControls.BookmarksButton.FontSize = 11;
             statusControls.BookmarksButton.FontWeight = 'bold';
             statusControls.BookmarksButton.Tooltip = 'Toggle Bookmarks Window (Open/Close)';
@@ -173,7 +173,7 @@ classdef UiBuilder
             statusControls.BookmarksButton.FontColor = [1 1 1];
 
             statusControls.StageViewButton = uibutton(statusBar, 'push');
-            statusControls.StageViewButton.Text = '📹';
+            statusControls.StageViewButton.Text = '';
             statusControls.StageViewButton.FontSize = 11;
             statusControls.StageViewButton.FontWeight = 'bold';
             statusControls.StageViewButton.Tooltip = 'Toggle Stage View Camera Window (Open/Close)';
@@ -186,7 +186,7 @@ classdef UiBuilder
             statusControls.RefreshButton.FontWeight = 'bold';
 
             statusControls.MetadataButton = uibutton(statusBar, 'push');
-            statusControls.MetadataButton.Text = '📝';
+            statusControls.MetadataButton.Text = '';
             statusControls.MetadataButton.FontSize = 11;
             statusControls.MetadataButton.FontWeight = 'bold';
             statusControls.MetadataButton.Tooltip = 'Initialize Metadata Logging';
@@ -194,7 +194,7 @@ classdef UiBuilder
             statusControls.MetadataButton.FontColor = [1 1 1];
 
             statusControls.MotorRecoveryButton = uibutton(statusBar, 'push');
-            statusControls.MotorRecoveryButton.Text = '🔧';
+            statusControls.MotorRecoveryButton.Text = '';
             statusControls.MotorRecoveryButton.FontSize = 11;
             statusControls.MotorRecoveryButton.FontWeight = 'bold';
             statusControls.MotorRecoveryButton.Tooltip = 'Recover from Motor Error';
@@ -205,7 +205,7 @@ classdef UiBuilder
         function manualControls = createManualControlContainer(mainLayout)
             % Creates the manual control panel with modern card styling and improved layout.
             manualCard = uipanel(mainLayout);
-            manualCard.Title = '🎮 Manual Control';
+            manualCard.Title = ' Manual Control';
             manualCard.FontSize = 11;
             manualCard.FontWeight = 'bold';
             manualCard.Layout.Row = 3;
@@ -245,7 +245,7 @@ classdef UiBuilder
             manualControls.StepUpButton = UiBuilder.createStyledButton(grid, 'muted', '➡️', 'Increase step size', [1, 4]);
 
             manualControls.DownButton = UiBuilder.createStyledButton(grid, 'warning', '⬇️ DOWN', 'Move stage down', [1, 5]);
-            manualControls.ZeroButton = UiBuilder.createStyledButton(grid, 'primary', '🎯 ZERO', 'Set position to zero', [1, 6]);
+            manualControls.ZeroButton = UiBuilder.createStyledButton(grid, 'primary', ' ZERO', 'Set position to zero', [1, 6]);
 
             manualControls.StepSizeDropdown = uidropdown(grid);
             manualControls.StepSizeDropdown.Items = FoilviewUtils.formatStepSizeItems(FoilviewController.STEP_SIZES);

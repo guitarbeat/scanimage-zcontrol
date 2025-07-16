@@ -749,12 +749,6 @@ classdef FoilviewController < handle
                 valid = false;
                 errorMsg = sprintf('Error validating parameters: %s', ME.message);
             end
-        end);
-
-            catch ME
-                valid = false;
-                errorMsg = sprintf('Error validating parameters: %s', ME.message);
-            end
         end
 
         % === TIMER STATE VALIDATION ===

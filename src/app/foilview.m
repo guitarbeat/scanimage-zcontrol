@@ -356,9 +356,9 @@ classdef foilview < matlab.apps.AppBase
         %% Initialize the application (controllers, listeners, UI, timers)
         function initializeApplication(app)
             app.Controller = FoilviewController();
-            app.UIController = UIController(app);
-            app.PlotManager = PlotManager(app);
-            app.ScanImageManager = ScanImageManager();
+            app.UIController = app.UIController(app);
+            app.PlotManager = app.PlotManager(app);
+            app.ScanImageManager = app.ScanImageManager();
             app.Controller.setFoilviewApp(app);
             addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
             addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());

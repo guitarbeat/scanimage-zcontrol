@@ -84,7 +84,7 @@
             metricDisplay.Value.FontColor = UiComponents.COLORS.Primary;
 
             metricDisplay.RefreshButton = uibutton(metricPanel, 'push');
-            metricDisplay.RefreshButton.Text = '';
+            metricDisplay.RefreshButton.Text = '';
             metricDisplay.RefreshButton.FontSize = 12;
             metricDisplay.RefreshButton.BackgroundColor = UiComponents.COLORS.Info;
             metricDisplay.RefreshButton.FontColor = [1 1 1];
@@ -132,7 +132,7 @@
             % Creates the button to expand/show the metrics plot.
             expandButton = uibutton(mainLayout, 'push');
             expandButton.Layout.Row = 5;
-            expandButton.Text = ' Show Plot';
+            expandButton.Text = ' Show Plot';
             expandButton.FontSize = 10;
             expandButton.FontWeight = 'bold';
             expandButton.BackgroundColor = UiComponents.COLORS.Primary;
@@ -147,7 +147,7 @@
             statusCard.BorderWidth = 1;
             statusCard.BorderColor = UiComponents.COLORS.Border;
             statusCard.BackgroundColor = UiComponents.COLORS.Card;
-            statusCard.Title = ' System Status & Tools';
+            statusCard.Title = ' System Status & Tools';
             statusCard.FontSize = 10;
             statusCard.FontWeight = 'bold';
 
@@ -164,7 +164,7 @@
             statusControls.Label.FontWeight = 'bold';
 
             statusControls.BookmarksButton = uibutton(statusBar, 'push');
-            statusControls.BookmarksButton.Text = '';
+            statusControls.BookmarksButton.Text = '';
             statusControls.BookmarksButton.FontSize = 11;
             statusControls.BookmarksButton.FontWeight = 'bold';
             statusControls.BookmarksButton.Tooltip = 'Toggle Bookmarks Window (Open/Close)';
@@ -172,7 +172,7 @@
             statusControls.BookmarksButton.FontColor = [1 1 1];
 
             statusControls.StageViewButton = uibutton(statusBar, 'push');
-            statusControls.StageViewButton.Text = '';
+            statusControls.StageViewButton.Text = '';
             statusControls.StageViewButton.FontSize = 11;
             statusControls.StageViewButton.FontWeight = 'bold';
             statusControls.StageViewButton.Tooltip = 'Toggle Stage View Camera Window (Open/Close)';
@@ -185,13 +185,184 @@
             statusControls.RefreshButton.FontWeight = 'bold';
 
             statusControls.MetadataButton = uibutton(statusBar, 'push');
-            statusControls.MetadataButton.Text = '';
+            statusControls.MetadataButton.Text = '';
             statusControls.MetadataButton.FontSize = 11;
             statusControls.MetadataButton.FontWeight = 'bold';
             statusControls.MetadataButton.Tooltip = 'Initialize Metadata Logging';
             statusControls.MetadataButton.BackgroundColor = UiComponents.COLORS.Primary;
             statusControls.MetadataButton.FontColor = [1 1 1];
 
+        end
+
+        function manualControls = createManualControlContainer(mainLayout)
+            % Creates the manual control panel with modern card styling and improved layout.
+            manualCard = uipanel(mainLayout);
+            manualCard.Title = ' Manual Control';
+            manualCard.FontSize = 11;
+            manualCard.FontWeight = 'bold';
+            manualCard.Layout.Row = 3;
+            manualCard.BorderType = 'line';
+            manualCard.BorderWidth = 1;
+            manualCard.BorderColor = UiComponents.COLORS.Border;
+            manualCard.BackgroundColor = UiComponents.COLORS.Card;
+
+            grid = uigridlayout(manualCard, [1, 6]);
+            grid.RowHeight = {'fit'};
+            grid.ColumnWidth = {'1x', '1x', '2x', '1x', '1x', '2x'};
+            grid.Padding = [10 8 10 8];
+            grid.ColumnSpacing = 6;
+
+            manualControls = struct();
+
+            manualControls.UpButton = UiBuilder.createStyledButton(grid, 'success', '⬆️ UP', 'Move stage up', [1, 1]);
+
+            manualControls.StepDownButton = UiBuilder.createStyledButton(grid, 'muted', '⬅️', 'Decrease step size', [1, 2]);
+
+            stepSizePanel = uipanel(grid);
+            stepSizePanel.Layout.Row = 1;
+            stepSizePanel.Layout.Column = 3;
+            stepSizePanel.BorderType = 'line';
+            stepSizePanel.BackgroundColor = UiComponents.COLORS.Light;
+
+            stepSizeGrid = uigridlayout(stepSizePanel, [1, 1]);
+            stepSizeGrid.Padding = [4 2 4 2];
+
+            manualControls.StepSizeDisplay = uilabel(stepSizeGrid);
+            manualControls.StepSizeDisplay.Text = '1.0μm';
+            manualControls.StepSizeDisplay.FontSize = 9;
+            manualControls.StepSizeDisplay.FontWeight = 'bold';
+            manualControls.StepSizeDisplay.FontColor = [0.2 0.2 0.2];
+            manualControls.StepSizeDisplay.HorizontalAlignment = 'center';
+
+            manualControls.StepUpButton = UiBuilder.createStyledButton(grid, 'muted', '➡️', 'Increase step size', [1, 4]);
+
+            manualControls.DownButton = UiBuilder.createStyledButton(grid, 'warning', '⬇️ DOWN', 'Move stage down', [1, 5]);
+            manualControls.ZeroButton = UiBuilder.createStyledButton(grid, 'primary', ' ZERO', 'Set position to zero', [1, 6]);
+
+            manualControls.StepSizeDropdown = uidropdown(grid);
+            manualControls.StepSizeDropdown.Items = FoilviewUtils.formatStepSizeItems(FoilviewController.STEP_SIZES);
+            manualControls.StepSizeDropdown.Value = FoilviewUtils.formatPosition(FoilviewController.DEFAULT_STEP_SIZE);
+            manualControls.StepSizeDropdown.Layout.Row = 1;
+            manualControls.StepSizeDropdown.Layout.Column = 3;
+            manualControls.StepSizeDropdown.Visible = 'off';
+
+            manualControls.StepSizes = FoilviewController.STEP_SIZES;
+            manualControls.CurrentStepIndex = find(manualControls.StepSizes == FoilviewController.DEFAULT_STEP_SIZE, 1);
+        end
+
+        function autoControls = createAutoStepContainer(mainLayout)
+            % Creates the auto step control panel with modern card styling and enhanced layout.
+            autoCard = uipanel(mainLayout);
+            autoCard.Title = '⚡ Auto Step Control';
+            autoCard.FontSize = 11;
+            autoCard.FontWeight = 'bold';
+            autoCard.Layout.Row = 4;
+            autoCard.BorderType = 'line';
+            autoCard.BorderWidth = 1;
+            autoCard.BorderColor = UiComponents.COLORS.Border;
+            autoCard.BackgroundColor = UiComponents.COLORS.Card;
+            autoCard.AutoResizeChildren = 'on';
+
+            grid = uigridlayout(autoCard, [2, 5]);
+            grid.RowHeight = {'1x', 40};  % Fixed height for status row
+            grid.ColumnWidth = {'fit', '1x', '1x', '1x', 120};
+            grid.Padding = [8 6 8 8];
+            grid.RowSpacing = 6;
+            grid.ColumnSpacing = 8;
+
+            autoControls = struct();
+
+            autoControls.StartStopButton = UiBuilder.createStyledButton(grid, 'success', 'START ▲', [], [1, 1]);
+            autoControls.StartStopButton.HorizontalAlignment = 'center';
+
+            autoControls.StepField = uieditfield(grid, 'numeric');
+            autoControls.StepField.Value = FoilviewController.DEFAULT_AUTO_STEP;
+            autoControls.StepField.FontSize = 10;
+            autoControls.StepField.Layout.Row = 1;
+            autoControls.StepField.Layout.Column = 2;
+            autoControls.StepField.Tooltip = 'Step size (μm)';
+            autoControls.StepField.HorizontalAlignment = 'center';
+
+            autoControls.StepsField = uieditfield(grid, 'numeric');
+            autoControls.StepsField.Value = FoilviewController.DEFAULT_AUTO_STEPS;
+            autoControls.StepsField.FontSize = 10;
+            autoControls.StepsField.Layout.Row = 1;
+            autoControls.StepsField.Layout.Column = 3;
+            autoControls.StepsField.Tooltip = 'Number of steps';
+            autoControls.StepsField.HorizontalAlignment = 'center';
+
+            autoControls.DelayField = uieditfield(grid, 'numeric');
+            autoControls.DelayField.Value = FoilviewController.DEFAULT_AUTO_DELAY;
+            autoControls.DelayField.FontSize = 10;
+            autoControls.DelayField.Layout.Row = 1;
+            autoControls.DelayField.Layout.Column = 4;
+            autoControls.DelayField.Tooltip = 'Delay between steps (seconds)';
+            autoControls.DelayField.HorizontalAlignment = 'center';
+
+            directionPanel = uipanel(grid);
+            directionPanel.Layout.Row = 1;
+            directionPanel.Layout.Column = 5;
+            directionPanel.BorderType = 'none';
+            directionPanel.BackgroundColor = UiComponents.COLORS.Background;
+
+            directionGrid = uigridlayout(directionPanel, [1, 2]);
+            directionGrid.RowHeight = {'fit'};
+            directionGrid.ColumnWidth = {'fit', '1x'};
+            directionGrid.Padding = [2 2 2 2];
+            directionGrid.RowSpacing = 2;
+            directionGrid.ColumnSpacing = 4;
+
+            directionLabel = uilabel(directionGrid);
+            directionLabel.Text = 'Direction';
+            directionLabel.FontSize = 9;
+            directionLabel.FontWeight = 'bold';
+            directionLabel.HorizontalAlignment = 'right';
+            directionLabel.Layout.Row = 1;
+            directionLabel.Layout.Column = 1;
+
+            autoControls.DirectionSwitch = uiswitch(directionGrid, 'toggle');
+            autoControls.DirectionSwitch.Items = {'Down', 'Up'};
+            autoControls.DirectionSwitch.Value = 'Up';
+            autoControls.DirectionSwitch.FontSize = 9;
+            autoControls.DirectionSwitch.Tooltip = 'Toggle direction (Up/Down)';
+            autoControls.DirectionSwitch.Layout.Row = 1;
+            autoControls.DirectionSwitch.Layout.Column = 2;
+
+            autoControls.DirectionButton = UiBuilder.createStyledButton(grid, 'success', '▲', 'Toggle direction (Up/Down)', [2, 4]);
+            autoControls.DirectionButton.Visible = 'off';
+
+            statusGrid = uigridlayout(grid, [1, 3]);
+            statusGrid.Layout.Row = 2;
+            statusGrid.Layout.Column = [1 4];
+            statusGrid.ColumnWidth = {'fit', '1x', 'fit'};
+            statusGrid.RowHeight = {'fit'};
+            statusGrid.Padding = [0 0 0 0];
+            statusGrid.ColumnSpacing = 4;
+
+            statusLabel = uilabel(statusGrid);
+            statusLabel.Text = 'Ready:';
+            statusLabel.FontSize = 10;
+            statusLabel.FontWeight = 'bold';
+            statusLabel.FontColor = [0.3 0.3 0.3];
+            statusLabel.HorizontalAlignment = 'right';
+            statusLabel.Layout.Row = 1;
+            statusLabel.Layout.Column = 1;
+
+            autoControls.StatusDisplay = uilabel(statusGrid);
+            autoControls.StatusDisplay.Text = 'Ready';
+            autoControls.StatusDisplay.FontSize = 10;
+            autoControls.StatusDisplay.FontColor = [0.4 0.4 0.4];
+            autoControls.StatusDisplay.HorizontalAlignment = 'left';
+            autoControls.StatusDisplay.Layout.Row = 1;
+            autoControls.StatusDisplay.Layout.Column = 2;
+
+            unitsLabel = uilabel(statusGrid);
+            unitsLabel.Text = 'μm × steps @ s';
+            unitsLabel.FontSize = 9;
+            unitsLabel.FontColor = [0.6 0.6 0.6];
+            unitsLabel.HorizontalAlignment = 'left';
+            unitsLabel.Layout.Row = 1;
+            unitsLabel.Layout.Column = 3;
         end
 
         function metricsPlotControls = createMetricsPlotArea(uiFigure)
@@ -497,7 +668,7 @@
             % Helper to create and style a button consistently with modern design.
             button = uibutton(parent, 'push');
             button.Text = text;
-            button.FontSize = 10;
+            button.FontSize = 11;
             button.FontWeight = 'bold';
 
             if ~isempty(tooltip)
@@ -516,6 +687,10 @@
             else
                 UiComponents.applyButtonStyle(button, style, text);
             end
+
+            % Add consistent button styling for better visual hierarchy
+            button.FontSize = 10;
+            button.FontWeight = 'bold';
         end
     end
 end

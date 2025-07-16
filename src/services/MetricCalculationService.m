@@ -52,8 +52,8 @@ classdef MetricCalculationService < handle
             obj.CacheTimestamps = containers.Map();
             
             obj.CurrentMetricType = obj.DEFAULT_METRIC;
-            % Initialize metrics structure but don't store unused return value
-            obj.initializeMetricsStructure();
+            % Initialize metrics structure
+            obj.LastCalculatedMetrics = obj.initializeMetricsStructure();
         end
 
         function metrics = calculateAllMetrics(obj, position)
@@ -71,9 +71,6 @@ classdef MetricCalculationService < handle
                 obj.LastCalculatedMetrics = metrics;
                 return;
             end
-
-            % Initialize metrics structure
-            metrics = obj.initializeMetricsStructure();
 
             try
                 if obj.SimulationMode

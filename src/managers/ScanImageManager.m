@@ -75,8 +75,18 @@ classdef ScanImageManager < handle
             try
                 fprintf('ScanImageManager: Attempting to connect to ScanImage...\n');
                 
-                % Try to get ScanImage handle
-                obj.HSI = evalin('base', 'hSI');
+                % Try to get ScanImage handle - check if it exists first
+                try
+                    obj.HSI = evalin('base', 'hSI');
+                catch
+                    % hSI doesn't exist - enter simulation mode
+                    success = false;
+                    message = 'ScanImage not available - entering simulation mode';
+                    obj.SimulationMode = true;
+                    obj.IsInitialized = false;
+                    fprintf('ScanImageManager: %s\n', message);
+                    return;
+                end
                 
                 if isempty(obj.HSI)
                     success = false;

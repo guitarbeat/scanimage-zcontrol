@@ -204,6 +204,77 @@ classdef foilview < matlab.apps.AppBase
         function onWindowClose(app, varargin)
             delete(app);
         end
+        function onWindowSizeChanged(app, varargin)
+            % Immediate callback for window size changes - more responsive than timer
+            if ~isvalid(app.UIFigure)
+                return;
+            end
+            
+            currentSize = app.UIFigure.Position;
+            
+            % Skip if we're ignoring resize events
+            if app.IgnoreNextResize
+                return;
+            end
+            
+            % Update the main panel position based on plot expansion state
+            if isvalid(app.MainPanel)
+                % Ensure MainPanel uses normalized units
+                app.MainPanel.Units = 'normalized';
+                
+                if app.PlotManager.getIsPlotExpanded()
+                    % When plot is expanded, main panel should only occupy left portion
+                    % Calculate the ratio based on original vs current window width
+                    originalWindowSize = app.PlotManager.getOriginalWindowSize();
+                    if ~isempty(originalWindowSize) && length(originalWindowSize) >= 4
+                        originalWidth = originalWindowSize(3);
+                        currentWidth = currentSize(3);
+                        if currentWidth > originalWidth && originalWidth > 0
+                            mainPanelWidthRatio = max(0.3, min(1.0, originalWidth / currentWidth));
+                            app.MainPanel.Position = [0, 0, mainPanelWidthRatio, 1];
+                        else
+                            app.MainPanel.Position = [0, 0, 1, 1];
+                        end
+                    else
+                        app.MainPanel.Position = [0, 0, 1, 1];
+                    end
+                else
+                    % When plot is collapsed, main panel fills entire window
+                    app.MainPanel.Position = [0, 0, 1, 1];
+                end
+                
+                % Force a layout refresh
+                drawnow limitrate;
+            end
+            
+            % Check if size actually changed significantly
+            if ~isempty(app.LastWindowSize)
+                sizeDiff = abs(currentSize - app.LastWindowSize);
+                if any(sizeDiff(3:4) > 10) % Even lower threshold for immediate response
+                    try
+                        % Prepare components for font scaling
+                        components = struct();
+                        components.PositionDisplay = app.PositionDisplay;
+                        components.AutoControls = app.AutoControls;
+                        components.ManualControls = app.ManualControls;
+                        components.MetricDisplay = app.MetricDisplay;
+                        components.StatusControls = app.StatusControls;
+                        
+                        % Apply font scaling immediately
+                        UiComponents.adjustFontSizes(components, currentSize);
+                        
+                        % Update last window size
+                        app.LastWindowSize = currentSize;
+                        
+                    catch ME
+                        FoilviewUtils.warn('FoilviewApp', 'Error during immediate resize: %s', ME.message);
+                    end
+                end
+            else
+                % First time - just store the size
+                app.LastWindowSize = currentSize;
+            end
+        end
         % -- Metric Controls Callbacks --
         function onMetricRefreshButtonPushed(app, ~, ~)
             app.Controller.updateMetric();
@@ -416,6 +487,7 @@ classdef foilview < matlab.apps.AppBase
         %% Set up all UI callback functions
         function setupCallbacks(app)
             app.UIFigure.CloseRequestFcn = createCallbackFcn(app, @app.onWindowClose, true);
+            app.UIFigure.SizeChangedFcn = createCallbackFcn(app, @app.onWindowSizeChanged, true);
             app.ManualControls.StepSizeDropdown.ValueChangedFcn = ...
                 createCallbackFcn(app, @app.onStepSizeChanged, true);
             app.ManualControls.UpButton.ButtonPushedFcn = ...
@@ -479,24 +551,25 @@ classdef foilview < matlab.apps.AppBase
                 return;
             end
             sizeDiff = abs(currentSize - app.LastWindowSize);
-            threshold = 30;
-            heightChanged = sizeDiff(4) > threshold;
-            if heightChanged
+            threshold = 15; % Lower threshold for more responsive resizing
+            
+            % Check for any significant size change (width OR height)
+            sizeChanged = any(sizeDiff(3:4) > threshold);
+            
+            if sizeChanged
                 try
+                    % Prepare components for font scaling
                     components = struct();
                     components.PositionDisplay = app.PositionDisplay;
                     components.AutoControls = app.AutoControls;
                     components.ManualControls = app.ManualControls;
                     components.MetricDisplay = app.MetricDisplay;
                     components.StatusControls = app.StatusControls;
-                    heightBasedSize = [currentSize(1:2), app.LastWindowSize(3), currentSize(4)];
-                    UiComponents.adjustFontSizes(components, heightBasedSize);
-                catch ME
-                    FoilviewUtils.warn('FoilviewApp', 'Error during font resize: %s', ME.message);
-                end
-            end
-            if any(sizeDiff(3:4) > threshold)
-                try
+                    
+                    % Use current size for scaling (both width and height matter)
+                    UiComponents.adjustFontSizes(components, currentSize);
+                    
+                    % Handle plot positioning if expanded
                     if app.PlotManager.getIsPlotExpanded() && ...
                        isvalid(app.MetricsPlotControls.Panel) && ...
                        strcmp(app.MetricsPlotControls.Panel.Visible, 'on')
@@ -506,8 +579,9 @@ classdef foilview < matlab.apps.AppBase
                             app.MetricsPlotControls.Panel.Visible = 'on';
                         end
                     end
+                    
                 catch ME
-                    FoilviewUtils.warn('FoilviewApp', 'Error during plot resize: %s', ME.message);
+                    FoilviewUtils.warn('FoilviewApp', 'Error during resize: %s', ME.message);
                 end
             end
             app.LastWindowSize = currentSize;
@@ -886,6 +960,14 @@ classdef foilview < matlab.apps.AppBase
                     fprintf('Error during beam diagnostics: %s\n', ME.message);
                 end
             end
+        end
+    end
+
+    % === UI State Management Methods ===
+    methods (Access = public)
+        function setIgnoreNextResize(app, value)
+            % Set the IgnoreNextResize flag for plot expansion/collapse
+            app.IgnoreNextResize = value;
         end
     end
 end

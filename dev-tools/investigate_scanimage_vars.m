@@ -1,4 +1,4 @@
-c% Investigate hSI and hSICtl for ScanImage data access
+% Investigate hSI and hSICtl for ScanImage data access
 
 fprintf('--- Investigating hSI ---\n');
 try

@@ -5,6 +5,8 @@ classdef PlotManager < handle
     properties (Access = private)
         App
         MetricsPlotService
+        IsPlotExpanded = false
+        OriginalWindowSize = []
     end
 
     methods
@@ -31,55 +33,142 @@ classdef PlotManager < handle
             success = true;
         end
 
-        function success = expandGUI(~, uiFigure, mainPanel, plotPanel, expandButton, app)
-            % Retain expand/collapse logic as UI wiring only
+        function success = expandGUI(obj, uiFigure, mainPanel, plotPanel, expandButton, app)
+            % Expand GUI to show plot - adaptive to current window size
             success = false;
             if ~isvalid(uiFigure) || ~isvalid(mainPanel) || ~isvalid(plotPanel)
                 return;
             end
-            if nargin >= 6 && ~isempty(app) && isprop(app, 'IgnoreNextResize')
-                app.IgnoreNextResize = true;
+            
+            % Set ignore resize flag if app has the method
+            if nargin >= 6 && ~isempty(app) && ismethod(app, 'setIgnoreNextResize')
+                app.setIgnoreNextResize(true);
             end
+            
             figPos = uiFigure.Position;
+            % Store the original window size before expanding
+            obj.OriginalWindowSize = figPos;
+            
             currentWidth = figPos(3);
             currentHeight = figPos(4);
-            newWidth = currentWidth + 400 + 20;
+            
+            % Calculate plot width based on current window size (adaptive)
+            plotWidth = min(400, max(300, currentWidth * 0.6)); % Between 300-400px, or 60% of window
+            spacing = 10;
+            
+            % Expand window to accommodate plot
+            newWidth = currentWidth + plotWidth + spacing;
             uiFigure.Position = [figPos(1), figPos(2), newWidth, figPos(4)];
-            plotPanelX = currentWidth + 10;
+            
+            % Constrain main panel to left portion only (prevent overlap with plot)
+            if isvalid(mainPanel)
+                % Main panel should only occupy the original width area
+                mainPanelWidthRatio = currentWidth / newWidth;
+                mainPanel.Position = [0, 0, mainPanelWidthRatio, 1];
+            end
+            
+            % Position plot panel to the right of the main content
+            plotPanelX = currentWidth + spacing/2;
             plotPanelY = 10;
             plotPanelHeight = currentHeight - 20;
-            plotPanel.Position = [plotPanelX, plotPanelY, 400, plotPanelHeight];
+            plotPanel.Position = [plotPanelX, plotPanelY, plotWidth, plotPanelHeight];
             plotPanel.Visible = 'on';
+            
+            % Update button appearance
             expandButton.BackgroundColor = [0.9 0.6 0.2];
             expandButton.FontColor = [1 1 1];
             expandButton.Text = '📊 Hide Plot';
             expandButton.FontSize = 10;
             expandButton.FontWeight = 'bold';
+            
+            % Update window title
             uiFigure.Name = sprintf('%s - Plot Expanded', UiComponents.TEXT.WindowTitle);
+            
+            obj.IsPlotExpanded = true;
             success = true;
         end
 
-        function success = collapseGUI(~, uiFigure, ~, plotPanel, expandButton, app)
+        function success = collapseGUI(obj, uiFigure, mainPanel, plotPanel, expandButton, app)
             % Retain collapse logic as UI wiring only
-            if nargin >= 6 && ~isempty(app) && isprop(app, 'IgnoreNextResize')
-                app.IgnoreNextResize = true;
+            success = false;
+            if ~isvalid(uiFigure) || ~isvalid(plotPanel)
+                return;
             end
+            
+            % Update state FIRST to prevent resize monitor interference
+            obj.IsPlotExpanded = false;
+            
+            % Set ignore resize flag BEFORE making changes
+            if nargin >= 6 && ~isempty(app) && ismethod(app, 'setIgnoreNextResize')
+                app.setIgnoreNextResize(true);
+            end
+            
+            % Hide the plot panel
             plotPanel.Visible = 'off';
+            
+            % Restore to the original window size (adaptive)
             figPos = uiFigure.Position;
-            originalWidth = figPos(3) - 400 - 20;
-            uiFigure.Position = [figPos(1), figPos(2), originalWidth, figPos(4)];
+            if ~isempty(obj.OriginalWindowSize) && length(obj.OriginalWindowSize) >= 4
+                % Use the stored original size for perfect restoration
+                newPosition = obj.OriginalWindowSize;
+            else
+                % Fallback: use a reasonable default width
+                collapsedWidth = max(UiComponents.DEFAULT_WINDOW_WIDTH, figPos(3) * 0.4);
+                newPosition = [figPos(1), figPos(2), collapsedWidth, figPos(4)];
+            end
+            
+            % Force the window to the collapsed size
+            uiFigure.Position = newPosition;
+            
+            % Force the main panel to recalculate its layout
+            if isvalid(mainPanel)
+                % Temporarily disable auto-resize to force recalculation
+                mainPanel.AutoResizeChildren = 'off';
+                drawnow;
+                mainPanel.AutoResizeChildren = 'on';
+                drawnow;
+                
+                % Force the main panel to fill the window
+                mainPanel.Position = [0, 0, 1, 1];
+                drawnow;
+            end
+            
+            % Force refresh of the main layout if available through app
+            if nargin >= 6 && ~isempty(app) && isfield(app, 'MainLayout') && isvalid(app.MainLayout)
+                % Force the grid layout to recalculate by toggling a property
+                currentPadding = app.MainLayout.Padding;
+                app.MainLayout.Padding = currentPadding + [1 1 1 1];
+                drawnow;
+                app.MainLayout.Padding = currentPadding;
+                drawnow;
+            end
+            
+            % Update button appearance
             expandButton.BackgroundColor = [0.2 0.6 0.9];
             expandButton.FontColor = [1 1 1];
             expandButton.Text = '📊 Show Plot';
             expandButton.FontSize = 10;
             expandButton.FontWeight = 'bold';
+            
+            % Update window title
             uiFigure.Name = UiComponents.TEXT.WindowTitle;
+            
+            % Final refresh to ensure everything is properly laid out
+            drawnow;
+            pause(0.05);
+            drawnow;
+            
             success = true;
         end
 
-        function expanded = getIsPlotExpanded(~)
-            % This can be tracked in the app or UI state if needed
-            expanded = false;
+        function expanded = getIsPlotExpanded(obj)
+            % Returns the current state of the plot (expanded or collapsed)
+            expanded = obj.IsPlotExpanded;
+        end
+
+        function originalSize = getOriginalWindowSize(obj)
+            % Returns the original window size stored before plot expansion
+            originalSize = obj.OriginalWindowSize;
         end
 
         function success = exportPlotData(~, uiFigure, controller)

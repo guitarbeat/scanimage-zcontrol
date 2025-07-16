@@ -12,13 +12,17 @@ classdef UiComponents
         PLOT_WIDTH = 400
         
         COLORS = struct(...
-            'Background', [0.95 0.95 0.95], ...
-            'Primary', [0.2 0.6 0.9], ...
-            'Success', [0.2 0.7 0.3], ...
-            'Warning', [0.9 0.6 0.2], ...
-            'Danger', [0.9 0.3 0.3], ...
-            'Light', [0.98 0.98 0.98], ...
-            'TextMuted', [0.5 0.5 0.5])
+            'Background', [0.97 0.97 0.98], ...
+            'Primary', [0.13 0.59 0.95], ...
+            'Success', [0.16 0.68 0.38], ...
+            'Warning', [0.95 0.61 0.07], ...
+            'Danger', [0.86 0.24 0.24], ...
+            'Light', [0.99 0.99 1.0], ...
+            'TextMuted', [0.45 0.45 0.5], ...
+            'Card', [1.0 1.0 1.0], ...
+            'Border', [0.88 0.88 0.9], ...
+            'Accent', [0.5 0.2 0.8], ...
+            'Info', [0.11 0.63 0.91])
         
         TEXT = struct(...
             'WindowTitle', 'FoilView - Z-Stage Control', ...
@@ -46,30 +50,33 @@ classdef UiComponents
                 return;
             end
             
+            % More adaptive scaling that works better with various window sizes
             widthScale = windowSize(3) / UiComponents.DEFAULT_WINDOW_WIDTH;
             heightScale = windowSize(4) / UiComponents.DEFAULT_WINDOW_HEIGHT;
-            overallScale = min(max(sqrt(widthScale * heightScale), 0.7), 1.5);
             
-            % Adjust position label font
+            % Use a more gradual scaling approach
+            overallScale = min(max(sqrt(widthScale * heightScale), 0.6), 2.0);
+            
+            % Adjust position label font with better scaling
             if isfield(components, 'PositionDisplay') && isfield(components.PositionDisplay, 'Label')
                 baseFontSize = 28;
-                newFontSize = max(round(baseFontSize * overallScale), 18);
+                % Scale more gradually for the main position display
+                newFontSize = max(round(baseFontSize * overallScale), 16);
+                newFontSize = min(newFontSize, 48); % Cap at reasonable maximum
                 components.PositionDisplay.Label.FontSize = newFontSize;
             end
             
-            % Adjust other controls if scale changed
-            if overallScale ~= 1.0
-                fontFields = {'AutoControls', 'ManualControls', 'MetricDisplay', 'StatusControls'};
-                for i = 1:length(fontFields)
-                    if isfield(components, fontFields{i})
-                        UiComponents.adjustControlFonts(components.(fontFields{i}), overallScale);
-                    end
+            % Adjust other controls with more flexible scaling
+            fontFields = {'AutoControls', 'ManualControls', 'MetricDisplay', 'StatusControls'};
+            for i = 1:length(fontFields)
+                if isfield(components, fontFields{i})
+                    UiComponents.adjustControlFonts(components.(fontFields{i}), overallScale);
                 end
             end
         end
         
         function adjustControlFonts(controlStruct, scale)
-            % Helper to scale font sizes in a control struct, clamping between 8-16.
+            % Helper to scale font sizes in a control struct with more flexible limits.
             % Only operates on UI handle fields; skips non-handle fields for robustness.
             if ~isstruct(controlStruct) || scale == 1.0
                 return;
@@ -80,8 +87,9 @@ classdef UiComponents
                 obj = controlStruct.(fields{i});
                 % Only operate on valid handle objects
                 if isa(obj, 'handle') && ~isempty(obj) && isvalid(obj) && isprop(obj, 'FontSize')
-                    newSize = max(round(obj.FontSize * scale), 8);
-                    newSize = min(newSize, 16);
+                    % More flexible font scaling - allow larger fonts for bigger windows
+                    newSize = max(round(obj.FontSize * scale), 7);
+                    newSize = min(newSize, 20); % Increased max font size
                     obj.FontSize = newSize;
                 end
                 % If obj is a struct (e.g., nested controls), recurse

@@ -156,22 +156,18 @@ classdef FoilviewUtils < handle
             end
         end
         
-        function setLogging(console, file, filePath)
+        function setLogging(console)
             % Configure logging output
             persistent logToConsole  
             if isempty(logToConsole)
                 logToConsole = true;
-                logToFile = false;
-                logFilePath = 'foilview.log';
             end
             if nargin >= 1
                 logToConsole = logical(console);
             end
             if nargin >= 2
-                logToFile = logical(file);
             end
             if nargin >= 3
-                logFilePath = filePath;
             end
         end
         

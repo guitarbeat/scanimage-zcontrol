@@ -193,13 +193,13 @@ classdef FoilviewController < handle
             function doUpdateMetric()
                 % Get current position for metric calculation
                 currentPos = [obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition];
-                
+
                 % Calculate all metrics using the service
                 obj.AllMetrics = obj.MetricCalculationService.calculateAllMetrics(currentPos);
-                
+
                 % Get the current selected metric value
                 obj.CurrentMetric = obj.MetricCalculationService.getCurrentMetric();
-                
+
                 obj.notifyMetricChanged();
 
                 % If recording metrics during auto-stepping
@@ -695,7 +695,7 @@ classdef FoilviewController < handle
             obj.syncPositionsFromService();
             obj.notifyPositionChanged();
         end
-        
+
         function onMetricCalculated(obj, ~, eventData)
             % Handle metric calculation events from MetricCalculationService
             if ~isempty(eventData) && isfield(eventData, 'metrics')

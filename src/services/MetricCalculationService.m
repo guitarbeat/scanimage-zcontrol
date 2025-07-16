@@ -21,9 +21,9 @@ classdef MetricCalculationService < handle
         ScanImageManager
         SimulationMode = true
 
-        % Metric caching
-        MetricCache = containers.Map()
-        CacheTimestamps = containers.Map()
+        % Metric caching - initialized in constructor to avoid shared instances
+        MetricCache
+        CacheTimestamps
         CacheTimeout = 30  % seconds - configurable cache timeout
 
         % Current state
@@ -47,7 +47,12 @@ classdef MetricCalculationService < handle
                 error('MetricCalculationService requires a ScanImageManager instance');
             end
 
+            % Initialize cache containers to avoid shared instances
+            obj.MetricCache = containers.Map();
+            obj.CacheTimestamps = containers.Map();
+            
             obj.CurrentMetricType = obj.DEFAULT_METRIC;
+            % Initialize metrics structure but don't store unused return value
             obj.initializeMetricsStructure();
         end
 

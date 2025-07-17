@@ -55,8 +55,7 @@ classdef UiBuilder
             metricCard = uipanel(mainLayout);
             metricCard.Layout.Row = 1;
             metricCard.BorderType = 'line';
-            metricCard.BorderWidth = 1;
-            metricCard.BorderColor = UiComponents.COLORS.Border;
+            % BorderWidth and BorderColor not supported in uifigure panels
             metricCard.BackgroundColor = UiComponents.COLORS.Card;
             metricCard.Title = 'Image Metrics';
             metricCard.FontSize = 9;
@@ -96,8 +95,7 @@ classdef UiBuilder
             positionCard = uipanel(mainLayout);
             positionCard.Layout.Row = 2;
             positionCard.BorderType = 'line';
-            positionCard.BorderWidth = 2;
-            positionCard.BorderColor = UiComponents.COLORS.Primary;
+            % BorderWidth and BorderColor not supported in uifigure panels
             positionCard.BackgroundColor = UiComponents.COLORS.Card;
             positionCard.Title = 'Current Position';
             positionCard.FontSize = 11;
@@ -144,8 +142,7 @@ classdef UiBuilder
             statusCard = uipanel(mainLayout);
             statusCard.Layout.Row = 4;
             statusCard.BorderType = 'line';
-            statusCard.BorderWidth = 1;
-            statusCard.BorderColor = UiComponents.COLORS.Border;
+            % BorderWidth and BorderColor not supported in uifigure panels
             statusCard.BackgroundColor = UiComponents.COLORS.Card;
             statusCard.Title = ' System Status & Tools';
             statusCard.FontSize = 10;
@@ -258,8 +255,7 @@ classdef UiBuilder
             manualCard.FontSize = 11;
             manualCard.FontWeight = 'bold';
             manualCard.BorderType = 'line';
-            manualCard.BorderWidth = 1;
-            manualCard.BorderColor = UiComponents.COLORS.Border;
+            % BorderWidth and BorderColor not supported in uifigure panels
             manualCard.BackgroundColor = UiComponents.COLORS.Card;
 
             % Main grid: 3 rows - UP button, step controls, DOWN button
@@ -290,8 +286,7 @@ classdef UiBuilder
             stepSizePanel.Layout.Row = 1;
             stepSizePanel.Layout.Column = 2;
             stepSizePanel.BorderType = 'line';
-            stepSizePanel.BorderWidth = 1;
-            stepSizePanel.BorderColor = UiComponents.COLORS.Border;
+            % BorderWidth and BorderColor not supported in uifigure panels
             stepSizePanel.BackgroundColor = UiComponents.COLORS.Light;
 
             stepSizeGrid = uigridlayout(stepSizePanel, [1, 1]);
@@ -330,8 +325,7 @@ classdef UiBuilder
             autoCard.FontSize = 11;
             autoCard.FontWeight = 'bold';
             autoCard.BorderType = 'line';
-            autoCard.BorderWidth = 1;
-            autoCard.BorderColor = UiComponents.COLORS.Border;
+            % BorderWidth and BorderColor not supported in uifigure panels
             autoCard.BackgroundColor = UiComponents.COLORS.Card;
 
             % Main grid: 4 rows - START button, controls row, status row
@@ -371,8 +365,7 @@ classdef UiBuilder
 
             stepSizePanel = uipanel(stepSizeGrid);
             stepSizePanel.BorderType = 'line';
-            stepSizePanel.BorderWidth = 1;
-            stepSizePanel.BorderColor = UiComponents.COLORS.Border;
+            % BorderWidth and BorderColor not supported in uifigure panels
             stepSizePanel.BackgroundColor = UiComponents.COLORS.Light;
 
             stepSizeInnerGrid = uigridlayout(stepSizePanel, [1, 2]);
@@ -426,8 +419,7 @@ classdef UiBuilder
 
             delayPanel = uipanel(delayGrid);
             delayPanel.BorderType = 'line';
-            delayPanel.BorderWidth = 1;
-            delayPanel.BorderColor = UiComponents.COLORS.Border;
+            % BorderWidth and BorderColor not supported in uifigure panels
             delayPanel.BackgroundColor = UiComponents.COLORS.Light;
 
             delayInnerGrid = uigridlayout(delayPanel, [1, 2]);

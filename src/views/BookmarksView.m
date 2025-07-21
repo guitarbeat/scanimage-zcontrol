@@ -49,21 +49,21 @@ classdef BookmarksView < handle
     methods (Access = private)
         function createUI(obj)
             % Create and configure all bookmarks UI components
-            
+
             % Main Figure
             obj.UIFigure = uifigure('Visible', 'off');
             obj.UIFigure.Name = 'Position Bookmarks (XYZ)';
             obj.UIFigure.Position = [400 300 350 400];
             obj.UIFigure.AutoResizeChildren = 'on';
             obj.UIFigure.Resize = 'on';
-            
+
             % Main Layout
             obj.MainLayout = uigridlayout(obj.UIFigure);
             obj.MainLayout.ColumnWidth = {'1x'};
             obj.MainLayout.RowHeight = {'fit', 'fit', 'fit', '1x', 'fit', 'fit'};
             obj.MainLayout.Padding = [15 15 15 15];
             obj.MainLayout.RowSpacing = 10;
-            
+
             % Current Position Display
             obj.CurrentPositionLabel = uilabel(obj.MainLayout);
             obj.CurrentPositionLabel.Text = 'Current: X:0.0, Y:0.0, Z:0.0 μm';
@@ -73,7 +73,7 @@ classdef BookmarksView < handle
             obj.CurrentPositionLabel.BackgroundColor = [0.95 0.95 0.95];
             obj.CurrentPositionLabel.Layout.Row = 1;
             obj.CurrentPositionLabel.Layout.Column = 1;
-            
+
             % Mark new position section
             markLayout = uigridlayout(obj.MainLayout);
             markLayout.ColumnWidth = {'1x', 'fit'};
@@ -81,13 +81,13 @@ classdef BookmarksView < handle
             markLayout.Layout.Row = 2;
             markLayout.Layout.Column = 1;
             markLayout.ColumnSpacing = 10;
-            
+
             obj.MarkField = uieditfield(markLayout, 'text');
             obj.MarkField.Placeholder = 'Label (optional - auto-generated if empty)';
             obj.MarkField.FontSize = 10;
             obj.MarkField.Layout.Row = 1;
             obj.MarkField.Layout.Column = 1;
-            
+
             obj.MarkButton = uibutton(markLayout, 'push');
             obj.MarkButton.Tooltip = 'Mark current XYZ position (auto-generates label if empty)';
             obj.MarkButton.Layout.Row = 1;
@@ -97,7 +97,7 @@ classdef BookmarksView < handle
             obj.MarkButton.Text = 'MARK';
             obj.MarkButton.FontSize = 10;
             obj.MarkButton.FontWeight = 'bold';
-            
+
             % Instructions
             instructLabel = uilabel(obj.MainLayout);
             instructLabel.Text = 'Saved Positions:';
@@ -105,7 +105,7 @@ classdef BookmarksView < handle
             instructLabel.FontWeight = 'bold';
             instructLabel.Layout.Row = 3;
             instructLabel.Layout.Column = 1;
-            
+
             % Position List
             obj.PositionList = uilistbox(obj.MainLayout);
             obj.PositionList.FontSize = 10;
@@ -113,7 +113,7 @@ classdef BookmarksView < handle
             obj.PositionList.Layout.Row = 4;
             obj.PositionList.Layout.Column = 1;
             obj.PositionList.Items = {};
-            
+
             % Control buttons
             buttonLayout = uigridlayout(obj.MainLayout);
             buttonLayout.ColumnWidth = {'1x', '1x'};
@@ -121,7 +121,7 @@ classdef BookmarksView < handle
             buttonLayout.Layout.Row = 5;
             buttonLayout.Layout.Column = 1;
             buttonLayout.ColumnSpacing = 10;
-            
+
             obj.GoToButton = uibutton(buttonLayout, 'push');
             obj.GoToButton.Enable = 'off';
             obj.GoToButton.Layout.Row = 1;
@@ -131,7 +131,7 @@ classdef BookmarksView < handle
             obj.GoToButton.Text = 'GO TO';
             obj.GoToButton.FontSize = 10;
             obj.GoToButton.FontWeight = 'bold';
-            
+
             obj.DeleteButton = uibutton(buttonLayout, 'push');
             obj.DeleteButton.Enable = 'off';
             obj.DeleteButton.Layout.Row = 1;
@@ -141,7 +141,7 @@ classdef BookmarksView < handle
             obj.DeleteButton.Text = 'DELETE';
             obj.DeleteButton.FontSize = 10;
             obj.DeleteButton.FontWeight = 'bold';
-            
+
             % Status Label
             obj.StatusLabel = uilabel(obj.MainLayout);
             obj.StatusLabel.Text = 'Ready';
@@ -150,23 +150,23 @@ classdef BookmarksView < handle
             obj.StatusLabel.FontColor = [0.5 0.5 0.5];
             obj.StatusLabel.Layout.Row = 6;
             obj.StatusLabel.Layout.Column = 1;
-            
+
             % Make figure visible
             obj.UIFigure.Visible = 'on';
         end
 
         function setupCallbacks(obj)
             % Set up all UI callback functions
-            
+
             % Main window
             obj.UIFigure.CloseRequestFcn = @(~,~) delete(obj);
-            
+
             % Control callbacks
             obj.MarkButton.ButtonPushedFcn = @(~,~) obj.onMarkButtonPushed();
             obj.PositionList.ValueChangedFcn = @(~,~) obj.onPositionListChanged();
             obj.GoToButton.ButtonPushedFcn = @(~,~) obj.onGoToButtonPushed();
             obj.DeleteButton.ButtonPushedFcn = @(~,~) obj.onDeleteButtonPushed();
-            
+
             % Enter key in mark field
             obj.MarkField.ValueChangedFcn = @(~,~) obj.onMarkFieldChanged();
         end
@@ -177,7 +177,7 @@ classdef BookmarksView < handle
             obj.updateBookmarksList();
             obj.updateButtonStates();
         end
-        
+
         function updatePositionDisplay(obj)
             % Update current position display
             if ~isempty(obj.Controller) && isvalid(obj.Controller)
@@ -186,7 +186,7 @@ classdef BookmarksView < handle
                     currentY = obj.Controller.CurrentYPosition;
                     currentZ = obj.Controller.CurrentPosition;
                     obj.CurrentPositionLabel.Text = sprintf('Current: X:%.1f, Y:%.1f, Z:%.1f μm', ...
-                                                           currentX, currentY, currentZ);
+                        currentX, currentY, currentZ);
                 catch
                     obj.CurrentPositionLabel.Text = 'Current: N/A';
                 end
@@ -207,7 +207,7 @@ classdef BookmarksView < handle
                             xPos = bookmarks.XPositions(i);
                             yPos = bookmarks.YPositions(i);
                             zPos = bookmarks.ZPositions(i);
-                            
+
                             if isempty(label)
                                 items{i} = sprintf('%d: X:%.1f, Y:%.1f, Z:%.1f μm', i, xPos, yPos, zPos);
                             else
@@ -229,30 +229,30 @@ classdef BookmarksView < handle
             obj.GoToButton.Enable = matlab.lang.OnOffSwitchState(hasSelection);
             obj.DeleteButton.Enable = matlab.lang.OnOffSwitchState(hasSelection);
         end
-        
+
         function onMarkButtonPushed(obj)
             % Handle mark button press
             label = strtrim(obj.MarkField.Value);
-            
+
             % Auto-generate label if empty
             if isempty(label)
                 label = obj.generateAutoLabel();
             end
-            
+
             try
                 if isempty(obj.Controller) || ~isvalid(obj.Controller)
                     obj.showStatus('Error: No controller connection', true);
                     return;
                 end
-                
+
                 % Use the controller's validation function for consistency
                 obj.Controller.markCurrentPositionWithValidation(obj.UIFigure, label, ...
                     @() obj.updateBookmarksList());
-                
+
                 % Clear the input field
                 obj.MarkField.Value = '';
                 obj.showStatus(sprintf('Position marked: %s', label));
-                
+
             catch ME
                 obj.showStatus(sprintf('Error: %s', ME.message), true);
             end
@@ -272,12 +272,12 @@ classdef BookmarksView < handle
             % Handle position list selection change
             obj.updateButtonStates();
         end
-        
+
         function onMarkFieldChanged(obj)
             % If user presses enter in the mark field, treat as button push
             obj.onMarkButtonPushed();
         end
-        
+
         function startUpdateTimer(obj)
             % Start a timer to periodically update the UI
             obj.UpdateTimer = timer(...
@@ -301,21 +301,21 @@ classdef BookmarksView < handle
             if nargin < 3
                 isError = false;
             end
-            
+
             obj.StatusLabel.Text = message;
             if isError
                 obj.StatusLabel.FontColor = [0.8 0.2 0.2];
             else
                 obj.StatusLabel.FontColor = [0.2 0.6 0.2];
             end
-            
+
             % Reset color after a delay
             pause(0.1);
             drawnow;
             resetTimer = timer('StartDelay', 3, 'TimerFcn', @(~,~) obj.resetStatus(), 'ExecutionMode', 'singleShot');
             start(resetTimer);
         end
-        
+
         function resetStatus(obj)
             % Reset status label to default
             if isvalid(obj.StatusLabel)
@@ -328,20 +328,20 @@ classdef BookmarksView < handle
             % Generate an auto-numbered bookmark label
             if ~isempty(obj.Controller) && isvalid(obj.Controller)
                 existingLabels = obj.Controller.BookmarkManager.getLabels();
-                
+
                 % Find the next available bookmark number
                 bookmarkNum = 1;
                 while true
                     candidateLabel = sprintf('Bookmark %d', bookmarkNum);
-                    
+
                     % Check if this label already exists
                     if ~any(strcmp(existingLabels, candidateLabel))
                         label = candidateLabel;
                         break;
                     end
-                    
+
                     bookmarkNum = bookmarkNum + 1;
-                    
+
                     % Safety check to prevent infinite loop
                     if bookmarkNum > 1000
                         label = sprintf('Bookmark %d_%s', bookmarkNum, datetime('now', 'Format', 'HHmmss'));
@@ -361,7 +361,7 @@ classdef BookmarksView < handle
                 index = [];
                 return;
             end
-            
+
             % Parse the index from the beginning of the string (format: "1: ...")
             tokens = regexp(selectedValue, '^(\d+):', 'tokens');
             if ~isempty(tokens)
@@ -404,4 +404,4 @@ classdef BookmarksView < handle
             end
         end
     end
-end 
+end

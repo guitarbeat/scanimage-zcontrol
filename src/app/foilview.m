@@ -64,7 +64,10 @@ classdef foilview < matlab.apps.AppBase
         function saveBookmarkToMetadata(app, label, xPos, yPos, zPos, metricStruct)
             % Save bookmark information to the metadata file - now delegates to MetadataService
             try
-                MetadataService.saveBookmarkMetadata(label, xPos, yPos, zPos, metricStruct, app.MetadataFile, app.Controller);
+                metadataFile = app.getMetadataFile();
+                if ~isempty(metadataFile)
+                    MetadataService.saveBookmarkMetadata(label, xPos, yPos, zPos, metricStruct, metadataFile, app.Controller);
+                end
             catch ME
                 FoilviewUtils.logException('FoilviewApp.saveBookmarkToMetadata', ME);
             end
@@ -88,15 +91,15 @@ classdef foilview < matlab.apps.AppBase
     methods (Access = private)
         % -- Manual Controls Callbacks --
         function onDownButtonPushed(app, varargin)
-            stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
+            stepSize = app.ManualControls.SharedStepSize.StepSizes(app.ManualControls.SharedStepSize.CurrentStepIndex);
             app.Controller.moveStageManual(stepSize, -1);
         end
         function onStepDownButtonPushed(app, varargin)
-            currentIndex = app.ManualControls.CurrentStepIndex;
+            currentIndex = app.ManualControls.SharedStepSize.CurrentStepIndex;
             if currentIndex > 1
                 newIndex = currentIndex - 1;
-                newStepSize = app.ManualControls.StepSizes(newIndex);
-                app.updateStepSizeDisplay(newIndex, newStepSize);
+                newStepSize = app.ManualControls.SharedStepSize.StepSizes(newIndex);
+                app.updateSharedStepSizeDisplay(newIndex, newStepSize);
             end
         end
         function onStepSizeChanged(app, varargin)
@@ -107,16 +110,48 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         function onStepUpButtonPushed(app, varargin)
-            currentIndex = app.ManualControls.CurrentStepIndex;
-            if currentIndex < length(app.ManualControls.StepSizes)
+            currentIndex = app.ManualControls.SharedStepSize.CurrentStepIndex;
+            if currentIndex < length(app.ManualControls.SharedStepSize.StepSizes)
                 newIndex = currentIndex + 1;
-                newStepSize = app.ManualControls.StepSizes(newIndex);
-                app.updateStepSizeDisplay(newIndex, newStepSize);
+                newStepSize = app.ManualControls.SharedStepSize.StepSizes(newIndex);
+                app.updateSharedStepSizeDisplay(newIndex, newStepSize);
             end
         end
         function onUpButtonPushed(app, varargin)
-            stepSize = app.ManualControls.StepSizes(app.ManualControls.CurrentStepIndex);
+            stepSize = app.ManualControls.SharedStepSize.StepSizes(app.ManualControls.SharedStepSize.CurrentStepIndex);
             app.Controller.moveStageManual(stepSize, 1);
+        end
+        function onSharedStepSizeChanged(app, varargin)
+            % Handle custom step size entry from the clickable field
+            if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
+                event = varargin{1};
+                customStepSize = event.Value;
+                
+                % Validate the custom step size
+                if isnumeric(customStepSize) && customStepSize > 0 && customStepSize <= 1000
+                    % Update the shared step size with the custom value
+                    app.ManualControls.SharedStepSize.CurrentValue = customStepSize;
+                    
+                    % Find the closest predefined step size for index compatibility
+                    [~, closestIndex] = min(abs(app.ManualControls.SharedStepSize.StepSizes - customStepSize));
+                    app.ManualControls.SharedStepSize.CurrentStepIndex = closestIndex;
+                    
+                    % Update compatibility properties
+                    app.ManualControls.CurrentStepIndex = closestIndex;
+                    
+                    % Update the hidden dropdown for compatibility
+                    formattedValue = FoilviewUtils.formatPosition(customStepSize);
+                    if ismember(formattedValue, app.ManualControls.SharedStepSize.StepSizeDropdown.Items)
+                        app.ManualControls.SharedStepSize.StepSizeDropdown.Value = formattedValue;
+                    end
+                    
+                    fprintf('Custom step size set to: %.3f μm\n', customStepSize);
+                else
+                    % Invalid value - revert to previous value
+                    app.ManualControls.SharedStepSize.StepSizeDisplay.Value = app.ManualControls.SharedStepSize.CurrentValue;
+                    fprintf('Invalid step size. Must be between 0.001 and 1000 μm\n');
+                end
+            end
         end
         function onZeroButtonPushed(app, varargin)
             app.Controller.resetPosition();
@@ -145,13 +180,7 @@ classdef foilview < matlab.apps.AppBase
             app.updateAutoStepStatus();
             app.UIController.updateAllUI();
         end
-        function onAutoStepSizeChanged(app, varargin)
-            if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
-                event = varargin{1};
-                app.Controller.syncStepSizes(app.ManualControls, app.AutoControls, event.Value, false);
-                app.updateAutoStepStatus();
-            end
-        end
+
         function onAutoStepsChanged(app, varargin)
             app.updateAutoStepStatus();
         end
@@ -309,13 +338,24 @@ classdef foilview < matlab.apps.AppBase
     methods (Access = private)
         %% Update step size display and sync controls
         function updateStepSizeDisplay(app, newIndex, newStepSize)
-            app.ManualControls.CurrentStepIndex = newIndex;
-            app.ManualControls.StepSizeDisplay.Text = sprintf('%.1fμm', newStepSize);
+            % Legacy method - now delegates to shared step size display
+            app.updateSharedStepSizeDisplay(newIndex, newStepSize);
+        end
+        
+        function updateSharedStepSizeDisplay(app, newIndex, newStepSize)
+            % Update the shared step size display and sync all references
+            app.ManualControls.SharedStepSize.CurrentStepIndex = newIndex;
+            app.ManualControls.SharedStepSize.CurrentValue = newStepSize;
+            app.ManualControls.SharedStepSize.StepSizeDisplay.Value = newStepSize;
+            
+            % Update the hidden dropdown for compatibility
             formattedValue = FoilviewUtils.formatPosition(newStepSize);
-            if ismember(formattedValue, app.ManualControls.StepSizeDropdown.Items)
-                app.ManualControls.StepSizeDropdown.Value = formattedValue;
+            if ismember(formattedValue, app.ManualControls.SharedStepSize.StepSizeDropdown.Items)
+                app.ManualControls.SharedStepSize.StepSizeDropdown.Value = formattedValue;
             end
-            app.AutoControls.StepField.Value = newStepSize;
+            
+            % Update compatibility properties in ManualControls
+            app.ManualControls.CurrentStepIndex = newIndex;
         end
         %% Update all UI components
         function updateAllUI(app)
@@ -352,14 +392,14 @@ classdef foilview < matlab.apps.AppBase
         function startRefreshTimer(app)
             app.RefreshTimer = FoilviewUtils.createTimer('fixedRate', ...
                 app.Controller.POSITION_REFRESH_PERIOD, ...
-                @(~,~) app.Controller.refreshPosition());
+                @(~,~) app.safeRefreshPosition());
             start(app.RefreshTimer);
         end
         %% Start the metric timer for metric updates
         function startMetricTimer(app)
             app.MetricTimer = FoilviewUtils.createTimer('fixedRate', ...
                 app.Controller.METRIC_REFRESH_PERIOD, ...
-                @(~,~) app.Controller.updateMetric());
+                @(~,~) app.safeUpdateMetric());
             start(app.MetricTimer);
         end
         %% Start the resize monitor timer
@@ -483,14 +523,16 @@ classdef foilview < matlab.apps.AppBase
                 createCallbackFcn(app, @app.onUpButtonPushed, true);
             app.ManualControls.DownButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onDownButtonPushed, true);
-            app.ManualControls.ZeroButton.ButtonPushedFcn = ...
-                createCallbackFcn(app, @app.onZeroButtonPushed, true);
-            app.ManualControls.StepUpButton.ButtonPushedFcn = ...
+            % ZeroButton no longer exists in the new simplified manual controls
+            % Set up shared step size button callbacks
+            app.ManualControls.SharedStepSize.StepUpButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onStepUpButtonPushed, true);
-            app.ManualControls.StepDownButton.ButtonPushedFcn = ...
+            app.ManualControls.SharedStepSize.StepDownButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onStepDownButtonPushed, true);
-            app.AutoControls.StepField.ValueChangedFcn = ...
-                createCallbackFcn(app, @app.onAutoStepSizeChanged, true);
+            % Set up shared step size field callback for custom values
+            app.ManualControls.SharedStepSize.StepSizeDisplay.ValueChangedFcn = ...
+                createCallbackFcn(app, @app.onSharedStepSizeChanged, true);
+            % StepField no longer exists - step size is now shared
             app.AutoControls.StepsField.ValueChangedFcn = ...
                 createCallbackFcn(app, @app.onAutoStepsChanged, true);
             app.AutoControls.DelayField.ValueChangedFcn = ...
@@ -585,6 +627,35 @@ classdef foilview < matlab.apps.AppBase
                 metadataFile = '';
             end
         end
+        %% Safe timer callback methods to prevent "Invalid or deleted object" errors
+        function safeRefreshPosition(app)
+            % Safe wrapper for position refresh timer callback
+            try
+                if isvalid(app) && ~isempty(app.Controller) && isvalid(app.Controller)
+                    app.Controller.refreshPosition();
+                end
+            catch ME
+                % Silently handle errors to prevent timer spam
+                if ~contains(ME.message, 'Invalid or deleted object')
+                    FoilviewUtils.warn('FoilviewApp', 'Timer callback error: %s', ME.message);
+                end
+            end
+        end
+        
+        function safeUpdateMetric(app)
+            % Safe wrapper for metric update timer callback
+            try
+                if isvalid(app) && ~isempty(app.Controller) && isvalid(app.Controller)
+                    app.Controller.updateMetric();
+                end
+            catch ME
+                % Silently handle errors to prevent timer spam
+                if ~contains(ME.message, 'Invalid or deleted object')
+                    FoilviewUtils.warn('FoilviewApp', 'Timer callback error: %s', ME.message);
+                end
+            end
+        end
+        
         %% Generate session statistics from metadata file
         function generateSessionStats(app, metadataFile)
             try

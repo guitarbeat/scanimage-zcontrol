@@ -1,34 +1,140 @@
-% Combined UI Components for FoilView
-% This file contains shared constants, UI adjustment utilities, 
-% sub-view creation methods, and UI update functions for state management and visualization.
+% UI RUNTIME MANAGEMENT & STYLING - Dynamic UI operations for FoilView application
+%
+% RESPONSIBILITY: Runtime UI management, styling, and dynamic updates
+% - Provides all UI constants (colors, dimensions, layout values)
+% - Handles dynamic UI updates during application runtime
+% - Manages responsive behavior and font scaling
+% - Applies styling and state changes to existing components
+% - Runs continuously throughout application lifecycle
+%
+% ARCHITECTURE:
+% - UiBuilder: Static UI construction & layout (uses constants from here)
+% - UiComponents (this class): Runtime management, styling, and dynamic updates
+% - All UI constants are centralized here for consistency
+%
+% ===== CONTAINER RUNTIME RESPONSIBILITIES =====
+% This class UPDATES and MANAGES the behavior of:
+%
+% 1. "Manual Control" Container:
+%    - Method: updateControlStates() -> setControlsEnabled()
+%    - Updates: Enable/disable buttons during auto-stepping
+%    - Updates: Step size display text and styling
+%
+% 2. "Auto Step Control" Container:
+%    - Method: updateControlStates() -> updateAutoStepButton()
+%    - Method: updateDirectionButtons() -> updateDirectionButtonStyling()
+%    - Method: updateAutoStepStatusDisplay()
+%    - Updates: START/STOP button text and colors
+%    - Updates: Direction switch and button styling
+%    - Updates: Enable/disable input fields during operation
+%    - Updates: Status text and progress display
+%
+% 3. "Current Position" Container:
+%    - Method: updatePositionDisplay()
+%    - Method: updateStatusDisplay()
+%    - Updates: Position value text and window title
+%    - Updates: Status text (Ready/Auto-stepping progress)
+%    - Updates: Font scaling for responsive design
+%
+% 4. "System Status & Tools" Container:
+%    - Method: updateStatusDisplay()
+%    - Updates: ScanImage connection status text
+%    - Updates: Status label colors (simulation vs connected)
+%
+% Main runtime sections:
+% - Constants: All UI dimensions, colors, layout values, and text
+% - Adjustment utilities: Responsive scaling and positioning
+% - Sub-view creation: Factory methods for additional windows
+% - Update functions: Dynamic state management and visual updates
 
 classdef UiComponents
-    
+
     properties (Constant, Access = public)
+        % ===== WINDOW DIMENSIONS =====
         MIN_WINDOW_WIDTH = 400
-        MIN_WINDOW_HEIGHT = 550
-        DEFAULT_WINDOW_WIDTH = 320
-        DEFAULT_WINDOW_HEIGHT = 450
+        MIN_WINDOW_HEIGHT = 400
         PLOT_WIDTH = 400
-        
+
+        % ===== LAYOUT CONSTANTS =====
+        % Common dimensions
+        BUTTON_HEIGHT = 30;
+
+        % Standard padding and spacing
+        STANDARD_PADDING = [2 2 2 2];
+        STANDARD_SPACING = 2;
+        TIGHT_PADDING = [1 1 1 1];
+        TIGHT_SPACING = 1;
+        LOOSE_PADDING = [4 4 4 4];
+        LOOSE_SPACING = 4;
+
+        % Main layout
+        MAIN_PADDING = [1 1 1 1];
+        MAIN_ROW_SPACING = 1;
+        MAIN_ROW_HEIGHTS = {'fit', 'fit', 'fit', 'fit', 'fit'};
+
+        % Status bar
+        STATUS_BAR_COLUMN_WIDTHS = {'1x', 40, 40, 40, 40, 40};
+        STATUS_BAR_PADDING = [8 8 8 8];
+        STATUS_BAR_SPACING = 4;
+
+        % Control panels
+        CONTROL_GRID_PADDING = [3 3 3 3];
+        CONTROL_GRID_SPACING = 4;
+        CONTROL_COLUMN_SPACING = 8;
+
+        % Standard column and row configurations
+        STANDARD_COLUMN_WIDTHS = {'1x', '1x'};
+        FIT_EXPAND_COLUMNS = {'fit', '1x'};
+        FIT_EXPAND_ROWS = {'fit', '1x'};
+        ALL_FIT_ROWS = {'fit', 'fit'};
+        THREE_FIT_ROWS = {'fit', 'fit', 'fit'};
+
+        % Plot area
+        PLOT_PANEL_OFFSET = 10;
+        PLOT_PANEL_MARGIN = 20;
+        PLOT_GRID_PADDING = [10 10 10 10];
+        PLOT_GRID_SPACING = 10;
+
+        % Font sizes - Unified for consistency
+        POSITION_DISPLAY_FONT_SIZE = 28;  % Large position display
+        CARD_TITLE_FONT_SIZE = 11;        % Card headers
+        CONTROL_FONT_SIZE = 10;           % All controls (buttons, fields, dropdowns, labels)
+
+        % ===== MODERN COLOR SCHEME =====
         COLORS = struct(...
-            'Background', [0.97 0.97 0.98], ...
-            'Primary', [0.13 0.59 0.95], ...
-            'Success', [0.16 0.68 0.38], ...
-            'Warning', [0.95 0.61 0.07], ...
-            'Danger', [0.86 0.24 0.24], ...
-            'Light', [0.99 0.99 1.0], ...
-            'TextMuted', [0.45 0.45 0.5], ...
-            'Card', [1.0 1.0 1.0], ...
+            'Background', [0.96 0.97 0.98], ...         % Light blue-gray background
+            'Primary', [0.13 0.45 0.82], ...            % Modern blue
+            'PrimaryHover', [0.10 0.35 0.72], ...       % Darker blue for emphasis
+            'Success', [0.16 0.68 0.38], ...            % Modern green
+            'SuccessHover', [0.12 0.58 0.28], ...       % Darker green
+            'Warning', [0.95 0.61 0.07], ...            % Modern orange
+            'WarningHover', [0.85 0.51 0.02], ...       % Darker orange
+            'Danger', [0.86 0.24 0.24], ...             % Modern red
+            'DangerHover', [0.76 0.14 0.14], ...        % Darker red
+            'Light', [0.98 0.99 1.0], ...               % Very light blue tint
+            'TextMuted', [0.45 0.55 0.65], ...          % Blue-tinted muted text
+            'Card', [1.0 1.0 1.0], ...                  % Pure white cards
+            'CardBorder', [0.90 0.92 0.95], ...         % Subtle card borders
             'Border', [0.88 0.88 0.9], ...
-            'Accent', [0.5 0.2 0.8], ...
-            'Info', [0.11 0.63 0.91])
-        
+            'Accent', [0.67 0.13 0.82], ...             % Purple accent
+            'Info', [0.11 0.63 0.95], ...               % Bright info blue
+            'White', [1 1 1], ...
+            'Black', [0 0 0], ...
+            'DarkText', [0.15 0.15 0.15], ...           % Softer dark text
+            'LightBackground', [0.98 0.98 0.98], ...
+            'MetricBackground', [0.95 0.9 0.95], ...
+            'StatusGood', [0.16 0.68 0.38], ...         % Green for good status
+            'StatusWarning', [0.95 0.61 0.07], ...      % Orange for warnings
+            'StatusError', [0.86 0.24 0.24], ...        % Red for errors
+            'ButtonShadow', [0.85 0.87 0.90] ...        % Button shadow color
+            )
+
+        % ===== TEXT CONSTANTS =====
         TEXT = struct(...
-            'WindowTitle', 'FoilView - Z-Stage Control', ...
-            'Ready', 'Ready')
+            'WindowTitle', 'FoilView - Enhanced', ...
+            'Ready', '✓ Ready')
     end
-    
+
     methods (Static)
         % ===== UI ADJUSTMENT UTILITIES =====
         function adjustPlotPosition(uiFigure, plotPanel, plotWidth)
@@ -36,70 +142,62 @@ classdef UiComponents
             if ~isvalid(uiFigure) || ~isvalid(plotPanel)
                 return;
             end
-            
+
             figPos = uiFigure.Position;
             expandedWidth = figPos(3);
             mainWindowWidth = expandedWidth - plotWidth - 20;
-            
+
             plotPanel.Position = [mainWindowWidth + 10, 10, plotWidth, figPos(4) - 20];
         end
-        
+
         function adjustFontSizes(components, windowSize)
             % Scales font sizes of UI components based on window size for responsiveness.
             if nargin < 2 || isempty(windowSize)
                 return;
             end
-            
-            % More adaptive scaling that works better with various window sizes
-            widthScale = windowSize(3) / UiComponents.DEFAULT_WINDOW_WIDTH;
-            heightScale = windowSize(4) / UiComponents.DEFAULT_WINDOW_HEIGHT;
-            
-            % Use a more gradual scaling approach
+
+            % Calculate responsive scaling factor
+            widthScale = windowSize(3) / UiComponents.MIN_WINDOW_WIDTH;
+            heightScale = windowSize(4) / UiComponents.MIN_WINDOW_HEIGHT;
             overallScale = min(max(sqrt(widthScale * heightScale), 0.6), 2.0);
-            
-            % Adjust position label font with better scaling
+
+            % Scale position display with unified constant
             if isfield(components, 'PositionDisplay') && isfield(components.PositionDisplay, 'Label')
-                baseFontSize = 28;
-                % Scale more gradually for the main position display
-                newFontSize = max(round(baseFontSize * overallScale), 16);
-                newFontSize = min(newFontSize, 48); % Cap at reasonable maximum
+                newFontSize = max(round(UiComponents.POSITION_DISPLAY_FONT_SIZE * overallScale), 16);
+                newFontSize = min(newFontSize, 48);
                 components.PositionDisplay.Label.FontSize = newFontSize;
             end
-            
-            % Adjust other controls with more flexible scaling
-            fontFields = {'AutoControls', 'ManualControls', 'MetricDisplay', 'StatusControls'};
-            for i = 1:length(fontFields)
-                if isfield(components, fontFields{i})
-                    UiComponents.adjustControlFonts(components.(fontFields{i}), overallScale);
+
+            % Scale all control components uniformly
+            controlFields = {'AutoControls', 'ManualControls', 'MetricDisplay', 'StatusControls'};
+            for i = 1:length(controlFields)
+                if isfield(components, controlFields{i})
+                    UiComponents.adjustControlFonts(components.(controlFields{i}), overallScale);
                 end
             end
         end
-        
+
         function adjustControlFonts(controlStruct, scale)
-            % Helper to scale font sizes in a control struct with more flexible limits.
-            % Only operates on UI handle fields; skips non-handle fields for robustness.
+            % Applies uniform font scaling to all controls using the standard control font size.
             if ~isstruct(controlStruct) || scale == 1.0
                 return;
             end
-            
+
+            % Calculate scaled font size once for all controls
+            scaledFontSize = max(round(UiComponents.CONTROL_FONT_SIZE * scale), 7);
+            scaledFontSize = min(scaledFontSize, 16);
+
             fields = fieldnames(controlStruct);
             for i = 1:length(fields)
                 obj = controlStruct.(fields{i});
-                % Only operate on valid handle objects
                 if isa(obj, 'handle') && ~isempty(obj) && isvalid(obj) && isprop(obj, 'FontSize')
-                    % More flexible font scaling - allow larger fonts for bigger windows
-                    newSize = max(round(obj.FontSize * scale), 7);
-                    newSize = min(newSize, 20); % Increased max font size
-                    obj.FontSize = newSize;
-                end
-                % If obj is a struct (e.g., nested controls), recurse
-                if isstruct(obj)
+                    obj.FontSize = scaledFontSize;
+                elseif isstruct(obj)
                     UiComponents.adjustControlFonts(obj, scale);
                 end
-                % Non-handle, non-struct fields are skipped
             end
         end
-        
+
         % ===== SUB-VIEW CREATION =====
         function bookmarksApp = createBookmarksView(controller)
             % Creates and returns a BookmarksView instance tied to the controller.
@@ -108,7 +206,7 @@ classdef UiComponents
             end
             bookmarksApp = BookmarksView(controller);
         end
-        
+
         function stageViewApp = createStageView()
             % Creates and returns a StageView instance.
             stageViewApp = StageView();
@@ -147,7 +245,7 @@ classdef UiComponents
                 @() UiComponents.updateStatusDisplay(app.PositionDisplay, app.StatusControls, app.Controller), ...
                 @() UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller), ...
                 @() UiComponents.updateMetricDisplay(app.MetricDisplay, app.Controller)
-            };
+                };
         end
 
         function success = updatePositionDisplay(uiFigure, positionDisplay, controller)
@@ -171,7 +269,7 @@ classdef UiComponents
         end
 
         function success = updateStatusDisplay(positionDisplay, statusControls, controller)
-            % Updates status labels for position and overall app state.
+            % Updates status labels for position and overall app state with enhanced styling.
             success = FoilviewUtils.safeExecuteWithReturn(@doUpdateStatus, 'updateStatusDisplay', false);
 
             function success = doUpdateStatus()
@@ -180,21 +278,13 @@ classdef UiComponents
                     return;
                 end
 
-                if controller.IsAutoRunning
-                    positionDisplay.Status.Text = sprintf('Auto-stepping: %d/%d', controller.CurrentStep, controller.TotalSteps);
-                    positionDisplay.Status.FontColor = [0.1 0.1 0.1];
-                else
-                    positionDisplay.Status.Text = 'Ready';
-                    positionDisplay.Status.FontColor = [0.5 0.5 0.5];
-                end
+                [statusText, statusColor] = UiComponents.getPositionStatusInfo(controller);
+                positionDisplay.Status.Text = statusText;
+                positionDisplay.Status.FontColor = statusColor;
 
-                if controller.SimulationMode
-                    statusControls.Label.Text = sprintf('ScanImage: Simulation (%s)', controller.StatusMessage);
-                    statusControls.Label.FontColor = [0.9 0.6 0.2];
-                else
-                    statusControls.Label.Text = sprintf('ScanImage: %s', controller.StatusMessage);
-                    statusControls.Label.FontColor = [0.2 0.7 0.3];
-                end
+                [systemText, systemColor] = UiComponents.getSystemStatusInfo(controller);
+                statusControls.Label.Text = systemText;
+                statusControls.Label.FontColor = systemColor;
 
                 success = true;
             end
@@ -212,19 +302,7 @@ classdef UiComponents
 
                 metricValue = controller.CurrentMetric;
                 displayText = FoilviewUtils.formatMetricValue(metricValue);
-
-                if isnan(metricValue)
-                    textColor = [0.5 0.5 0.5];
-                    bgColor = [0.98 0.98 0.98];
-                else
-                    textColor = [0 0 0];
-                    if metricValue > 0
-                        intensity = min(1, metricValue / 100);
-                        bgColor = [0.95 0.9 + 0.1 * intensity 0.95];
-                    else
-                        bgColor = [0.98 0.98 0.98];
-                    end
-                end
+                [textColor, bgColor] = UiComponents.getMetricDisplayColors(metricValue);
 
                 metricDisplay.Value.Text = displayText;
                 metricDisplay.Value.FontColor = textColor;
@@ -249,12 +327,10 @@ classdef UiComponents
                 UiComponents.setControlsEnabled(manualControls, ~isRunning);
 
                 if isRunning
-                    FoilviewUtils.setControlEnabled(autoControls, false, 'StepField');
                     FoilviewUtils.setControlEnabled(autoControls, false, 'StepsField');
                     FoilviewUtils.setControlEnabled(autoControls, false, 'DelayField');
                     FoilviewUtils.setControlEnabled(autoControls, false, 'DirectionSwitch');
 
-                    FoilviewUtils.setControlEnabled(autoControls, true, 'DirectionButton');
                     FoilviewUtils.setControlEnabled(autoControls, true, 'StartStopButton');
                 else
                     UiComponents.setControlsEnabled(autoControls, true);
@@ -287,48 +363,38 @@ classdef UiComponents
                     return;
                 end
 
-                if isRunning
-                    UiComponents.applyButtonStyle(autoControls.StartStopButton, 'danger', 'STOP');
-                else
-                    UiComponents.applyButtonStyle(autoControls.StartStopButton, 'success', 'START');
-                end
+                [style, text] = UiComponents.getButtonStateStyle(isRunning);
+                UiComponents.applyButtonStyle(autoControls.StartStopButton, style, text);
 
                 success = true;
             end
         end
 
         function success = updateDirectionButtonStyling(autoControls, direction)
-            % Updates direction button style and syncs with switch.
+            % Updates direction switch to match current direction.
             success = FoilviewUtils.safeExecuteWithReturn(@doUpdateDirection, 'updateDirectionButtonStyling', false);
 
             function success = doUpdateDirection()
-                if ~FoilviewUtils.validateControlStruct(autoControls, {'DirectionButton'})
+                if ~FoilviewUtils.validateControlStruct(autoControls, {'DirectionSwitch'})
                     success = false;
                     return;
                 end
 
-                if direction == 1
-                    UiComponents.applyButtonStyle(autoControls.DirectionButton, 'success', '▲ UP');
-                    if isfield(autoControls, 'DirectionSwitch')
-                        autoControls.DirectionSwitch.Value = 'Up';
-                    end
-                else
-                    UiComponents.applyButtonStyle(autoControls.DirectionButton, 'warning', '▼ DOWN');
-                    if isfield(autoControls, 'DirectionSwitch')
-                        autoControls.DirectionSwitch.Value = 'Down';
-                    end
+                directionValue = UiComponents.getDirectionValue(direction);
+                if isfield(autoControls, 'DirectionSwitch') && isvalid(autoControls.DirectionSwitch)
+                    autoControls.DirectionSwitch.Value = directionValue;
                 end
 
                 success = true;
             end
         end
-        
+
         function applyButtonStyle(button, style, text)
             % Applies style-based background color and optional text to a button.
             if ~isvalid(button)
                 return;
             end
-            
+
             styleName = [upper(style(1)) lower(style(2:end))];
             if isfield(UiComponents.COLORS, styleName)
                 button.BackgroundColor = UiComponents.COLORS.(styleName);
@@ -336,74 +402,127 @@ classdef UiComponents
                 button.BackgroundColor = UiComponents.COLORS.Primary;  % Fallback
             end
 
-            button.FontColor = [1 1 1];
+            button.FontColor = UiComponents.COLORS.White;
             if nargin > 2 && ~isempty(text)
                 button.Text = text;
             end
         end
 
         function updateDirectionButtons(app)
-            % Update direction button and start button to show current direction
+            % Update direction switch and start button to show current direction with enhanced styling
             direction = app.Controller.AutoDirection;
+            isRunning = app.Controller.IsAutoRunning;
+
             % Update toggle switch to match current direction
-            if isfield(app.AutoControls, 'DirectionSwitch') && ~isempty(app.AutoControls.DirectionSwitch)
-                if direction > 0
-                    app.AutoControls.DirectionSwitch.Value = 'Up';
+            directionValue = UiComponents.getDirectionValue(direction);
+            if isfield(app.AutoControls, 'DirectionSwitch') && ~isempty(app.AutoControls.DirectionSwitch) && isvalid(app.AutoControls.DirectionSwitch)
+                app.AutoControls.DirectionSwitch.Value = directionValue;
+            end
+
+            % Get enhanced direction-specific values with better icons
+            [dirSymbol, ~] = UiComponents.getDirectionSymbols(direction);
+
+            % Style start/stop button with enhanced direction indicator
+            if isfield(app.AutoControls, 'StartStopButton') && ~isempty(app.AutoControls.StartStopButton) && isvalid(app.AutoControls.StartStopButton)
+                if isRunning
+                    buttonText = sprintf('⏹ STOP %s', dirSymbol);
+                    startStopColor = UiComponents.COLORS.Danger;
                 else
-                    app.AutoControls.DirectionSwitch.Value = 'Down';
+                    buttonText = sprintf('▶ START %s', dirSymbol);
+                    startStopColor = UiComponents.COLORS.Success;
                 end
+                UiComponents.styleDirectionButton(app.AutoControls.StartStopButton, buttonText, startStopColor);
             end
-            % Style direction button based on direction and running state
-            if direction > 0
-                app.AutoControls.DirectionButton.Text = '▲';
-                baseColor = [0.2 0.7 0.3];  % success color
-            else
-                app.AutoControls.DirectionButton.Text = '▼';
-                baseColor = [0.9 0.6 0.2];  % warning color
-            end
-            if app.Controller.IsAutoRunning
-                app.AutoControls.DirectionButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
-            else
-                app.AutoControls.DirectionButton.BackgroundColor = baseColor;
-            end
-            app.AutoControls.DirectionButton.FontColor = [1 1 1];  % white text
-            app.AutoControls.DirectionButton.FontSize = 10;
-            app.AutoControls.DirectionButton.FontWeight = 'bold';
-            % Style start/stop button based on state and direction
-            if direction > 0
-                if app.Controller.IsAutoRunning
-                    app.AutoControls.StartStopButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
-                    app.AutoControls.StartStopButton.Text = 'STOP ▲';
-                else
-                    app.AutoControls.StartStopButton.BackgroundColor = [0.2 0.7 0.3];  % success color
-                    app.AutoControls.StartStopButton.Text = 'START ▲';
-                end
-            else
-                if app.Controller.IsAutoRunning
-                    app.AutoControls.StartStopButton.BackgroundColor = [0.9 0.3 0.3];  % danger color
-                    app.AutoControls.StartStopButton.Text = 'STOP ▼';
-                else
-                    app.AutoControls.StartStopButton.BackgroundColor = [0.2 0.7 0.3];  % success color
-                    app.AutoControls.StartStopButton.Text = 'START ▼';
-                end
-            end
-            app.AutoControls.StartStopButton.FontColor = [1 1 1];  % white text
-            app.AutoControls.StartStopButton.FontSize = 10;
-            app.AutoControls.StartStopButton.FontWeight = 'bold';
         end
 
-        function updateAutoStepStatusDisplay(app)
-            % Updates the status display for auto step controls based on current settings
-            direction = app.Controller.AutoDirection;
-            step = app.AutoControls.StepField.Value;
-            steps = app.AutoControls.StepsField.Value;
-            delay = app.AutoControls.DelayField.Value;
-            if direction > 0
-                dirStr = 'upward';
-            else
-                dirStr = 'downward';
+        function styleDirectionButton(button, text, backgroundColor)
+            % Helper method to apply consistent styling to direction-related buttons
+            if ~isvalid(button)
+                return;
             end
-            app.AutoControls.StatusDisplay.Text = sprintf('%.1f μm %s (%ds × %d)', step, dirStr, delay, steps);
+
+            button.Text = text;
+            button.BackgroundColor = backgroundColor;
+            button.FontColor = UiComponents.COLORS.White;
+            button.FontSize = 10;
+            button.FontWeight = 'bold';
+        end
+
+        function updateAutoStepStatusDisplay(~)
+            % Updates the status display for auto step controls based on current settings
+            % This function is called but doesn't update a display since there's no StatusDisplay field
+            % The status is shown in the position display instead
+            return;
+        end
+
+        % ===== HELPER METHODS =====
+        function directionValue = getDirectionValue(direction)
+            % Converts numeric direction to string value for UI controls.
+            if direction == 1
+                directionValue = 'Up';
+            else
+                directionValue = 'Down';
+            end
+        end
+
+        function [dirSymbol, dirText] = getDirectionSymbols(direction)
+            % Returns direction symbols and text for UI display.
+            if direction > 0
+                dirSymbol = '▲';
+                dirText = 'UP';
+            else
+                dirSymbol = '▼';
+                dirText = 'DOWN';
+            end
+        end
+
+        function [style, text] = getButtonStateStyle(isRunning)
+            % Returns appropriate style and text for start/stop button based on running state.
+            if isRunning
+                style = 'danger';
+                text = 'STOP';
+            else
+                style = 'success';
+                text = 'START';
+            end
+        end
+
+        function [statusText, statusColor] = getPositionStatusInfo(controller)
+            % Returns position status text and color based on controller state.
+            if controller.IsAutoRunning
+                statusText = sprintf('▶ Auto-stepping: %d/%d', controller.CurrentStep, controller.TotalSteps);
+                statusColor = UiComponents.COLORS.Primary;
+            else
+                statusText = '✓ Ready';
+                statusColor = UiComponents.COLORS.StatusGood;
+            end
+        end
+
+        function [systemText, systemColor] = getSystemStatusInfo(controller)
+            % Returns system status text and color based on controller state.
+            if controller.SimulationMode
+                systemText = sprintf('⚠ ScanImage: Simulation (%s)', controller.StatusMessage);
+                systemColor = UiComponents.COLORS.StatusWarning;
+            else
+                systemText = sprintf('✓ ScanImage: %s', controller.StatusMessage);
+                systemColor = UiComponents.COLORS.StatusGood;
+            end
+        end
+
+        function [textColor, bgColor] = getMetricDisplayColors(metricValue)
+            % Returns appropriate text and background colors for metric display based on value.
+            if isnan(metricValue)
+                textColor = UiComponents.COLORS.TextMuted;
+                bgColor = UiComponents.COLORS.LightBackground;
+            else
+                textColor = UiComponents.COLORS.Black;
+                if metricValue > 0
+                    intensity = min(1, metricValue / 100);
+                    bgColor = [0.95 0.9 + 0.1 * intensity 0.95];
+                else
+                    bgColor = UiComponents.COLORS.LightBackground;
+                end
+            end
         end
     end
 end

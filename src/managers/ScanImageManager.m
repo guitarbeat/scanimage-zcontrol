@@ -47,7 +47,14 @@ classdef ScanImageManager < handle
             
             try
                 % Check if ScanImage is available
-                obj.HSI = evalin('base', 'hSI');
+                if evalin('base', 'exist(''hSI'', ''var'')')
+                    obj.HSI = evalin('base', 'hSI');
+                    obj.SimulationMode = false;
+                    obj.IsInitialized = true;
+                    fprintf('ScanImageManager: Connected to ScanImage\n');
+                else
+                    error('hSI variable not found in base workspace');
+                end
                 
                 % Try to get metadata file path, but don't fail if it doesn't exist
                 try
@@ -56,9 +63,6 @@ classdef ScanImageManager < handle
                     obj.MetadataFile = [];
                 end
                 
-                obj.SimulationMode = false;
-                obj.IsInitialized = true;
-                
                 % Note: Event listeners for frameAcquired and acqDone are not set up
                 % as these events may not be available in all ScanImage versions
                 % The application will still function without automatic metadata logging
@@ -66,6 +70,7 @@ classdef ScanImageManager < handle
                 FoilviewUtils.logException('ScanImageManager', ME, 'Initialization failed');
                 obj.SimulationMode = true;
                 obj.IsInitialized = false;
+                fprintf('ScanImageManager: ScanImage not available - entering simulation mode\n');
             end
         end
         
@@ -91,9 +96,19 @@ classdef ScanImageManager < handle
                 
                 % Try to get ScanImage handle - check if it exists first
                 try
-                    obj.HSI = evalin('base', 'hSI');
+                    if evalin('base', 'exist(''hSI'', ''var'')')
+                        obj.HSI = evalin('base', 'hSI');
+                    else
+                        % hSI doesn't exist - enter simulation mode
+                        success = false;
+                        message = 'ScanImage not available - entering simulation mode';
+                        obj.SimulationMode = true;
+                        obj.IsInitialized = false;
+                        fprintf('ScanImageManager: %s\n', message);
+                        return;
+                    end
                 catch
-                    % hSI doesn't exist - enter simulation mode
+                    % Error checking for hSI - enter simulation mode
                     success = false;
                     message = 'ScanImage not available - entering simulation mode';
                     obj.SimulationMode = true;

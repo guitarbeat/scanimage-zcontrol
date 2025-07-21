@@ -285,7 +285,19 @@ classdef StageView < handle
             end
 
             % Get selected camera
-            camName = obj.CameraListBox.Value;
+            selectedValue = obj.CameraListBox.Value;
+            
+            % Handle both single selection (char) and multi-selection (cell array)
+            if iscell(selectedValue)
+                if isempty(selectedValue)
+                    uialert(obj.UIFigure, 'Please select a camera to start.', 'No Selection');
+                    return;
+                end
+                camName = selectedValue{1}; % Use first selected camera
+            else
+                camName = selectedValue;
+            end
+            
             if isempty(camName) || strcmp(camName, 'No cameras detected')
                 uialert(obj.UIFigure, 'Please select a camera to start.', 'No Selection');
                 return;
@@ -936,6 +948,43 @@ classdef StageView < handle
         
         function onStopPeriodicButtonPushed(obj)
             obj.stopPeriodicCapture();
+        end
+        
+        function onPeriodicDisplayClose(obj, cameraName)
+            % Handle individual camera display window close
+            if obj.CameraDisplays.isKey(cameraName)
+                displayData = obj.CameraDisplays(cameraName);
+                if isfield(displayData, 'figure') && isvalid(displayData.figure)
+                    delete(displayData.figure);
+                end
+                obj.CameraDisplays.remove(cameraName);
+            end
+            
+            % If no more displays, stop periodic capture
+            if obj.CameraDisplays.Count == 0
+                obj.stopPeriodicCapture();
+            end
+        end
+        
+        function onPeriodicDisplayResize(obj, cameraName)
+            % Handle individual camera display window resize
+            if ~obj.CameraDisplays.isKey(cameraName)
+                return;
+            end
+            
+            displayData = obj.CameraDisplays(cameraName);
+            
+            try
+                % Ensure image scales with window while preserving aspect ratio
+                axis(displayData.axes, 'image');  % Preserve aspect ratio
+                axis(displayData.axes, 'tight');  % Show full image without extra space
+                
+                % Reposition axes to fill the figure
+                displayData.axes.Position = [0 0 1 1];
+                
+            catch ME
+                % Ignore resize errors
+            end
         end
     end
 end

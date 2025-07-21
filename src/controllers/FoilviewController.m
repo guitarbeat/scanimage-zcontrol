@@ -355,7 +355,7 @@
                 end
 
                 % Get parameters from UI
-                stepSize = autoControls.StepField.Value;
+                stepSize = autoControls.SharedStepSize.CurrentValue;
                 numSteps = autoControls.StepsField.Value;
                 delay = autoControls.DelayField.Value;
 
@@ -552,24 +552,28 @@
         end
 
         function syncStepSizes(obj, manualControls, autoControls, sourceValue, isFromManual)
-            % Enhanced step size synchronization with validation
+            % Enhanced step size synchronization with validation - now uses shared step size
             FoilviewUtils.safeExecute(@() doSync(), 'syncStepSizes');
 
             function doSync()
                 if isFromManual
-                    % Manual dropdown changed, update auto field
+                    % Manual dropdown changed, update shared step size
                     stepValue = FoilviewUtils.extractStepSizeFromString(sourceValue);
                     if ~isnan(stepValue) && stepValue > 0
-                        autoControls.StepField.Value = stepValue;
+                        % Update shared step size control
+                        [~, idx] = min(abs(obj.STEP_SIZES - stepValue));
+                        autoControls.SharedStepSize.CurrentValue = stepValue;
+                        autoControls.SharedStepSize.CurrentStepIndex = idx;
+                        autoControls.SharedStepSize.StepSizeDisplay.Text = sprintf('%.1f', stepValue);
                     end
                 else
-                    % Auto field changed, update manual dropdown
+                    % Shared step size changed, update manual dropdown
                     newStepSize = sourceValue;
                     if isnumeric(newStepSize) && newStepSize > 0
                         [~, idx] = min(abs(obj.STEP_SIZES - newStepSize));
                         targetValue = FoilviewUtils.formatPosition(obj.STEP_SIZES(idx));
-                        if ismember(targetValue, manualControls.StepSizeDropdown.Items)
-                            manualControls.StepSizeDropdown.Value = targetValue;
+                        if ismember(targetValue, manualControls.SharedStepSize.StepSizeDropdown.Items)
+                            manualControls.SharedStepSize.StepSizeDropdown.Value = targetValue;
                         end
                     end
                 end
@@ -736,7 +740,7 @@
         function [valid, errorMsg] = validateAutoStepParameters(~, autoControls)
             % Validate auto-step parameters from UI controls
             try
-                stepSize = autoControls.StepField.Value;
+                stepSize = autoControls.SharedStepSize.CurrentValue;
                 numSteps = autoControls.StepsField.Value;
                 delay = autoControls.DelayField.Value;
 

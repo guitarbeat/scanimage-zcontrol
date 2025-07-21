@@ -1,6 +1,0 @@
-{
-  "editor.defaultFormatter": "yzhang.markdown-all-in-one",
-  "[matlab]": {
-    "editor.defaultFormatter": "chrisatwindsurf.language-matlab"
-  }
-}

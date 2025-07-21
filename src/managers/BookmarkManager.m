@@ -43,10 +43,11 @@ classdef BookmarkManager < handle
             % Save bookmark to metadata using MetadataService
             if ~isempty(obj.FoilviewApp) && isvalid(obj.FoilviewApp)
                 try
-                    % Use MetadataService directly for better separation of concerns
-                    if ~isempty(obj.FoilviewApp.MetadataFile)
+                    % Get metadata file path from workspace instead of app property
+                    metadataFile = obj.getMetadataFile();
+                    if ~isempty(metadataFile)
                         MetadataService.saveBookmarkMetadata(label, xPos, yPos, zPos, metricStruct, ...
-                            obj.FoilviewApp.MetadataFile, obj.FoilviewApp.Controller);
+                            metadataFile, obj.FoilviewApp.Controller);
                     end
                 catch ME
                     FoilviewUtils.logException('BookmarkManager.add', ME);
@@ -96,6 +97,18 @@ classdef BookmarkManager < handle
 
         function valid = isValidIndex(obj, index)
             valid = isnumeric(index) && isscalar(index) && index >= 1 && index <= length(obj.MarkedPositions.Labels);
+        end
+        
+        function metadataFile = getMetadataFile(obj)
+            % Get the metadata file path from workspace
+            try
+                metadataFile = evalin('base', 'metadataFilePath');
+                if ~ischar(metadataFile) || isempty(metadataFile)
+                    metadataFile = '';
+                end
+            catch
+                metadataFile = '';
+            end
         end
     end
 end 

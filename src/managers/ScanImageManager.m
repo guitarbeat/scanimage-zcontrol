@@ -15,6 +15,7 @@ classdef ScanImageManager < handle
         RetryConfig
         LastConnectionAttempt
         RetryCount = 0
+        ZStepSize = NaN % * Caches the last known Z step size for bidirectional sync
     end
     
     properties (Constant)
@@ -560,7 +561,11 @@ classdef ScanImageManager < handle
                     % Simulate movement
                     currentPos = obj.getCurrentPosition(axisName);
                     newPosition = currentPos + microns;
-                    fprintf('Simulation: %s stage moved %.1f μm to position %.1f μm\n', axisName, microns, newPosition);
+                    if strcmpi(axisName, 'Z')
+                        fprintf('[Sim] Z: %+0.2f μm → %0.2f μm\n', microns, newPosition);
+                    else
+                        fprintf('[Sim] %s: %+0.2f μm → %0.2f μm\n', axisName, microns, newPosition);
+                    end
                     return;
                 end
                 
@@ -570,57 +575,62 @@ classdef ScanImageManager < handle
                     return;
                 end
                 
-                % Find motor controls window
                 motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
                 if isempty(motorFig)
                     error('Motor Controls window not found. Please ensure ScanImage Motor Controls window is open.');
                 end
                 
-                % Check for motor error state first
                 if obj.checkMotorErrorState(motorFig, axisName)
                     fprintf('ScanImageManager: Attempting to clear motor error for %s axis\n', axisName);
                     obj.clearMotorError(motorFig, axisName);
                     pause(0.5); % Wait for error to clear
                     
-                    % Check again after attempting to clear
                     if obj.checkMotorErrorState(motorFig, axisName)
                         error('Motor is still in error state for %s axis. Please manually clear the error in ScanImage Motor Controls.', axisName);
                     end
                 end
                 
-                % Get UI elements for the specified axis
                 axisInfo = obj.getAxisInfo(motorFig, axisName);
                 if isempty(axisInfo.etPos)
                     error('Position field not found for axis %s. Check if Motor Controls window is properly initialized.', axisName);
                 end
                 
-                % Check current position before movement
                 currentPos = str2double(axisInfo.etPos.String);
                 if isnan(currentPos)
                     FoilviewUtils.warn('ScanImageManager', 'Could not read current position for %s axis', axisName);
                     currentPos = 0;
                 end
                 
-                % Set step size
-                if ~isempty(axisInfo.step)
-                    axisInfo.step.String = num2str(abs(microns));
-                    if isprop(axisInfo.step, 'Callback') && ~isempty(axisInfo.step.Callback)
-                        try
-                            axisInfo.step.Callback(axisInfo.step, []);
-                        catch ME
-                            FoilviewUtils.logException('ScanImageManager', ME, 'Error setting step size');
+                % Z step size sync logic
+                if strcmpi(axisName, 'Z')
+                    guiZStep = obj.getZStepSizeFromGUI();
+                    requestedStep = abs(microns);
+                    % If the requested step is different from GUI, update GUI and cache
+                    if isnan(guiZStep) || abs(guiZStep - requestedStep) > eps
+                        obj.setZStepSizeInGUI(requestedStep);
+                        fprintf('ScanImageManager: Synced Z step size to %.2f μm\n', requestedStep);
+                    else
+                        obj.ZStepSize = guiZStep; % Keep cache updated
+                    end
+                else
+                    % For X/Y, keep legacy behavior
+                    if ~isempty(axisInfo.step)
+                        axisInfo.step.String = num2str(abs(microns));
+                        if isprop(axisInfo.step, 'Callback') && ~isempty(axisInfo.step.Callback)
+                            try
+                                axisInfo.step.Callback(axisInfo.step, []);
+                            catch ME
+                                FoilviewUtils.logException('ScanImageManager', ME, 'Error setting step size');
+                            end
                         end
                     end
                 end
                 
-                % Determine which button to press
                 buttonToPress = [];
                 if microns > 0 && ~isempty(axisInfo.inc)
                     buttonToPress = axisInfo.inc;
-                    fprintf('DEBUG: Selecting increment button (Zinc) for %.1f μm movement\n', microns);
                 elseif microns < 0 && ~isempty(axisInfo.dec)
                     buttonToPress = axisInfo.dec;
-                    fprintf('DEBUG: Selecting decrement button (Zdec) for %.1f μm movement\n', microns);
                 end
                 
                 if isempty(buttonToPress)
@@ -628,12 +638,10 @@ classdef ScanImageManager < handle
                           ternary(microns > 0, 'positive', 'negative'), microns);
                 end
                 
-                % Check if button is enabled before pressing
                 if isprop(buttonToPress, 'Enable') && strcmp(buttonToPress.Enable, 'off')
                     error('Motor button is disabled. The motor may be in an error state. Please check ScanImage Motor Controls.');
                 end
                 
-                % Trigger the button callback
                 if isprop(buttonToPress, 'Callback') && ~isempty(buttonToPress.Callback)
                     try
                         buttonToPress.Callback(buttonToPress, []);
@@ -649,7 +657,6 @@ classdef ScanImageManager < handle
                     error('Button callback not available for %s axis', axisName);
                 end
                 
-                % Wait for movement and read back position
                 pause(0.2); % Wait for movement
                 newPosition = str2double(axisInfo.etPos.String);
                 if isnan(newPosition)
@@ -663,6 +670,63 @@ classdef ScanImageManager < handle
                 errorMsg = sprintf('Movement error for %s axis: %s', axisName, ME.message);
                 FoilviewUtils.warn('ScanImageManager', '%s', errorMsg);
                 newPosition = obj.getCurrentPosition(axisName);
+            end
+        end
+        
+        function goToPosition(obj, axisName, value)
+            % goToPosition - Move the stage to a specific position by simulating user input in the Motor Controls GUI
+            % axisName: 'X', 'Y', or 'Z'
+            % value: target position (microns)
+            try
+                motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
+                if isempty(motorFig)
+                    error('Motor Controls window not found. Please ensure ScanImage Motor Controls window is open.');
+                end
+                % Map axis to field tags
+                switch upper(axisName)
+                    case 'X'
+                        posFieldTag = 'etXPos';
+                        goButtonTag = 'Xinc'; % Use increment as a proxy if no explicit Go button
+                    case 'Y'
+                        posFieldTag = 'etYPos';
+                        goButtonTag = 'Yinc';
+                    case 'Z'
+                        posFieldTag = 'etZPos';
+                        goButtonTag = 'Zinc';
+                    otherwise
+                        error('Invalid axis name: %s', axisName);
+                end
+                posField = findall(motorFig, 'Tag', posFieldTag);
+                if isempty(posField)
+                    error('Position field not found for axis %s.', axisName);
+                end
+                % Set the value as string
+                posField.String = num2str(value);
+                % Shift focus to another control to trigger update
+                allControls = findall(motorFig, 'Type', 'uicontrol');
+                foundOther = false;
+                for k = 1:length(allControls)
+                    if allControls(k) ~= posField
+                        uicontrol(allControls(k));
+                        foundOther = true;
+                        break;
+                    end
+                end
+                if ~foundOther
+                    FoilviewUtils.warn('ScanImageManager', 'No other control found to shift focus after setting %s position.', axisName);
+                end
+                % Optionally, click the Go/arrow button if present
+                goButton = findall(motorFig, 'Tag', goButtonTag);
+                if ~isempty(goButton) && isprop(goButton, 'Callback') && ~isempty(goButton.Callback)
+                    try
+                        goButton.Callback(goButton, []);
+                        fprintf('ScanImageManager: Triggered %s axis move to %.2f μm\n', axisName, value);
+                    catch ME
+                        FoilviewUtils.logException('ScanImageManager', ME, sprintf('Error triggering %s axis move', axisName));
+                    end
+                end
+            catch ME
+                FoilviewUtils.logException('ScanImageManager', ME, 'goToPosition failed');
             end
         end
         
@@ -741,18 +805,6 @@ classdef ScanImageManager < handle
             axisInfo = struct('etPos', [], 'step', [], 'inc', [], 'dec', []);
             
             try
-                % Debug: List all available tags for troubleshooting
-                allTags = findall(motorFig, 'Tag', '.*');
-                if ~isempty(allTags)
-                    fprintf('DEBUG: Available tags in motor controls: ');
-                    for i = 1:min(10, length(allTags))  % Show first 10 tags
-                        if isprop(allTags(i), 'Tag') && ~isempty(allTags(i).Tag)
-                            fprintf('%s ', allTags(i).Tag);
-                        end
-                    end
-                    fprintf('\n');
-                end
-                
                 switch upper(axisName)
                     case 'X'
                         axisInfo.etPos = findall(motorFig, 'Tag', 'etXPos');
@@ -769,8 +821,6 @@ classdef ScanImageManager < handle
                         axisInfo.step = findall(motorFig, 'Tag', 'Zstep');
                         axisInfo.inc = findall(motorFig, 'Tag', 'Zinc');
                         axisInfo.dec = findall(motorFig, 'Tag', 'Zdec');
-                        fprintf('DEBUG: Z axis buttons - inc found: %s, dec found: %s\n', ...
-                            ~isempty(axisInfo.inc), ~isempty(axisInfo.dec));
                 end
             catch ME
                 FoilviewUtils.logException('ScanImageManager', ME, sprintf('Error getting axis info for %s', axisName));
@@ -843,6 +893,57 @@ classdef ScanImageManager < handle
                 
             catch ME
                 FoilviewUtils.logException('ScanImageManager', ME, 'Error clearing motor error');
+            end
+        end
+
+        function zStep = getZStepSizeFromGUI(obj)
+            % * Gets the current Z step size from the ScanImage Motor Controls GUI
+            zStep = NaN;
+            try
+                motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
+                if isempty(motorFig)
+                    return;
+                end
+                zStepField = findall(motorFig, 'Tag', 'Zstep');
+                if ~isempty(zStepField)
+                    zStep = str2double(zStepField.String);
+                    if isnan(zStep)
+                        zStep = NaN;
+                    end
+                end
+            catch ME
+                FoilviewUtils.logException('ScanImageManager', ME, 'getZStepSizeFromGUI failed');
+            end
+            obj.ZStepSize = zStep;
+        end
+
+        function setZStepSizeInGUI(obj, value)
+            % * Sets the Z step size in the ScanImage Motor Controls GUI and updates cache
+            try
+                motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
+                if isempty(motorFig)
+                    return;
+                end
+                zStepField = findall(motorFig, 'Tag', 'Zstep');
+                if ~isempty(zStepField)
+                    zStepField.String = num2str(value);
+                    % * Shift focus to another control to trigger update
+                    allControls = findall(motorFig, 'Type', 'uicontrol');
+                    foundOther = false;
+                    for k = 1:length(allControls)
+                        if allControls(k) ~= zStepField
+                            uicontrol(allControls(k));
+                            foundOther = true;
+                            break;
+                        end
+                    end
+                    if ~foundOther
+                        FoilviewUtils.warn('ScanImageManager', 'No other control found to shift focus after setting Z step size.');
+                    end
+                end
+                obj.ZStepSize = value;
+            catch ME
+                FoilviewUtils.logException('ScanImageManager', ME, 'setZStepSizeInGUI failed');
             end
         end
     end

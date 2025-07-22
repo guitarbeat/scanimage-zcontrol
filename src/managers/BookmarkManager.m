@@ -110,5 +110,80 @@ classdef BookmarkManager < handle
                 metadataFile = '';
             end
         end
+
+        function loadBookmarksFromMetadata(obj, metadataFile)
+            % loadBookmarksFromMetadata - Loads bookmarks from a metadata file and updates MarkedPositions
+            % Assumes metadata file is CSV with bookmark fields
+            try
+                if nargin < 2 || isempty(metadataFile)
+                    metadataFile = obj.getMetadataFile();
+                end
+                if isempty(metadataFile) || ~exist(metadataFile, 'file')
+                    FoilviewUtils.warn('BookmarkManager', 'Metadata file not found: %s', metadataFile);
+                    return;
+                end
+                % Use FilePathUtils to ensure full path
+                metadataFile = FilePathUtils.ensureFullPath(metadataFile);
+                % Read file as text
+                fid = fopen(metadataFile, 'r');
+                if fid == -1
+                    FoilviewUtils.warn('BookmarkManager', 'Could not open metadata file: %s', metadataFile);
+                    return;
+                end
+                lines = {};
+                tline = fgetl(fid);
+                while ischar(tline)
+                    lines{end+1} = tline; %#ok<AGROW>
+                    tline = fgetl(fid);
+                end
+                fclose(fid);
+                % Parse lines for bookmarks
+                labels = {};
+                xPos = [];
+                yPos = [];
+                zPos = [];
+                metrics = {};
+                for i = 1:length(lines)
+                    line = lines{i};
+                    tokens = strsplit(line, ',');
+                    % Expecting at least 18 columns (see ScanImageManager writeMetadataToFile)
+                    if numel(tokens) >= 18
+                        bookmarkLabel = strtrim(tokens{16});
+                        bookmarkMetricType = strtrim(tokens{17});
+                        bookmarkMetricValue = strtrim(tokens{18});
+                        if ~isempty(bookmarkLabel)
+                            % Parse positions (columns 15, 14, 13: z, x, y)
+                            try
+                                z = str2double(tokens{14});
+                                x = str2double(tokens{15});
+                                y = str2double(tokens{16});
+                            catch
+                                z = NaN; x = NaN; y = NaN;
+                            end
+                            % Parse metric value
+                            metricVal = str2double(bookmarkMetricValue);
+                            if isnan(metricVal)
+                                metricVal = bookmarkMetricValue;
+                            end
+                            metricStruct = struct('Type', bookmarkMetricType, 'Value', metricVal);
+                            labels{end+1} = bookmarkLabel;
+                            xPos(end+1) = x;
+                            yPos(end+1) = y;
+                            zPos(end+1) = z;
+                            metrics{end+1} = metricStruct;
+                        end
+                    end
+                end
+                % Update MarkedPositions
+                obj.MarkedPositions.Labels = labels;
+                obj.MarkedPositions.XPositions = xPos;
+                obj.MarkedPositions.YPositions = yPos;
+                obj.MarkedPositions.ZPositions = zPos;
+                obj.MarkedPositions.Metrics = metrics;
+                fprintf('BookmarkManager: Loaded %d bookmarks from metadata.\n', numel(labels));
+            catch ME
+                FoilviewUtils.logException('BookmarkManager', ME, 'loadBookmarksFromMetadata failed');
+            end
+        end
     end
 end 

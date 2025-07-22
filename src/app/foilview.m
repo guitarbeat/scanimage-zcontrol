@@ -23,6 +23,8 @@ classdef foilview < matlab.apps.AppBase
         StageViewApp
         BookmarksViewApp
         ScanImageManager
+        % * Tracks if the Metadata button has ever been pressed
+        MetadataButtonPressed logical = false;
     end
     
     properties (Access = private)
@@ -44,7 +46,10 @@ classdef foilview < matlab.apps.AppBase
             app.setupCallbacks();
             app.initializeApplication();
             registerApp(app, app.UIFigure);
-            
+            % * Initialize metadata button pressed flag
+            app.MetadataButtonPressed = false;
+            % * Set initial Metadata button color
+            app.updateMetadataButtonColor();
             if nargout == 0
                 clear app
             end
@@ -185,18 +190,13 @@ classdef foilview < matlab.apps.AppBase
             app.updateAutoStepStatus();
         end
         function onStartStopButtonPushed(app, varargin)
-            fprintf('DEBUG: onStartStopButtonPushed ENTRY - IsAutoRunning: %d\n', app.Controller.IsAutoRunning);
             if app.Controller.IsAutoRunning
-                fprintf('DEBUG: Stopping auto-stepping from UI\n');
                 app.Controller.stopAutoStepping();
             else
-                fprintf('DEBUG: Starting auto-stepping from UI\n');
                 app.Controller.startAutoSteppingWithValidation(app, app.AutoControls, app.PlotManager);
             end
-            fprintf('DEBUG: Updating UI after start/stop operation\n');
             app.UIController.updateAllUI();
             app.updateAutoStepStatus();
-            fprintf('DEBUG: onStartStopButtonPushed EXIT - IsAutoRunning: %d\n', app.Controller.IsAutoRunning);
         end
         % -- Status Controls Callbacks --
         function onBookmarksButtonPushed(app, ~, ~)
@@ -769,6 +769,9 @@ classdef foilview < matlab.apps.AppBase
     methods (Access = private)
         %% Handles the Metadata button press, initializes logging and simulation entry
         function onMetadataButtonPushed(app, ~, ~)
+            % * Mark that the metadata button has been pressed
+            app.MetadataButtonPressed = true;
+            app.updateMetadataButtonColor();
             % Check if Controller exists and is valid
             if isempty(app.Controller) || ~isvalid(app.Controller)
                 return;
@@ -1027,6 +1030,18 @@ classdef foilview < matlab.apps.AppBase
         function setIgnoreNextResize(app, value)
             % Set the IgnoreNextResize flag for plot expansion/collapse
             app.IgnoreNextResize = value;
+        end
+    end
+
+    % * Updates the Metadata button color based on the pressed flag
+    methods (Access = private)
+        function updateMetadataButtonColor(app)
+            if app.MetadataButtonPressed
+                app.StatusControls.MetadataButton.BackgroundColor = [0.16 0.68 0.38]; % Success green
+            else
+                app.StatusControls.MetadataButton.BackgroundColor = [0.95 0.61 0.07]; % Warning orange
+            end
+            app.StatusControls.MetadataButton.FontColor = [1 1 1];
         end
     end
 end

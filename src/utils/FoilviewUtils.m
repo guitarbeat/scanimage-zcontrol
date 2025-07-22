@@ -422,7 +422,6 @@ classdef FoilviewUtils < handle
         function valid = validateNumericRange(value, minVal, maxVal, name)
             % Centralized numeric range validation
             valid = true;
-            
             if ~isnumeric(value) || ~isscalar(value)
                 if nargin >= 4
                     fprintf('%s must be a numeric scalar\n', name);
@@ -430,16 +429,15 @@ classdef FoilviewUtils < handle
                 valid = false;
                 return;
             end
-            
-            if value < minVal
+            % Only check min/max if they are finite
+            if isfinite(minVal) && value < minVal
                 if nargin >= 4
                     fprintf('%s must be at least %.3f\n', name, minVal);
                 end
                 valid = false;
                 return;
             end
-            
-            if value > maxVal
+            if isfinite(maxVal) && value > maxVal
                 if nargin >= 4
                     fprintf('%s must not exceed %.3f\n', name, maxVal);
                 end

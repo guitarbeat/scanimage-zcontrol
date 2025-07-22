@@ -7,8 +7,6 @@ classdef StageControlService < handle
         % Movement constraints
         MIN_STEP_SIZE = 0.01
         MAX_STEP_SIZE = 1000
-        MIN_POSITION = -10000
-        MAX_POSITION = 10000
         POSITION_TOLERANCE = 0.01
         MOVEMENT_WAIT_TIME = 0.2
         
@@ -79,7 +77,10 @@ classdef StageControlService < handle
                         fprintf('Y Stage moved %.1f μm to position %.1f μm\n', microns, newPos);
                     case 'Z'
                         obj.CurrentZPosition = newPos;
-                        fprintf('Z Stage moved %.1f μm to position %.1f μm\n', microns, newPos);
+                        % Only print in real mode, not simulation (ScanImageManager handles simulation print)
+                        if ~obj.ScanImageManager.isSimulationMode()
+                            fprintf('Z Stage moved %.1f μm to position %.1f μm\n', microns, newPos);
+                        end
                 end
                 
                 % Notify listeners of position change
@@ -271,7 +272,7 @@ classdef StageControlService < handle
         
         function valid = validatePosition(obj, position)
             % Validate absolute position
-            valid = FoilviewUtils.validateNumericRange(position, obj.MIN_POSITION, obj.MAX_POSITION, 'Position');
+            valid = true;
         end
         
         function valid = isValidAxis(~, axis)
@@ -296,11 +297,10 @@ classdef StageControlService < handle
         function notifyPositionChanged(obj)
             % Notify listeners that position has changed
             try
-                eventData = struct();
-                eventData.positions = obj.getCurrentPositions();
-                eventData.timestamp = datetime('now');
-                
-                notify(obj, 'PositionChanged', eventData);
+                % eventData = struct();
+                % eventData.positions = obj.getCurrentPositions();
+                % eventData.timestamp = datetime('now');
+                notify(obj, 'PositionChanged');
             catch ME
                 FoilviewUtils.logException('StageControlService.notifyPositionChanged', ME);
             end
@@ -351,17 +351,7 @@ classdef StageControlService < handle
                 return;
             end
             
-            if position < StageControlService.MIN_POSITION
-                valid = false;
-                errorMsg = sprintf('Position below minimum (%.0f μm)', StageControlService.MIN_POSITION);
-                return;
-            end
-            
-            if position > StageControlService.MAX_POSITION
-                valid = false;
-                errorMsg = sprintf('Position exceeds maximum (%.0f μm)', StageControlService.MAX_POSITION);
-                return;
-            end
+            % No min/max position check
         end
         
         function stepSizes = getAvailableStepSizes()

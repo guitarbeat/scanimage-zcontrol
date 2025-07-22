@@ -8,7 +8,7 @@ classdef BookmarksView < handle
     properties (Access = private)
         Controller
         UpdateTimer
-
+        
         % UI Components
         MainLayout
         CurrentPositionLabel
@@ -18,6 +18,9 @@ classdef BookmarksView < handle
         GoToButton
         DeleteButton
         StatusLabel
+        
+        % * Debounce flag to prevent double mark
+        IsMarking logical = false;
     end
 
     methods
@@ -231,7 +234,12 @@ classdef BookmarksView < handle
         end
 
         function onMarkButtonPushed(obj)
-            % Handle mark button press
+            % * Debounce: prevent double-trigger
+            if obj.IsMarking
+                return;
+            end
+            obj.IsMarking = true;
+            cleanupObj = onCleanup(@() setMarkingFalse(obj));
             label = strtrim(obj.MarkField.Value);
 
             % Auto-generate label if empty
@@ -403,5 +411,12 @@ classdef BookmarksView < handle
                 end
             end
         end
+    end
+end
+
+% * Helper function to reset debounce flag
+function setMarkingFalse(obj)
+    if isvalid(obj)
+        obj.IsMarking = false;
     end
 end

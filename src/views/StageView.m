@@ -21,6 +21,9 @@ classdef StageView < handle
         StopPeriodicButton
         IntervalSpinner
         IntervalLabel
+        RecordingElapsedLabel
+        % Add next capture label to public UI properties
+        NextCaptureLabel
     end
 
     properties (Access = private)
@@ -95,115 +98,224 @@ classdef StageView < handle
             % Main Figure
             obj.UIFigure = uifigure('Visible', 'off');
             obj.UIFigure.Name = 'Stage View - Live Camera Control';
-            obj.UIFigure.Position = [200 200 280 580];  % Increased height for new controls
+            obj.UIFigure.Position = [200 200 400 400];  % Even more compact initial height
             obj.UIFigure.AutoResizeChildren = 'off';
 
             % Main Layout
             obj.MainLayout = uigridlayout(obj.UIFigure);
             obj.MainLayout.ColumnWidth = {'1x'};
-            obj.MainLayout.RowHeight = {'1x'};
-            obj.MainLayout.Padding = [10 10 10 10];
+            obj.MainLayout.RowHeight = {'fit', 'fit', 'fit'};
+            obj.MainLayout.Padding = [1 1 1 1];
+            obj.MainLayout.RowSpacing = 1;
 
-            % Control Panel
-            obj.ControlPanel = uipanel(obj.MainLayout);
-            obj.ControlPanel.Title = 'Camera Controls';
-            obj.ControlPanel.Layout.Row = 1;
-            obj.ControlPanel.Layout.Column = 1;
+            % Header
+            headerLabel = uilabel(obj.MainLayout);
+            headerLabel.Text = 'Stage View - Live Camera Control';
+            headerLabel.FontSize = 18;
+            headerLabel.FontWeight = 'bold';
+            headerLabel.HorizontalAlignment = 'center';
+            headerLabel.Layout.Row = 1;
+            headerLabel.Layout.Column = 1;
 
-            % Create control panel layout
-            controlLayout = uigridlayout(obj.ControlPanel);
-            controlLayout.ColumnWidth = {'1x'};
-            controlLayout.RowHeight = {30, '1x', 40, 40, 40, 40, 40, 40, 30, 40, 40, 30, 30};
-            controlLayout.Padding = [10 10 10 10];
-            controlLayout.RowSpacing = 5;
-
-            % Status Label
-            obj.StatusLabel = uilabel(controlLayout);
+            % Status Bar
+            obj.StatusLabel = uilabel(obj.MainLayout);
             obj.StatusLabel.Text = 'Initializing cameras...';
-            obj.StatusLabel.Layout.Row = 1;
-            obj.StatusLabel.Layout.Column = 1;
+            obj.StatusLabel.FontSize = 12;
             obj.StatusLabel.FontWeight = 'bold';
+            obj.StatusLabel.BackgroundColor = [0.95 0.61 0.07]; % Orange for init
+            obj.StatusLabel.HorizontalAlignment = 'center';
+            obj.StatusLabel.Layout.Row = 2;
+            obj.StatusLabel.Layout.Column = 1;
+
+            % Main Control Panel (with sub-panels)
+            obj.ControlPanel = uipanel(obj.MainLayout);
+            obj.ControlPanel.Title = '';
+            obj.ControlPanel.Layout.Row = 3;
+            obj.ControlPanel.Layout.Column = 1;
+            obj.ControlPanel.BackgroundColor = [0.98 0.99 1.0];
+
+            % Sub-layout for grouped controls
+            mainControlLayout = uigridlayout(obj.ControlPanel);
+            mainControlLayout.RowHeight = {'fit', 'fit', 'fit'};
+            mainControlLayout.ColumnWidth = {'1x'};
+            mainControlLayout.Padding = [5 5 5 5];
+            mainControlLayout.RowSpacing = 10;
+
+            %% Camera Actions Group
+            cameraPanel = uipanel(mainControlLayout);
+            cameraPanel.Title = 'Camera Actions';
+            cameraPanel.Layout.Row = 1;
+            cameraPanel.Layout.Column = 1;
+            cameraPanel.BackgroundColor = [0.96 0.97 0.98];
+            cameraLayout = uigridlayout(cameraPanel);
+            cameraLayout.RowHeight = {100, 'fit', 'fit', 'fit', 'fit'};
+            cameraLayout.ColumnWidth = {'1x', '1x'};
+            cameraLayout.Padding = [1 1 1 1];
+            cameraLayout.RowSpacing = 1;
+            cameraLayout.ColumnSpacing = 1;
 
             % Camera List Box
-            obj.CameraListBox = uilistbox(controlLayout);
-            obj.CameraListBox.Layout.Row = 2;
-            obj.CameraListBox.Layout.Column = 1;
-            obj.CameraListBox.Multiselect = 'on';  % Enable multi-select for periodic capture
+            obj.CameraListBox = uilistbox(cameraLayout);
+            obj.CameraListBox.Layout.Row = 1;
+            obj.CameraListBox.Layout.Column = [1 2];
+            obj.CameraListBox.Multiselect = 'on';
             obj.CameraListBox.Items = {};
+            obj.CameraListBox.FontSize = 11;
+            obj.CameraListBox.Tooltip = 'Select camera(s) for preview or periodic capture';
 
-            % Control Buttons
-            obj.RefreshButton = uibutton(controlLayout, 'push');
-            obj.RefreshButton.Text = 'Refresh Cameras';
-            obj.RefreshButton.Layout.Row = 3;
+            % Refresh Button
+            obj.RefreshButton = uibutton(cameraLayout, 'push');
+            obj.RefreshButton.Text = 'Refresh';
+            obj.RefreshButton.Layout.Row = 2;
             obj.RefreshButton.Layout.Column = 1;
+            obj.RefreshButton.BackgroundColor = [0.2 0.6 0.8];
+            obj.RefreshButton.FontColor = [1 1 1];
+            obj.RefreshButton.Tooltip = 'Refresh camera list';
+            obj.RefreshButton.FontSize = 12;
 
-            obj.StartAllButton = uibutton(controlLayout, 'push');
-            obj.StartAllButton.Text = 'Start Camera';
-            obj.StartAllButton.Layout.Row = 4;
-            obj.StartAllButton.Layout.Column = 1;
-            obj.StartAllButton.BackgroundColor = [0.2 0.8 0.2];
+            % Start Camera Button
+            obj.StartAllButton = uibutton(cameraLayout, 'push');
+            obj.StartAllButton.Text = 'Start';
+            obj.StartAllButton.Layout.Row = 2;
+            obj.StartAllButton.Layout.Column = 2;
+            obj.StartAllButton.BackgroundColor = [0.16 0.68 0.38];
+            obj.StartAllButton.FontColor = [1 1 1];
+            obj.StartAllButton.Tooltip = 'Start preview for selected camera(s)';
+            obj.StartAllButton.FontSize = 12;
 
-            obj.StopAllButton = uibutton(controlLayout, 'push');
-            obj.StopAllButton.Text = 'Stop Camera';
-            obj.StopAllButton.Layout.Row = 5;
+            % Stop Camera Button
+            obj.StopAllButton = uibutton(cameraLayout, 'push');
+            obj.StopAllButton.Text = 'Stop';
+            obj.StopAllButton.Layout.Row = 3;
             obj.StopAllButton.Layout.Column = 1;
-            obj.StopAllButton.BackgroundColor = [0.8 0.2 0.2];
+            obj.StopAllButton.BackgroundColor = [0.86 0.24 0.24];
+            obj.StopAllButton.FontColor = [1 1 1];
+            obj.StopAllButton.Tooltip = 'Stop all camera previews';
+            obj.StopAllButton.FontSize = 12;
 
-            obj.SnapshotAllButton = uibutton(controlLayout, 'push');
-            obj.SnapshotAllButton.Text = 'Snapshot Camera';
-            obj.SnapshotAllButton.Layout.Row = 6;
-            obj.SnapshotAllButton.Layout.Column = 1;
+            % Snapshot Button
+            obj.SnapshotAllButton = uibutton(cameraLayout, 'push');
+            obj.SnapshotAllButton.Text = 'Snapshot';
+            obj.SnapshotAllButton.Layout.Row = 3;
+            obj.SnapshotAllButton.Layout.Column = 2;
             obj.SnapshotAllButton.BackgroundColor = [0.2 0.6 0.8];
+            obj.SnapshotAllButton.FontColor = [1 1 1];
+            obj.SnapshotAllButton.Tooltip = 'Capture a snapshot from the active camera';
+            obj.SnapshotAllButton.FontSize = 12;
 
-            % Video Recording Buttons
-            obj.StartRecordingButton = uibutton(controlLayout, 'push');
-            obj.StartRecordingButton.Text = 'Start Recording';
-            obj.StartRecordingButton.Layout.Row = 7;
+            %% Recording Group
+            recordingPanel = uipanel(mainControlLayout);
+            recordingPanel.Title = 'Recording';
+            recordingPanel.Layout.Row = 2;
+            recordingPanel.Layout.Column = 1;
+            recordingPanel.BackgroundColor = [0.98 0.95 0.90];
+            recordingLayout = uigridlayout(recordingPanel);
+            recordingLayout.RowHeight = {'fit', 'fit', 'fit'};
+            recordingLayout.ColumnWidth = {'1x', '1x'};
+            recordingLayout.Padding = [1 1 1 1];
+            recordingLayout.RowSpacing = 1;
+            recordingLayout.ColumnSpacing = 1;
+
+            % Start Recording Button
+            obj.StartRecordingButton = uibutton(recordingLayout, 'push');
+            obj.StartRecordingButton.Text = 'Record';
+            obj.StartRecordingButton.Layout.Row = 1;
             obj.StartRecordingButton.Layout.Column = 1;
             obj.StartRecordingButton.BackgroundColor = [0.9 0.6 0.2];
+            obj.StartRecordingButton.FontColor = [1 1 1];
+            obj.StartRecordingButton.Tooltip = 'Start video recording';
+            obj.StartRecordingButton.FontSize = 12;
 
-            obj.StopRecordingButton = uibutton(controlLayout, 'push');
-            obj.StopRecordingButton.Text = 'Stop Recording';
-            obj.StopRecordingButton.Layout.Row = 8;
-            obj.StopRecordingButton.Layout.Column = 1;
-            obj.StopRecordingButton.BackgroundColor = [0.8 0.2 0.2];
+            % Stop Recording Button
+            obj.StopRecordingButton = uibutton(recordingLayout, 'push');
+            obj.StopRecordingButton.Text = 'Stop';
+            obj.StopRecordingButton.Layout.Row = 1;
+            obj.StopRecordingButton.Layout.Column = 2;
+            obj.StopRecordingButton.BackgroundColor = [0.86 0.24 0.24];
+            obj.StopRecordingButton.FontColor = [1 1 1];
+            obj.StopRecordingButton.Tooltip = 'Stop video recording';
+            obj.StopRecordingButton.FontSize = 12;
             obj.StopRecordingButton.Enable = 'off';
 
             % Recording Status Label
-            obj.RecordingStatusLabel = uilabel(controlLayout);
+            obj.RecordingStatusLabel = uilabel(recordingLayout);
             obj.RecordingStatusLabel.Text = 'Not recording';
-            obj.RecordingStatusLabel.Layout.Row = 9;
-            obj.RecordingStatusLabel.Layout.Column = 1;
+            obj.RecordingStatusLabel.Layout.Row = 2;
+            obj.RecordingStatusLabel.Layout.Column = [1 2];
             obj.RecordingStatusLabel.FontColor = [0.5 0.5 0.5];
             obj.RecordingStatusLabel.FontWeight = 'bold';
+            obj.RecordingStatusLabel.FontSize = 11;
+            obj.RecordingStatusLabel.HorizontalAlignment = 'center';
 
-            % Periodic Capture Buttons
-            obj.StartPeriodicButton = uibutton(controlLayout, 'push');
-            obj.StartPeriodicButton.Text = 'Start Periodic Capture';
-            obj.StartPeriodicButton.Layout.Row = 10;
+            % Elapsed Recording Time
+            obj.RecordingElapsedLabel = uilabel(recordingLayout);
+            obj.RecordingElapsedLabel.Text = 'Elapsed: 00:00';
+            obj.RecordingElapsedLabel.Layout.Row = 3;
+            obj.RecordingElapsedLabel.Layout.Column = [1 2];
+            obj.RecordingElapsedLabel.FontColor = [0.2 0.6 0.8];
+            obj.RecordingElapsedLabel.FontSize = 10;
+            obj.RecordingElapsedLabel.HorizontalAlignment = 'center';
+
+            %% Periodic Capture Group
+            periodicPanel = uipanel(mainControlLayout);
+            periodicPanel.Title = 'Periodic Capture';
+            periodicPanel.Layout.Row = 3;
+            periodicPanel.Layout.Column = 1;
+            periodicPanel.BackgroundColor = [0.95 0.98 0.95];
+            periodicLayout = uigridlayout(periodicPanel);
+            periodicLayout.RowHeight = {'fit', 'fit', 'fit', 'fit'};
+            periodicLayout.ColumnWidth = {'1x', '1x'};
+            periodicLayout.Padding = [1 1 1 1];
+            periodicLayout.RowSpacing = 1;
+            periodicLayout.ColumnSpacing = 1;
+
+            % Start Periodic Capture Button
+            obj.StartPeriodicButton = uibutton(periodicLayout, 'push');
+            obj.StartPeriodicButton.Text = 'Start Periodic';
+            obj.StartPeriodicButton.Layout.Row = 1;
             obj.StartPeriodicButton.Layout.Column = 1;
-            obj.StartPeriodicButton.BackgroundColor = [0.2 0.8 0.4];
+            obj.StartPeriodicButton.BackgroundColor = [0.16 0.68 0.38];
+            obj.StartPeriodicButton.FontColor = [1 1 1];
+            obj.StartPeriodicButton.Tooltip = 'Start periodic capture for all available cameras';
+            obj.StartPeriodicButton.FontSize = 12;
 
-            obj.StopPeriodicButton = uibutton(controlLayout, 'push');
-            obj.StopPeriodicButton.Text = 'Stop Periodic Capture';
-            obj.StopPeriodicButton.Layout.Row = 11;
-            obj.StopPeriodicButton.Layout.Column = 1;
-            obj.StopPeriodicButton.BackgroundColor = [0.8 0.2 0.2];
+            % Stop Periodic Capture Button
+            obj.StopPeriodicButton = uibutton(periodicLayout, 'push');
+            obj.StopPeriodicButton.Text = 'Stop';
+            obj.StopPeriodicButton.Layout.Row = 1;
+            obj.StopPeriodicButton.Layout.Column = 2;
+            obj.StopPeriodicButton.BackgroundColor = [0.86 0.24 0.24];
+            obj.StopPeriodicButton.FontColor = [1 1 1];
+            obj.StopPeriodicButton.Tooltip = 'Stop periodic capture';
+            obj.StopPeriodicButton.FontSize = 12;
             obj.StopPeriodicButton.Enable = 'off';
 
-            % Interval Control
-            obj.IntervalLabel = uilabel(controlLayout);
+            % Interval Label
+            obj.IntervalLabel = uilabel(periodicLayout);
             obj.IntervalLabel.Text = 'Interval (seconds):';
-            obj.IntervalLabel.Layout.Row = 12;
+            obj.IntervalLabel.Layout.Row = 2;
             obj.IntervalLabel.Layout.Column = 1;
-            obj.IntervalLabel.FontSize = 10;
+            obj.IntervalLabel.FontSize = 11;
+            obj.IntervalLabel.HorizontalAlignment = 'right';
 
-            obj.IntervalSpinner = uispinner(controlLayout);
-            obj.IntervalSpinner.Layout.Row = 13;
-            obj.IntervalSpinner.Layout.Column = 1;
+            % Interval Spinner
+            obj.IntervalSpinner = uispinner(periodicLayout);
+            obj.IntervalSpinner.Layout.Row = 2;
+            obj.IntervalSpinner.Layout.Column = 2;
             obj.IntervalSpinner.Limits = [0.5 10];
             obj.IntervalSpinner.Value = 1.0;
             obj.IntervalSpinner.Step = 0.1;
+            obj.IntervalSpinner.FontSize = 11;
+            obj.IntervalSpinner.Tooltip = 'Set interval for periodic capture';
+
+            % Next Capture Label
+            obj.NextCaptureLabel = uilabel(periodicLayout);
+            obj.NextCaptureLabel.Text = 'Next: --:--:--';
+            obj.NextCaptureLabel.Layout.Row = 3;
+            obj.NextCaptureLabel.Layout.Column = [1 2];
+            obj.NextCaptureLabel.FontColor = [0.2 0.6 0.8];
+            obj.NextCaptureLabel.FontSize = 10;
+            obj.NextCaptureLabel.HorizontalAlignment = 'center';
 
             % Make figure visible
             obj.UIFigure.Visible = 'on';
@@ -251,6 +363,22 @@ classdef StageView < handle
             obj.SnapshotAllButton.Enable = hasActiveCameras;
             obj.StartRecordingButton.Enable = obj.IsPreviewActive && ~obj.IsRecording;
             obj.StopRecordingButton.Enable = obj.IsRecording;
+            obj.StartPeriodicButton.Enable = hasCamerasAvailable && ~obj.IsPeriodicCaptureActive;
+            obj.StopPeriodicButton.Enable = obj.IsPeriodicCaptureActive;
+            obj.IntervalSpinner.Enable = ~obj.IsPeriodicCaptureActive;
+
+            % Update status bar color
+            if obj.IsRecording
+                obj.StatusLabel.BackgroundColor = [0.9 0.6 0.2]; % Orange for recording
+            elseif obj.IsPeriodicCaptureActive
+                obj.StatusLabel.BackgroundColor = [0.2 0.6 0.8]; % Blue for periodic
+            elseif hasActiveCameras
+                obj.StatusLabel.BackgroundColor = [0.16 0.68 0.38]; % Green for active
+            elseif hasCamerasAvailable
+                obj.StatusLabel.BackgroundColor = [0.95 0.61 0.07]; % Orange for ready
+            else
+                obj.StatusLabel.BackgroundColor = [0.86 0.24 0.24]; % Red for error
+            end
         end
 
         % Camera Operations
@@ -325,6 +453,22 @@ classdef StageView < handle
                 hFig = hParent;
 
                 hFig.Name = sprintf('Live Feed: %s', camName);
+                set(hFig, 'MenuBar', 'none', 'ToolBar', 'none', 'Color', [0 0 0]);
+                % Make axes tight
+                ax = hImage.Parent;
+                if isa(ax, 'matlab.graphics.axis.Axes')
+                    ax.Units = 'normalized';
+                    ax.Position = [0 0 1 1];
+                    ax.XColor = 'none';
+                    ax.YColor = 'none';
+                    ax.Box = 'off';
+                    ax.XTick = [];
+                    ax.YTick = [];
+                    ax.Toolbar = [];
+                    ax.Title.String = '';
+                    ax.Clipping = 'off';
+                    set(ax, 'LooseInset', [0 0 0 0]);
+                end
 
                 % Hook the close function to our custom handler
                 hFig.CloseRequestFcn = @(~,~) obj.closeSingleCamera(camName);
@@ -460,9 +604,19 @@ classdef StageView < handle
 
                     % Create new figure for snapshot
                     figName = sprintf('Snapshot - %s', feed.name);
-                    figure('Name', figName, 'NumberTitle', 'off');
-                    imshow(img);
-                    title(sprintf('%s - %s', feed.name, datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
+                    hFig = figure('Name', figName, 'NumberTitle', 'off', 'Color', [0 0 0]);
+                    ax = axes(hFig, 'Position', [0 0 1 1], 'Units', 'normalized');
+                    ax.XColor = 'none';
+                    ax.YColor = 'none';
+                    ax.Box = 'off';
+                    ax.XTick = [];
+                    ax.YTick = [];
+                    ax.Toolbar = [];
+                    ax.Title.String = '';
+                    ax.Clipping = 'off';
+                    set(ax, 'LooseInset', [0 0 0 0]);
+                    imshow(img, 'Parent', ax);
+                    title(ax, sprintf('%s - %s', feed.name, datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
 
                     success = true;
                 end
@@ -702,18 +856,27 @@ classdef StageView < handle
                     'ResizeFcn', @(~,~) obj.onPeriodicDisplayResize(cameraName));
                 
                 % Create axes that fill the entire figure
-                ax = axes(hFig, 'Position', [0 0 1 1]);
+                ax = axes(hFig, 'Position', [0 0 1 1], 'Units', 'normalized');
+                set(hFig, 'MenuBar', 'none', 'ToolBar', 'none', 'Color', [0 0 0]);
+                ax.Units = 'normalized';
+                ax.Position = [0 0 1 1];
+                ax.XColor = 'none';
+                ax.YColor = 'none';
+                ax.Box = 'off';
+                ax.XTick = [];
+                ax.YTick = [];
+                ax.Toolbar = [];
+                ax.Title.String = '';
+                ax.Clipping = 'off';
                 
                 % Create placeholder image
                 placeholderImg = zeros(240, 320, 3, 'uint8');
                 imgHandle = imshow(placeholderImg, 'Parent', ax);
                 
                 % Configure axes for scalable display
-                ax.XTick = [];
-                ax.YTick = [];
-                ax.Box = 'off';
                 axis(ax, 'image');  % Preserve aspect ratio
                 axis(ax, 'tight');  % No extra space around image
+                set(ax, 'LooseInset', [0 0 0 0]);
                 
                 % Store display data
                 displayData = struct(...
@@ -813,6 +976,16 @@ classdef StageView < handle
                 % Ensure proper aspect ratio and scaling
                 axis(displayData.axes, 'image');  % Preserve aspect ratio
                 axis(displayData.axes, 'tight');  % Show full image without extra space
+                displayData.axes.Position = [0 0 1 1];
+                displayData.axes.XColor = 'none';
+                displayData.axes.YColor = 'none';
+                displayData.axes.Box = 'off';
+                displayData.axes.XTick = [];
+                displayData.axes.YTick = [];
+                displayData.axes.Toolbar = [];
+                displayData.axes.Title.String = '';
+                displayData.axes.Clipping = 'off';
+                set(displayData.axes, 'LooseInset', [0 0 0 0]);
                 
                 % Update figure title with timestamp
                 timeStr = char(datetime('now', 'Format', 'HH:mm:ss'));
@@ -943,6 +1116,9 @@ classdef StageView < handle
         
         % Periodic Capture Callbacks
         function onStartPeriodicButtonPushed(obj)
+            % * Overhauled: Start periodic capture for all available cameras
+            obj.CameraListBox.Value = obj.CameraListBox.Items; % Select all
+            obj.updateSelectedCameras();
             obj.startPeriodicCapture();
         end
         
@@ -978,10 +1154,16 @@ classdef StageView < handle
                 % Ensure image scales with window while preserving aspect ratio
                 axis(displayData.axes, 'image');  % Preserve aspect ratio
                 axis(displayData.axes, 'tight');  % Show full image without extra space
-                
-                % Reposition axes to fill the figure
                 displayData.axes.Position = [0 0 1 1];
-                
+                displayData.axes.XColor = 'none';
+                displayData.axes.YColor = 'none';
+                displayData.axes.Box = 'off';
+                displayData.axes.XTick = [];
+                displayData.axes.YTick = [];
+                displayData.axes.Toolbar = [];
+                displayData.axes.Title.String = '';
+                displayData.axes.Clipping = 'off';
+                set(displayData.axes, 'LooseInset', [0 0 0 0]);
             catch ME
                 % Ignore resize errors
             end

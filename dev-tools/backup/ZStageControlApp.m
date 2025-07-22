@@ -669,7 +669,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             label.Layout.Row = 1;
             label.Layout.Column = 3;
             app.AutoControls.StepsField = uieditfield(grid, 'numeric');
-            app.AutoControls.StepsField.Value = ZStageController.DEFAULT_AUTO_STEPS;
+            app.AutoControls.StepsField.Field.Value = ZStageController.DEFAULT_AUTO_STEPS;
             app.AutoControls.StepsField.FontSize = 9;
             app.AutoControls.StepsField.Layout.Row = 1;
             app.AutoControls.StepsField.Layout.Column = 4;
@@ -679,7 +679,7 @@ classdef ZStageControlApp < matlab.apps.AppBase
             label.Layout.Row = 2;
             label.Layout.Column = 1;
             app.AutoControls.DelayField = uieditfield(grid, 'numeric');
-            app.AutoControls.DelayField.Value = ZStageController.DEFAULT_AUTO_DELAY;
+            app.AutoControls.DelayField.Field.Value = ZStageController.DEFAULT_AUTO_DELAY;
             app.AutoControls.DelayField.FontSize = 9;
             app.AutoControls.DelayField.Layout.Row = 2;
             app.AutoControls.DelayField.Layout.Column = 2;
@@ -831,8 +831,8 @@ classdef ZStageControlApp < matlab.apps.AppBase
             
             % Get parameters from UI
             stepSize = app.AutoControls.StepField.Value;
-            numSteps = app.AutoControls.StepsField.Value;
-            delay = app.AutoControls.DelayField.Value;
+            numSteps = app.AutoControls.StepsField.Field.Value;
+            delay = app.AutoControls.DelayField.Field.Value;
             direction = app.Controller.AutoDirection;
             recordMetrics = app.AutoControls.RecordMetricsCheckbox.Value;
             
@@ -857,11 +857,11 @@ classdef ZStageControlApp < matlab.apps.AppBase
             if app.AutoControls.StepField.Value <= 0
                 uialert(app.UIFigure, 'Step size must be greater than 0', 'Invalid Parameter');
                 valid = false;
-            elseif app.AutoControls.StepsField.Value <= 0 || ...
-                   mod(app.AutoControls.StepsField.Value, 1) ~= 0
+            elseif app.AutoControls.StepsField.Field.Value <= 0 || ...
+                   mod(app.AutoControls.StepsField.Field.Value, 1) ~= 0
                 uialert(app.UIFigure, 'Number of steps must be a positive whole number', 'Invalid Parameter');
                 valid = false;
-            elseif app.AutoControls.DelayField.Value < 0
+            elseif app.AutoControls.DelayField.Field.Value < 0
                 uialert(app.UIFigure, 'Delay must be non-negative', 'Invalid Parameter');
                 valid = false;
             end

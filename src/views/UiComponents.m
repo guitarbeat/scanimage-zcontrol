@@ -51,7 +51,7 @@ classdef UiComponents
 
     properties (Constant, Access = public)
         % ===== WINDOW DIMENSIONS =====
-        MIN_WINDOW_WIDTH = 400
+        MIN_WINDOW_WIDTH = 500
         MIN_WINDOW_HEIGHT = 400
         PLOT_WIDTH = 400
 
@@ -78,12 +78,12 @@ classdef UiComponents
         STATUS_BAR_SPACING = 4;
 
         % Control panels
-        CONTROL_GRID_PADDING = [3 3 3 3];
+        CONTROL_GRID_PADDING = [2 2 2 2];
         CONTROL_GRID_SPACING = 4;
         CONTROL_COLUMN_SPACING = 8;
 
         % Standard column and row configurations
-        STANDARD_COLUMN_WIDTHS = {'1x', '1x'};
+        STANDARD_COLUMN_WIDTHS = {'1x', 'fit'};
         FIT_EXPAND_COLUMNS = {'fit', '1x'};
         FIT_EXPAND_ROWS = {'fit', '1x'};
         ALL_FIT_ROWS = {'fit', 'fit'};
@@ -131,7 +131,7 @@ classdef UiComponents
 
         % ===== TEXT CONSTANTS =====
         TEXT = struct(...
-            'WindowTitle', 'FoilView - Enhanced', ...
+            'WindowTitle', 'FoilView', ...
             'Ready', '✓ Ready')
     end
 

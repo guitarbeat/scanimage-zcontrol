@@ -22,8 +22,6 @@
         METRIC_TYPES = {'Std Dev', 'Mean', 'Max'}
         DEFAULT_METRIC = 'Std Dev'
 
-        MIN_POSITION = -10000
-        MAX_POSITION = 10000
         POSITION_TOLERANCE = 0.01
 
         % Label validation constants
@@ -356,8 +354,8 @@
 
                 % Get parameters from UI
                 stepSize = autoControls.SharedStepSize.CurrentValue;
-                numSteps = autoControls.StepsField.Value;
-                delay = autoControls.DelayField.Value;
+                numSteps = autoControls.StepsField.Field.Value;
+                delay = autoControls.DelayField.Field.Value;
 
                 % Get direction from toggle switch
                 if strcmp(autoControls.DirectionSwitch.Value, 'Up')
@@ -741,8 +739,8 @@
             % Validate auto-step parameters from UI controls
             try
                 stepSize = autoControls.SharedStepSize.CurrentValue;
-                numSteps = autoControls.StepsField.Value;
-                delay = autoControls.DelayField.Value;
+                numSteps = autoControls.StepsField.Field.Value;
+                delay = autoControls.DelayField.Field.Value;
 
                 % Use ScanControlService for validation
                 [valid, errorMsg] = ScanControlService.validateAutoStepParameters(stepSize, numSteps, delay);

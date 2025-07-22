@@ -98,7 +98,7 @@ classdef StageView < handle
             % Main Figure
             obj.UIFigure = uifigure('Visible', 'off');
             obj.UIFigure.Name = 'Stage View - Live Camera Control';
-            obj.UIFigure.Position = [200 200 400 400];  % Even more compact initial height
+            obj.UIFigure.Position = [200 200 260 340];  % Much smaller default size
             obj.UIFigure.AutoResizeChildren = 'on'; % * Enable responsive resizing
 
             % Main Layout

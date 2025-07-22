@@ -104,7 +104,7 @@ classdef StageView < handle
             % Main Layout
             obj.MainLayout = uigridlayout(obj.UIFigure);
             obj.MainLayout.ColumnWidth = {'1x'};
-            obj.MainLayout.RowHeight = {'fit', '1x', 'fit'}; % * Make middle row (ControlPanel) expand
+            obj.MainLayout.RowHeight = {'fit', '1x'}; % Remove status label row
             obj.MainLayout.Padding = [1 1 1 1];
             obj.MainLayout.RowSpacing = 1;
 
@@ -117,20 +117,10 @@ classdef StageView < handle
             headerLabel.Layout.Row = 1;
             headerLabel.Layout.Column = 1;
 
-            % Status Bar
-            obj.StatusLabel = uilabel(obj.MainLayout);
-            obj.StatusLabel.Text = 'Initializing cameras...';
-            obj.StatusLabel.FontSize = 12;
-            obj.StatusLabel.FontWeight = 'bold';
-            obj.StatusLabel.BackgroundColor = [0.95 0.61 0.07]; % Orange for init
-            obj.StatusLabel.HorizontalAlignment = 'center';
-            obj.StatusLabel.Layout.Row = 2;
-            obj.StatusLabel.Layout.Column = 1;
-
             % Main Control Panel (with sub-panels)
             obj.ControlPanel = uipanel(obj.MainLayout);
             obj.ControlPanel.Title = '';
-            obj.ControlPanel.Layout.Row = 3;
+            obj.ControlPanel.Layout.Row = 2;
             obj.ControlPanel.Layout.Column = 1;
             obj.ControlPanel.BackgroundColor = [0.98 0.99 1.0];
 

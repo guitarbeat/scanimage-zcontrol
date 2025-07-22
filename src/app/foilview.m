@@ -79,9 +79,74 @@ classdef foilview < matlab.apps.AppBase
         end
         
         function writeMetadataToFile(app, metadata, filePath, verbose)
-            % Write metadata to file - delegates to MetadataService
             if nargin < 4
                 verbose = false;
+            end
+            % * Attempt to get hSI from base workspace and add extra fields
+            try
+                try
+                    hSI = evalin('base', 'hSI');
+                catch
+                    hSI = [];
+                end
+                if ~isempty(hSI)
+                    % * Populate additional fields from hSI
+                    metadata.imagingSystem = getfield_safe(hSI, 'imagingSystem');
+                    metadata.scannerType = getfield_safe(hSI.hScan2D, 'scannerType');
+                    metadata.scanMode = getfield_safe(hSI.hScan2D, 'scanMode');
+                    metadata.objectiveResolution = getfield_safe(hSI, 'objectiveResolution');
+                    metadata.pixelsPerLine = getfield_safe(hSI.hRoiManager, 'pixelsPerLine');
+                    metadata.linesPerFrame = getfield_safe(hSI.hRoiManager, 'linesPerFrame');
+                    metadata.scanZoomFactor = getfield_safe(hSI.hRoiManager, 'scanZoomFactor');
+                    metadata.scanFrameRate = getfield_safe(hSI.hRoiManager, 'scanFrameRate');
+                    metadata.sampleRate = getfield_safe(hSI.hScan2D, 'sampleRate');
+                    metadata.channelsAvailable = getfield_safe(hSI.hChannels, 'channelsAvailable');
+                    metadata.channelsActive = getfield_safe(hSI.hChannels, 'channelsActive');
+                    metadata.channelNames = strjoin(getfield_safe(hSI.hChannels, 'channelName'), ';');
+                    metadata.channelTypes = strjoin(getfield_safe(hSI.hChannels, 'channelType'), ';');
+                    metadata.channelGains = mat2str(getfield_safe(hSI.hPmts, 'gains'));
+                    metadata.powerFractions = mat2str(getfield_safe(hSI.hBeams, 'powerFractions'));
+                    metadata.axesPosition = mat2str(getfield_safe(hSI.hMotors, 'axesPosition'));
+                    metadata.samplePosition = mat2str(getfield_safe(hSI.hMotors, 'samplePosition'));
+                    metadata.ScanImageVersion = sprintf('%s.%s.%s-%s', ...
+                        getfield_safe(hSI, 'VERSION_MAJOR'), ...
+                        getfield_safe(hSI, 'VERSION_MINOR'), ...
+                        getfield_safe(hSI, 'VERSION_UPDATE'), ...
+                        getfield_safe(hSI, 'VERSION_COMMIT'));
+                    metadata.simulated = getfield_safe(hSI.hScan2D, 'simulated');
+                    metadata.imagingFovUm = mat2str(getfield_safe(hSI.hRoiManager, 'imagingFovUm'));
+                    % * Number of ROIs
+                    try
+                        metadata.numROIs = numel(hSI.hRoiManager.currentRoiGroup.rois);
+                    catch
+                        metadata.numROIs = '';
+                    end
+                else
+                    % * If hSI is not available, fill with blanks or simulation defaults
+                    metadata.imagingSystem = '';
+                    metadata.scannerType = '';
+                    metadata.scanMode = '';
+                    metadata.objectiveResolution = '';
+                    metadata.pixelsPerLine = '';
+                    metadata.linesPerFrame = '';
+                    metadata.scanZoomFactor = '';
+                    metadata.scanFrameRate = '';
+                    metadata.sampleRate = '';
+                    metadata.channelsAvailable = '';
+                    metadata.channelsActive = '';
+                    metadata.channelNames = '';
+                    metadata.channelTypes = '';
+                    metadata.channelGains = '';
+                    metadata.powerFractions = '';
+                    metadata.axesPosition = '';
+                    metadata.samplePosition = '';
+                    metadata.ScanImageVersion = '';
+                    metadata.simulated = '';
+                    metadata.imagingFovUm = '';
+                    metadata.numROIs = '';
+                end
+            catch ME
+                FoilviewUtils.logException('FoilviewApp.writeMetadataToFile', ME);
             end
             try
                 MetadataService.writeMetadataToFile(metadata, filePath, verbose);
@@ -105,6 +170,7 @@ classdef foilview < matlab.apps.AppBase
                 newIndex = currentIndex - 1;
                 newStepSize = app.ManualControls.SharedStepSize.StepSizes(newIndex);
                 app.updateSharedStepSizeDisplay(newIndex, newStepSize);
+                app.updateTotalMoveLabel();
             end
         end
         function onStepSizeChanged(app, varargin)
@@ -112,6 +178,7 @@ classdef foilview < matlab.apps.AppBase
                 event = varargin{1};
                 app.Controller.setStepSize(event.Value);
                 app.updateStepSizeDisplay();
+                app.updateTotalMoveLabel();
             end
         end
         function onStepUpButtonPushed(app, varargin)
@@ -120,6 +187,7 @@ classdef foilview < matlab.apps.AppBase
                 newIndex = currentIndex + 1;
                 newStepSize = app.ManualControls.SharedStepSize.StepSizes(newIndex);
                 app.updateSharedStepSizeDisplay(newIndex, newStepSize);
+                app.updateTotalMoveLabel();
             end
         end
         function onUpButtonPushed(app, varargin)
@@ -151,6 +219,7 @@ classdef foilview < matlab.apps.AppBase
                     end
                     
                     fprintf('Custom step size set to: %.3f μm\n', customStepSize);
+                    app.updateTotalMoveLabel();
                 else
                     % Invalid value - revert to previous value
                     app.ManualControls.SharedStepSize.StepSizeDisplay.Value = app.ManualControls.SharedStepSize.CurrentValue;
@@ -164,6 +233,7 @@ classdef foilview < matlab.apps.AppBase
         % -- Auto Controls Callbacks --
         function onAutoDelayChanged(app, varargin)
             app.updateAutoStepStatus();
+            app.updateTotalMoveLabel();
         end
         function onAutoDirectionSwitchChanged(app, varargin)
             if ~isempty(varargin) && isa(varargin{1}, 'matlab.ui.eventdata.ValueChangedData')
@@ -177,6 +247,7 @@ classdef foilview < matlab.apps.AppBase
                 app.updateAutoStepStatus();
                 app.UIController.updateAllUI();
             end
+            app.updateTotalMoveLabel(); % <-- moved to very end
         end
         function onAutoDirectionToggled(app, varargin)
             currentDirection = app.Controller.AutoDirection;
@@ -184,10 +255,12 @@ classdef foilview < matlab.apps.AppBase
             app.Controller.setAutoDirectionWithValidation(app.AutoControls, newDirection);
             app.updateAutoStepStatus();
             app.UIController.updateAllUI();
+            app.updateTotalMoveLabel(); % <-- moved to very end
         end
 
         function onAutoStepsChanged(app, varargin)
             app.updateAutoStepStatus();
+            app.updateTotalMoveLabel();
         end
         function onStartStopButtonPushed(app, varargin)
             if app.Controller.IsAutoRunning
@@ -331,6 +404,45 @@ classdef foilview < matlab.apps.AppBase
         end
         function onExportPlotButtonPushed(app, varargin)
             app.PlotManager.exportPlotData(app.UIFigure, app.Controller);
+        end
+        % -- Auto Controls Arrow Button Callbacks --
+        function onAutoStepsDecrease(app, varargin)
+            field = app.AutoControls.StepsField.Field;
+            minVal = app.AutoControls.StepsField.MinValue;
+            maxVal = app.AutoControls.StepsField.MaxValue;
+            newVal = max(minVal, field.Value - 1);
+            field.Value = newVal;
+            app.onAutoStepsChanged();
+            app.updateTotalMoveLabel();
+        end
+        function onAutoStepsIncrease(app, varargin)
+            field = app.AutoControls.StepsField.Field;
+            minVal = app.AutoControls.StepsField.MinValue;
+            maxVal = app.AutoControls.StepsField.MaxValue;
+            newVal = min(maxVal, field.Value + 1);
+            field.Value = newVal;
+            app.onAutoStepsChanged();
+            app.updateTotalMoveLabel();
+        end
+        function onAutoDelayDecrease(app, varargin)
+            field = app.AutoControls.DelayField.Field;
+            minVal = app.AutoControls.DelayField.MinValue;
+            maxVal = app.AutoControls.DelayField.MaxValue;
+            step = 0.1;
+            newVal = max(minVal, round((field.Value - step)*10)/10);
+            field.Value = newVal;
+            app.onAutoDelayChanged();
+            app.updateTotalMoveLabel();
+        end
+        function onAutoDelayIncrease(app, varargin)
+            field = app.AutoControls.DelayField.Field;
+            minVal = app.AutoControls.DelayField.MinValue;
+            maxVal = app.AutoControls.DelayField.MaxValue;
+            step = 0.1;
+            newVal = min(maxVal, round((field.Value + step)*10)/10);
+            field.Value = newVal;
+            app.onAutoDelayChanged();
+            app.updateTotalMoveLabel();
         end
     end
 
@@ -543,6 +655,15 @@ classdef foilview < matlab.apps.AppBase
                 createCallbackFcn(app, @app.onAutoDirectionToggled, true);
             app.AutoControls.StartStopButton.ButtonPushedFcn = ...
                 createCallbackFcn(app, @app.onStartStopButtonPushed, true);
+            % --- Add arrow button callbacks for Steps and Delay fields ---
+            app.AutoControls.StepsField.DecreaseButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onAutoStepsDecrease, true);
+            app.AutoControls.StepsField.IncreaseButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onAutoStepsIncrease, true);
+            app.AutoControls.DelayField.DecreaseButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onAutoDelayDecrease, true);
+            app.AutoControls.DelayField.IncreaseButton.ButtonPushedFcn = ...
+                createCallbackFcn(app, @app.onAutoDelayIncrease, true);
             app.MetricDisplay.TypeDropdown.ValueChangedFcn = ...
                 createCallbackFcn(app, @app.onMetricTypeChanged, true);
             app.MetricDisplay.RefreshButton.ButtonPushedFcn = ...
@@ -837,7 +958,11 @@ classdef foilview < matlab.apps.AppBase
                 config.headers = ['Timestamp,Filename,Scanner,Zoom,FrameRate,Averaging,',...
                               'Resolution,FOV_um,PowerPercent,PockelsValue,',...
                               'ModulationVoltage,FeedbackVoltage,PowerWatts,',...
-                              'ZPosition,XPosition,YPosition,BookmarkLabel,BookmarkMetricType,BookmarkMetricValue,Notes\n'];
+                              'ZPosition,XPosition,YPosition,BookmarkLabel,BookmarkMetricType,BookmarkMetricValue,Notes,',...
+                              'ImagingSystem,ScannerType,ScanMode,ObjectiveResolution,PixelsPerLine,LinesPerFrame,',...
+                              'ScanZoomFactor,ScanFrameRate,SampleRate,ChannelsAvailable,ChannelsActive,ChannelNames,',...
+                              'ChannelTypes,ChannelGains,PowerFractions,AxesPosition,SamplePosition,ScanImageVersion,',...
+                              'Simulated,ImagingFovUm,NumROIs\n'];
             end
         end
 
@@ -929,6 +1054,28 @@ classdef foilview < matlab.apps.AppBase
                 metadata.bookmarkLabel = '';
                 metadata.bookmarkMetricType = '';
                 metadata.bookmarkMetricValue = '';
+                % * Add additional ScanImage fields (simulation defaults)
+                metadata.imagingSystem = 'Simulation';
+                metadata.scannerType = '';
+                metadata.scanMode = '';
+                metadata.objectiveResolution = '';
+                metadata.pixelsPerLine = '';
+                metadata.linesPerFrame = '';
+                metadata.scanZoomFactor = '';
+                metadata.scanFrameRate = '';
+                metadata.sampleRate = '';
+                metadata.channelsAvailable = '';
+                metadata.channelsActive = '';
+                metadata.channelNames = '';
+                metadata.channelTypes = '';
+                metadata.channelGains = '';
+                metadata.powerFractions = '';
+                metadata.axesPosition = '';
+                metadata.samplePosition = '';
+                metadata.ScanImageVersion = '';
+                metadata.simulated = '1';
+                metadata.imagingFovUm = '';
+                metadata.numROIs = '';
                 if ~isempty(app.MetadataFile) && exist(fileparts(app.MetadataFile), 'dir')
                     app.writeMetadataToFile(metadata, app.MetadataFile, false);
                 end
@@ -1043,5 +1190,47 @@ classdef foilview < matlab.apps.AppBase
             end
             app.StatusControls.MetadataButton.FontColor = [1 1 1];
         end
+        %% Add the updateTotalMoveLabel method
+        function updateTotalMoveLabel(app)
+            % Get current step size, number of steps, delay, and direction
+            stepSize = app.ManualControls.SharedStepSize.CurrentValue;
+            numSteps = app.AutoControls.StepsField.Field.Value;
+            delay = app.AutoControls.DelayField.Field.Value;
+            % Prefer reading direction from the UI control for immediate feedback
+            if isfield(app.AutoControls, 'DirectionSwitch') && isvalid(app.AutoControls.DirectionSwitch)
+                if strcmp(app.AutoControls.DirectionSwitch.Value, 'Up')
+                    direction = 1;
+                else
+                    direction = -1;
+                end
+            else
+                direction = app.Controller.AutoDirection;
+                if isempty(direction) || ~isnumeric(direction)
+                    direction = 1;
+                end
+            end
+            totalMove = stepSize * numSteps;
+            totalTime = delay * max(numSteps-1, 0); % Only count intervals between steps
+            if direction == 1
+                dirSymbol = '\u2191'; % Up arrow
+            else
+                dirSymbol = '\u2193'; % Down arrow
+            end
+            app.AutoControls.TotalMoveLabel.Text = sprintf('Total Move : %.3g \x03bcm %s | Total Time: %.2f s', totalMove, char(java.lang.Character.toChars(hex2dec(dirSymbol(3:end)))), totalTime);
+        end
+    end
+end
+
+% * Helper for safe field access for metadata extraction
+function val = getfield_safe(obj, field)
+    try
+        val = obj.(field);
+        if isnumeric(val)
+            val = num2str(val);
+        elseif iscell(val)
+            val = strjoin(cellfun(@num2str, val, 'UniformOutput', false), ';');
+        end
+    catch
+        val = '';
     end
 end

@@ -99,12 +99,12 @@ classdef StageView < handle
             obj.UIFigure = uifigure('Visible', 'off');
             obj.UIFigure.Name = 'Stage View - Live Camera Control';
             obj.UIFigure.Position = [200 200 400 400];  % Even more compact initial height
-            obj.UIFigure.AutoResizeChildren = 'off';
+            obj.UIFigure.AutoResizeChildren = 'on'; % * Enable responsive resizing
 
             % Main Layout
             obj.MainLayout = uigridlayout(obj.UIFigure);
             obj.MainLayout.ColumnWidth = {'1x'};
-            obj.MainLayout.RowHeight = {'fit', 'fit', 'fit'};
+            obj.MainLayout.RowHeight = {'fit', '1x', 'fit'}; % * Make middle row (ControlPanel) expand
             obj.MainLayout.Padding = [1 1 1 1];
             obj.MainLayout.RowSpacing = 1;
 
@@ -136,7 +136,7 @@ classdef StageView < handle
 
             % Sub-layout for grouped controls
             mainControlLayout = uigridlayout(obj.ControlPanel);
-            mainControlLayout.RowHeight = {'fit', 'fit', 'fit'};
+            mainControlLayout.RowHeight = {'fit', '1x', 'fit'}; % * Make recording panel expand
             mainControlLayout.ColumnWidth = {'1x'};
             mainControlLayout.Padding = [5 5 5 5];
             mainControlLayout.RowSpacing = 10;
@@ -148,7 +148,7 @@ classdef StageView < handle
             cameraPanel.Layout.Column = 1;
             cameraPanel.BackgroundColor = [0.96 0.97 0.98];
             cameraLayout = uigridlayout(cameraPanel);
-            cameraLayout.RowHeight = {100, 'fit', 'fit', 'fit', 'fit'};
+            cameraLayout.RowHeight = {'1x', 'fit', 'fit', 'fit', 'fit'}; % * Camera list grows with panel
             cameraLayout.ColumnWidth = {'1x', '1x'};
             cameraLayout.Padding = [1 1 1 1];
             cameraLayout.RowSpacing = 1;
@@ -210,7 +210,7 @@ classdef StageView < handle
             recordingPanel.Layout.Column = 1;
             recordingPanel.BackgroundColor = [0.98 0.95 0.90];
             recordingLayout = uigridlayout(recordingPanel);
-            recordingLayout.RowHeight = {'fit', 'fit', 'fit'};
+            recordingLayout.RowHeight = {'fit', 'fit', '1x'}; % * Elapsed label grows
             recordingLayout.ColumnWidth = {'1x', '1x'};
             recordingLayout.Padding = [1 1 1 1];
             recordingLayout.RowSpacing = 1;
@@ -263,7 +263,7 @@ classdef StageView < handle
             periodicPanel.Layout.Column = 1;
             periodicPanel.BackgroundColor = [0.95 0.98 0.95];
             periodicLayout = uigridlayout(periodicPanel);
-            periodicLayout.RowHeight = {'fit', 'fit', 'fit', 'fit'};
+            periodicLayout.RowHeight = {'fit', 'fit', '1x', 'fit'}; % * Next capture label grows
             periodicLayout.ColumnWidth = {'1x', '1x'};
             periodicLayout.Padding = [1 1 1 1];
             periodicLayout.RowSpacing = 1;
@@ -375,7 +375,7 @@ classdef StageView < handle
             elseif hasActiveCameras
                 obj.StatusLabel.BackgroundColor = [0.16 0.68 0.38]; % Green for active
             elseif hasCamerasAvailable
-                obj.StatusLabel.BackgroundColor = [0.95 0.61 0.07]; % Orange for ready
+                obj.StatusLabel.BackgroundColor = [1 1 1]; % White/neutral for ready (no orange block)
             else
                 obj.StatusLabel.BackgroundColor = [0.86 0.24 0.24]; % Red for error
             end
@@ -392,7 +392,9 @@ classdef StageView < handle
                     obj.StatusLabel.FontColor = [0.8 0.2 0.2];
                 else
                     obj.CameraListBox.Items = obj.AvailableCameras;
-                    obj.StatusLabel.Text = sprintf('%d camera(s) detected', length(obj.AvailableCameras));
+                    % REMOVED: obj.StatusLabel.Text = sprintf('%d camera(s) detected', length(obj.AvailableCameras));
+                    % REMOVED: obj.StatusLabel.FontColor = [0.2 0.6 0.2];
+                    obj.StatusLabel.Text = '';
                     obj.StatusLabel.FontColor = [0.2 0.6 0.2];
                 end
             catch ME
@@ -853,7 +855,8 @@ classdef StageView < handle
                     'NumberTitle', 'off', ...
                     'Position', [baseX, baseY, 640, 480], ...
                     'CloseRequestFcn', @(~,~) obj.onPeriodicDisplayClose(cameraName), ...
-                    'ResizeFcn', @(~,~) obj.onPeriodicDisplayResize(cameraName));
+                    'ResizeFcn', @(~,~) obj.onPeriodicDisplayResize(cameraName), ...
+                    'AutoResizeChildren', 'on'); % * Enable responsive resizing
                 
                 % Create axes that fill the entire figure
                 ax = axes(hFig, 'Position', [0 0 1 1], 'Units', 'normalized');
@@ -1147,22 +1150,13 @@ classdef StageView < handle
             if ~obj.CameraDisplays.isKey(cameraName)
                 return;
             end
-            
             displayData = obj.CameraDisplays(cameraName);
-            
             try
-                % Ensure image scales with window while preserving aspect ratio
-                axis(displayData.axes, 'image');  % Preserve aspect ratio
-                axis(displayData.axes, 'tight');  % Show full image without extra space
+                % * Ensure image and axes fill the window responsively
+                displayData.axes.Units = 'normalized';
                 displayData.axes.Position = [0 0 1 1];
-                displayData.axes.XColor = 'none';
-                displayData.axes.YColor = 'none';
-                displayData.axes.Box = 'off';
-                displayData.axes.XTick = [];
-                displayData.axes.YTick = [];
-                displayData.axes.Toolbar = [];
-                displayData.axes.Title.String = '';
-                displayData.axes.Clipping = 'off';
+                axis(displayData.axes, 'image');
+                axis(displayData.axes, 'tight');
                 set(displayData.axes, 'LooseInset', [0 0 0 0]);
             catch ME
                 % Ignore resize errors

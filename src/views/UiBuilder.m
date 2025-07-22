@@ -351,7 +351,7 @@ classdef UiBuilder
             autoControls.StepsField = UiBuilder.createArrowField(controlsGrid, 1, 'Steps     :', ...
                 FoilviewController.DEFAULT_AUTO_STEPS, 'Number of steps', [], 1, 100);
             autoControls.DelayField = UiBuilder.createArrowField(controlsGrid, 2, 'Delay     :', ...
-                FoilviewController.DEFAULT_AUTO_DELAY, 'Delay between steps (seconds)', 's', 0.1, 10);
+                1, 'Delay between steps (seconds)', 's', 0.1, 10);
 
             % RIGHT SIDE - Direction (spans both rows)
             directionGrid = uigridlayout(controlsGrid, [3, 1]);
@@ -382,7 +382,7 @@ classdef UiBuilder
             totalLabel.FontWeight = 'bold';
             totalLabel.FontColor = UiComponents.COLORS.TextMuted;
             totalLabel.Layout.Row = 3;
-
+            autoControls.TotalMoveLabel = totalLabel;
         end
 
         function sharedStepSize = createSharedStepSizeControl(parent)

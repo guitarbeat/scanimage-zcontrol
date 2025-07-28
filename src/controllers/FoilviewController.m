@@ -653,6 +653,9 @@
                 % Apply direction at execution time
                 actualStep = stepSize * obj.AutoDirection;
 
+                % Notify UI that status has changed (step count updated)
+                obj.notifyStatusChanged();
+
                 try
                     obj.moveStage(actualStep);
                     fprintf('Auto-step %d/%d: moved %.2f μm (direction %d)\n', obj.CurrentStep, obj.TotalSteps, actualStep, obj.AutoDirection);

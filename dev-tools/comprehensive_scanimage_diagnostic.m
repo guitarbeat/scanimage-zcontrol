@@ -1,22 +1,24 @@
-% diagnose_scanimage_data.m
-% Comprehensive diagnostic tool for ScanImage data access and integration
+% comprehensive_scanimage_diagnostic.m
+% Combined comprehensive diagnostic tool for ScanImage data access and object exploration
 
-function diagnose_scanimage_data(varargin)
-    % diagnose_scanimage_data  Run comprehensive diagnostics on ScanImage data access.
+function comprehensive_scanimage_diagnostic(varargin)
+    % comprehensive_scanimage_diagnostic  Run comprehensive diagnostics on ScanImage data access.
     %
-    % This tool helps you understand:
+    % This tool combines detailed diagnostics with object exploration to help you understand:
     %   - Current ScanImage status and configuration
     %   - Available data access methods and their reliability
     %   - Pixel data quality and focus metrics
+    %   - Complete object structure exploration
     %   - Integration code for your specific setup
     %
     % USAGE:
-    %   diagnose_scanimage_data()                   % Run standard diagnostics
-    %   diagnose_scanimage_data('Save',true)        % Save report to timestamped file
-    %   diagnose_scanimage_data('Verbose',true)     % Show detailed technical information
-    %   diagnose_scanimage_data('TestFocus',false)  % Skip focus quality metrics
-    %   diagnose_scanimage_data('ShowExamples',true)% Show code examples for each method
-    %   diagnose_scanimage_data('DetectNoise',false)% Disable noise floor detection
+    %   comprehensive_scanimage_diagnostic()                   % Run standard diagnostics
+    %   comprehensive_scanimage_diagnostic('Save',true)        % Save report to timestamped file
+    %   comprehensive_scanimage_diagnostic('Verbose',true)     % Show detailed technical information
+    %   comprehensive_scanimage_diagnostic('TestFocus',false)  % Skip focus quality metrics
+    %   comprehensive_scanimage_diagnostic('ShowExamples',true)% Show code examples for each method
+    %   comprehensive_scanimage_diagnostic('DetectNoise',false)% Disable noise floor detection
+    %   comprehensive_scanimage_diagnostic('ExploreDepth',3)   % Set object exploration depth
     %
     % OPTIONS:
     %   'Save'         - Save report to file (default: false)
@@ -24,10 +26,12 @@ function diagnose_scanimage_data(varargin)
     %   'TestFocus'    - Calculate focus quality metrics (default: true)
     %   'ShowExamples' - Display code examples for data access (default: true)
     %   'DetectNoise'  - Look for noise even when signal is off (default: true)
+    %   'ExploreDepth' - Depth for object structure exploration (default: 2)
     %
     % OUTPUT:
     %   The diagnostic will analyze your ScanImage setup and provide:
     %   - Status report with actionable recommendations
+    %   - Complete object structure exploration
     %   - Working code snippets for pixel data access
     %   - Focus quality metrics (if acquiring)
     %   - Troubleshooting guidance for common issues
@@ -39,13 +43,14 @@ function diagnose_scanimage_data(varargin)
     addParameter(p,'TestFocus',true,@islogical);
     addParameter(p,'ShowExamples',true,@islogical);
     addParameter(p,'DetectNoise',true,@islogical);
+    addParameter(p,'ExploreDepth',2,@(x) isnumeric(x) && x >= 1 && x <= 5);
     parse(p,varargin{:});
     opts = p.Results;
 
     % Set up output
     if opts.Save
         ts = datestr(now,'yyyymmdd_HHMMSS');
-        fname = sprintf('scanimage_diagnostic_%s.txt',ts);
+        fname = sprintf('comprehensive_scanimage_diagnostic_%s.txt',ts);
         fid = fopen(fname,'w');
         out = @(varargin) fprintf(fid,varargin{:});
         colorOut = @(color,varargin) fprintf(fid,varargin{:}); % No colors in file
@@ -69,6 +74,9 @@ function diagnose_scanimage_data(varargin)
         end
         return;
     end
+
+    % Object structure exploration
+    exploreObjectStructures(out, colorOut, opts.ExploreDepth);
 
     % Display component analysis
     dispInfo = diagnoseDisplayComponent(hSI, opts.Verbose);
@@ -107,19 +115,122 @@ function diagnose_scanimage_data(varargin)
     end
 end
 
+%% Object Structure Exploration
+function exploreObjectStructures(out, colorOut, maxDepth)
+    out('\n┌─────────────────────────────────────────────────────────────┐\n');
+    out('│ SCANIMAGE OBJECT STRUCTURE EXPLORATION                     │\n');
+    out('└─────────────────────────────────────────────────────────────┘\n\n');
+    
+    % Investigate hSI
+    out('--- Investigating hSI Structure ---\n');
+    try
+        hSI = evalin('base', 'hSI');
+        colorOut('green', '✅ hSI found in base workspace\n\n');
+        exploreObject(hSI, 'hSI', 0, maxDepth, out);
+    catch ME
+        colorOut('red', '❌ hSI not found in base workspace\n');
+        out('Error: %s\n', ME.message);
+    end
+
+    out('\n--- Investigating hSICtl Structure ---\n');
+    try
+        hSICtl = evalin('base', 'hSICtl');
+        colorOut('green', '✅ hSICtl found in base workspace\n\n');
+        exploreObject(hSICtl, 'hSICtl', 0, maxDepth, out);
+    catch ME
+        colorOut('yellow', '⚠️  hSICtl not found in base workspace\n');
+        out('Note: This is normal if using newer ScanImage versions\n');
+        out('Error: %s\n', ME.message);
+    end
+    
+    out('\n');
+end
+
+function exploreObject(obj, name, depth, maxDepth, out)
+    if depth > maxDepth
+        return;
+    end
+    
+    indent = repmat('  ', 1, depth);
+    
+    if isobject(obj) || isstruct(obj)
+        try
+            if isobject(obj)
+                props = properties(obj);
+            else
+                props = fieldnames(obj);
+            end
+            
+            % Sort properties for better readability
+            props = sort(props);
+            
+            for i = 1:length(props)
+                prop = props{i};
+                try
+                    val = obj.(prop);
+                    sz = size(val);
+                    
+                    if isobject(val) || isstruct(val)
+                        out('%s%s.%s: [%s] %s\n', indent, name, prop, class(val), mat2str(sz));
+                        if depth < maxDepth
+                            exploreObject(val, [name '.' prop], depth+1, maxDepth, out);
+                        end
+                    elseif isnumeric(val) || islogical(val)
+                        if numel(val) <= 10 && ~isempty(val)
+                            if isscalar(val)
+                                out('%s%s.%s: [%s] = %s\n', indent, name, prop, class(val), num2str(val));
+                            else
+                                out('%s%s.%s: [%s] %s = %s\n', indent, name, prop, class(val), mat2str(sz), mat2str(val));
+                            end
+                        else
+                            out('%s%s.%s: [%s] %s\n', indent, name, prop, class(val), mat2str(sz));
+                        end
+                    elseif ischar(val) || isstring(val)
+                        valStr = char(val);
+                        if length(valStr) > 50
+                            valStr = [valStr(1:47) '...'];
+                        end
+                        out('%s%s.%s: "%s"\n', indent, name, prop, valStr);
+                    elseif iscell(val)
+                        out('%s%s.%s: cell [%s]\n', indent, name, prop, mat2str(sz));
+                        if depth < maxDepth && numel(val) <= 5 && ~isempty(val)
+                            for j = 1:numel(val)
+                                if ~isempty(val{j})
+                                    exploreObject(val{j}, sprintf('%s.%s{%d}', name, prop, j), depth+1, maxDepth, out);
+                                end
+                            end
+                        end
+                    elseif isa(val, 'function_handle')
+                        out('%s%s.%s: @%s\n', indent, name, prop, func2str(val));
+                    else
+                        out('%s%s.%s: [%s] %s\n', indent, name, prop, class(val), mat2str(sz));
+                    end
+                catch ME
+                    out('%s%s.%s: <error accessing: %s>\n', indent, name, prop, ME.message);
+                end
+            end
+        catch ME
+            out('%s%s: <error getting properties: %s>\n', indent, name, ME.message);
+        end
+    else
+        out('%s%s: [%s] %s\n', indent, name, class(obj), mat2str(size(obj)));
+    end
+end
+
 %% Output Functions
 function printHeader(out)
     out('\n');
     out('╔══════════════════════════════════════════════════════════════╗\n');
-    out('║           ScanImage Data Access Diagnostic Report            ║\n');
+    out('║        Comprehensive ScanImage Diagnostic Report            ║\n');
     out('║                  Generated: %-28s  ║\n', datestr(now));
     out('╚══════════════════════════════════════════════════════════════╝\n\n');
 end
 
 function printIntroduction(out, opts)
-    out('WHAT THIS DIAGNOSTIC DOES:\n');
-    out('─────────────────────────\n');
+    out('WHAT THIS COMPREHENSIVE DIAGNOSTIC DOES:\n');
+    out('───────────────────────────────────────\n');
     out('• Verifies ScanImage is running and accessible\n');
+    out('• Explores complete object structure (hSI, hSICtl)\n');
     out('• Tests multiple methods to extract pixel data\n');
     out('• Analyzes data quality and focus metrics\n');
     out('• Provides working code for your specific setup\n');
@@ -130,6 +241,7 @@ function printIntroduction(out, opts)
     out('• Focus testing: %s\n', ternary(opts.TestFocus,'ON','OFF'));
     out('• Code examples: %s\n', ternary(opts.ShowExamples,'ON','OFF'));
     out('• Noise detection: %s\n', ternary(opts.DetectNoise,'ON','OFF'));
+    out('• Exploration depth: %d levels\n', opts.ExploreDepth);
     out('\n');
 end
 
@@ -490,7 +602,7 @@ function recs = generateRecommendations(stat, dispInfo, dataRes, pixAnalysis)
                            
         % Add special recommendation for noise detection
         recs{end+1} = struct('text','ℹ️  To check even for noise floor, run with option:',...
-                           'action','diagnose_scanimage_data(''DetectNoise'',true)');
+                           'action','comprehensive_scanimage_diagnostic(''DetectNoise'',true)');
     end
     
     % Focus quality
@@ -562,7 +674,7 @@ end
 
 function closeFile(fid, fname)
     fclose(fid);
-    fprintf('\n📄 Diagnostic report saved to: %s\n', fname);
+    fprintf('\n📄 Comprehensive diagnostic report saved to: %s\n', fname);
     fprintf('   Open with: edit(''%s'')\n\n', fname);
 end
 

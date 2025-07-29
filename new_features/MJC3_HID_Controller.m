@@ -60,8 +60,8 @@ classdef MJC3_HID_Controller < handle
 
             % Configure a fixed‑rate timer to poll the HID reports
             obj.timerObj = timer('ExecutionMode', 'fixedRate', ...
-                                 'Period', 0.05, ...        % Poll at 20 Hz
-                                 'TimerFcn', @(~,~)obj.poll());
+                'Period', 0.05, ...        % Poll at 20 Hz
+                'TimerFcn', @(~,~)obj.poll());
         end
 
         function start(obj)
@@ -108,8 +108,8 @@ classdef MJC3_HID_Controller < handle
                     return;
                 end
                 % Cast to signed ints; data is uint8
-                xVal = typecast(uint8(data(1)), 'int8'); %#ok<NASGU> 
-                yVal = typecast(uint8(data(2)), 'int8'); %#ok<NASGU> 
+                xVal = typecast(uint8(data(1)), 'int8'); %#ok<NASGU>
+                yVal = typecast(uint8(data(2)), 'int8'); %#ok<NASGU>
                 zVal = typecast(uint8(data(3)), 'int8');
                 button = data(4); %#ok<NASGU>
                 speed = double(data(5)) / 255; % normalize [0,1]
@@ -120,12 +120,12 @@ classdef MJC3_HID_Controller < handle
                     try
                         obj.ctrl.relativeMove(dz);
                     catch ME
-                        warning('Failed to invoke relativeMove: %s', ME.message);
+                        warning(ME.identifier, 'Failed to invoke relativeMove: %s', ME.message);
                         obj.stop();
                     end
                 end
             catch ME
-                warning('Error reading MJC3 HID device: %s', ME.message);
+                warning(ME.identifier, 'Error reading MJC3 HID device: %s', ME.message);
                 obj.stop();
             end
         end

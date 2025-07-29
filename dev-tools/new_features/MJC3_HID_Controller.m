@@ -4,8 +4,8 @@ classdef MJC3_HID_Controller < handle
     %
     % This class uses Psychtoolbox's PsychHID functions to access the
     % MJC3 joystick directly.  The joystick is identified by its
-    % Vendor ID (0x1313) and Product ID (0x9000)【490547707256661†L14-L18】.  Each HID
-    % report from the joystick contains five bytes【754721178379980†L263-L307】:
+    % Vendor ID (0x1313) and Product ID (0x9000). Each HID
+    % report from the joystick contains five bytes:
     %   Byte 0 – x axis or rotary encoder (int8)
     %   Byte 1 – y axis (int8)
     %   Byte 2 – z axis (int8)
@@ -14,17 +14,25 @@ classdef MJC3_HID_Controller < handle
     %
     % The class polls the joystick at a fixed rate and maps the z axis
     % value and speed knob to a relative Z move in micrometres.  It
-    % invokes the ``relativeMove`` method on the provided Z‑control
-    % object.  You can supply your own controller object as long as it
-    % exposes a ``relativeMove(dz)`` method; for example, an instance of
-    % SI_MotorGUI_ZControl or a similar class from this repository.
+    % creates a ScanImage-compatible Z-control object that interfaces
+    % with hSI.hMotors for motor movement.
+    %
+    % USAGE:
+    %   % Create with ScanImage handle (auto-detects hSI.hMotors)
+    %   controller = MJC3_HID_Controller(hSI, stepFactor);
+    %   controller.start();
+    %
+    %   % Create with custom Z-control object
+    %   zCtrl = ScanImageZController(hSI.hMotors);
+    %   controller = MJC3_HID_Controller(zCtrl, stepFactor);
 
     properties
-        ctrl      % Handle to the ScanImage Z‑controller (must implement relativeMove)
+        ctrl      % Handle to the ScanImage Z‑controller (ScanImageZController or hSI)
         device    % PsychHID device handle
         timerObj  % MATLAB timer object used for polling
         stepFactor  % Micrometres moved per unit of joystick deflection
         running     % Logical flag indicating whether polling is active
+        zController % Internal Z-controller object
     end
 
     methods
@@ -33,19 +41,25 @@ classdef MJC3_HID_Controller < handle
             %
             % obj = MJC3_HID_Controller(ctrl, stepFactor)
             %
-            % ``ctrl`` is the object responsible for moving the Z stage.
+            % ``ctrl`` can be:
+            %   - ScanImage handle (hSI) - will auto-create ScanImageZController
+            %   - Custom Z-controller object with relativeMove(dz) method
             % ``stepFactor`` (optional) scales joystick values into
-            % micrometres; the default is 5 µm per unit.
+            % micrometres; the default is 5 µm per unit.
 
             if nargin < 1
-                error('You must provide a Z‑control object that implements relativeMove(dz)');
+                error('You must provide a ScanImage handle (hSI) or Z‑control object');
             end
             if nargin < 2
                 stepFactor = 5; % default micrometres per unit of zVal
             end
+            
             obj.ctrl = ctrl;
             obj.stepFactor = stepFactor;
             obj.running = false;
+            
+            % Create appropriate Z-controller based on input type
+            obj.createZController();
 
             % Identify the MJC3 HID device
             devs = PsychHID('Devices');
@@ -60,7 +74,7 @@ classdef MJC3_HID_Controller < handle
 
             % Configure a fixed‑rate timer to poll the HID reports
             obj.timerObj = timer('ExecutionMode', 'fixedRate', ...
-                'Period', 0.05, ...        % Poll at 20 Hz
+                'Period', 0.05, ...        % Poll at 20 Hz
                 'TimerFcn', @(~,~)obj.poll());
         end
 
@@ -69,6 +83,7 @@ classdef MJC3_HID_Controller < handle
             if ~obj.running
                 obj.running = true;
                 start(obj.timerObj);
+                fprintf('MJC3 HID Controller started (Step factor: %.1f μm/unit)\n', obj.stepFactor);
             end
         end
 
@@ -77,6 +92,7 @@ classdef MJC3_HID_Controller < handle
             if obj.running
                 obj.running = false;
                 stop(obj.timerObj);
+                fprintf('MJC3 HID Controller stopped\n');
             end
         end
 
@@ -116,17 +132,60 @@ classdef MJC3_HID_Controller < handle
 
                 % Compute movement in micrometres.  Positive zVal = clockwise
                 dz = double(zVal) * obj.stepFactor * speed;
-                if dz ~= 0
+                if abs(dz) > 0.01  % Minimum movement threshold
                     try
-                        obj.ctrl.relativeMove(dz);
+                        obj.zController.relativeMove(dz);
                     catch ME
-                        warning(ME.identifier, 'Failed to invoke relativeMove: %s', ME.message);
+                        warning(ME.identifier, 'Failed to move Z-axis: %s', ME.message);
                         obj.stop();
                     end
                 end
             catch ME
                 warning(ME.identifier, 'Error reading MJC3 HID device: %s', ME.message);
                 obj.stop();
+            end
+        end
+        
+        function setStepFactor(obj, newStepFactor)
+            % Update the step factor for joystick sensitivity
+            if newStepFactor > 0
+                obj.stepFactor = newStepFactor;
+                fprintf('MJC3 step factor updated to %.1f μm/unit\n', newStepFactor);
+            else
+                warning('Step factor must be positive');
+            end
+        end
+    end
+    
+    methods (Access = private)
+        function createZController(obj)
+            % Create appropriate Z-controller based on input type
+            try
+                % Check if input is a ScanImage handle
+                if isa(obj.ctrl, 'scanimage.SI') || (isobject(obj.ctrl) && isprop(obj.ctrl, 'hMotors'))
+                    % Create ScanImage Z-controller
+                    obj.zController = ScanImageZController(obj.ctrl.hMotors);
+                    fprintf('Created ScanImage Z-controller using hSI.hMotors\n');
+                elseif isobject(obj.ctrl) && ismethod(obj.ctrl, 'relativeMove')
+                    % Use provided Z-controller directly
+                    obj.zController = obj.ctrl;
+                    fprintf('Using provided Z-controller object\n');
+                else
+                    % Try to access hSI from base workspace
+                    try
+                        hSI = evalin('base', 'hSI');
+                        if ~isempty(hSI) && isprop(hSI, 'hMotors')
+                            obj.zController = ScanImageZController(hSI.hMotors);
+                            fprintf('Created ScanImage Z-controller using hSI from base workspace\n');
+                        else
+                            error('Invalid ScanImage handle');
+                        end
+                    catch
+                        error('Could not create Z-controller. Provide hSI handle or custom Z-controller with relativeMove method');
+                    end
+                end
+            catch ME
+                error('Failed to create Z-controller: %s', ME.message);
             end
         end
     end

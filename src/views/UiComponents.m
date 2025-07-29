@@ -152,19 +152,26 @@ classdef UiComponents
 
         function adjustFontSizes(components, windowSize)
             % Scales font sizes of UI components based on window size for responsiveness.
+            % Respects system font scaling preferences by using relative scaling only.
             if nargin < 2 || isempty(windowSize)
                 return;
             end
 
-            % Calculate responsive scaling factor
+            % Calculate responsive scaling factor with gentler limits
             widthScale = windowSize(3) / UiComponents.MIN_WINDOW_WIDTH;
             heightScale = windowSize(4) / UiComponents.MIN_WINDOW_HEIGHT;
-            overallScale = min(max(sqrt(widthScale * heightScale), 0.6), 2.0);
+            overallScale = min(max(sqrt(widthScale * heightScale), 0.8), 1.5);
 
-            % Scale position display with unified constant
+            % Scale position display with unified constant, preserving system scaling
             if isfield(components, 'PositionDisplay') && isfield(components.PositionDisplay, 'Label')
-                newFontSize = max(round(UiComponents.POSITION_DISPLAY_FONT_SIZE * overallScale), 16);
-                newFontSize = min(newFontSize, 48);
+                % Get current font size to respect any system scaling already applied
+                currentSize = components.PositionDisplay.Label.FontSize;
+                if currentSize == 0 || isempty(currentSize)
+                    currentSize = UiComponents.POSITION_DISPLAY_FONT_SIZE;
+                end
+                
+                % Apply relative scaling without hard limits
+                newFontSize = round(currentSize * overallScale);
                 components.PositionDisplay.Label.FontSize = newFontSize;
             end
 
@@ -178,20 +185,23 @@ classdef UiComponents
         end
 
         function adjustControlFonts(controlStruct, scale)
-            % Applies uniform font scaling to all controls using the standard control font size.
+            % Applies uniform font scaling to all controls, preserving system font scaling.
             if ~isstruct(controlStruct) || scale == 1.0
                 return;
             end
-
-            % Calculate scaled font size once for all controls
-            scaledFontSize = max(round(UiComponents.CONTROL_FONT_SIZE * scale), 7);
-            scaledFontSize = min(scaledFontSize, 16);
 
             fields = fieldnames(controlStruct);
             for i = 1:length(fields)
                 obj = controlStruct.(fields{i});
                 if isa(obj, 'handle') && ~isempty(obj) && isvalid(obj) && isprop(obj, 'FontSize')
-                    obj.FontSize = scaledFontSize;
+                    % Get current font size to respect system scaling
+                    currentSize = obj.FontSize;
+                    if currentSize == 0 || isempty(currentSize)
+                        currentSize = UiComponents.CONTROL_FONT_SIZE;
+                    end
+                    
+                    % Apply relative scaling without hard limits
+                    obj.FontSize = round(currentSize * scale);
                 elseif isstruct(obj)
                     UiComponents.adjustControlFonts(obj, scale);
                 end
@@ -437,6 +447,7 @@ classdef UiComponents
 
         function styleDirectionButton(button, text, backgroundColor)
             % Helper method to apply consistent styling to direction-related buttons
+            % Preserves existing font size to respect system scaling
             if ~isvalid(button)
                 return;
             end
@@ -444,7 +455,10 @@ classdef UiComponents
             button.Text = text;
             button.BackgroundColor = backgroundColor;
             button.FontColor = UiComponents.COLORS.White;
-            button.FontSize = 10;
+            % Only set font size if it hasn't been set (preserves responsive scaling)
+            if button.FontSize == 0 || isempty(button.FontSize)
+                button.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            end
             button.FontWeight = 'bold';
         end
 

@@ -102,17 +102,16 @@ end
 results = createResultsStruct(unusedFunctions, suspiciousFunctions, protectedFunctions, ...
     allFunctions, allCalls, classInfo, fileStats, analysisStats, config);
 
-% Export results in requested format
-if ~strcmp(config.export, 'none')
-    exportResults(results, config.export, config.verbose);
-end
+% Export results to output folder
+outputFile = fullfile('dev-tools', 'output', sprintf('dead_code_analysis_%s.txt', datestr(now, 'yyyymmdd_HHMMSS')));
+exportResultsToFile(results, outputFile, config.verbose);
 
 if config.verbose
     fprintf('✅ Enhanced dead code analysis complete!\n');
-    fprintf('   📊 Results exported as: %s\n', config.export);
+    fprintf('   📄 Results saved to: %s\n', outputFile);
     fprintf('   🎯 Code health score: %.1f%%\n', results.summary.codeHealthScore);
 else
-    fprintf('Enhanced dead code analysis complete. See output files for details.\n');
+    fprintf('Dead code analysis complete. Results saved to: %s\n', outputFile);
 end
 
 % Return results if requested
@@ -550,6 +549,25 @@ end
 
 
 
+function generateEnhancedDeadCodeReportToFile(unusedFunctions, suspiciousFunctions, protectedFunctions, allFunctions, allCalls, classInfo, fileStats, outputFile)
+% Generate enhanced report with detailed analysis and actionable insights to specified file
+
+fid = fopen(outputFile, 'w');
+
+if fid == -1
+    error('Could not create report file: %s', outputFile);
+end
+
+try
+    writeReportContent(fid, unusedFunctions, suspiciousFunctions, protectedFunctions, allFunctions, allCalls, classInfo, fileStats);
+catch ME
+    fclose(fid);
+    rethrow(ME);
+end
+
+fclose(fid);
+end
+
 function generateEnhancedDeadCodeReport(unusedFunctions, suspiciousFunctions, protectedFunctions, allFunctions, allCalls, classInfo, ~)
 % Generate enhanced report with detailed analysis and actionable insights
 
@@ -773,6 +791,113 @@ end
 fclose(fid);
 end
 
+function writeReportContent(fid, unusedFunctions, suspiciousFunctions, protectedFunctions, allFunctions, allCalls, classInfo, fileStats)
+% Write the complete report content to file handle
+    fprintf(fid, 'ENHANCED DEAD CODE ANALYSIS REPORT\n');
+    fprintf(fid, '==================================\n');
+    fprintf(fid, 'Generated: %s\n\n', char(datetime('now')));
+
+    fprintf(fid, 'ANALYSIS SUMMARY\n');
+    fprintf(fid, '----------------\n');
+    fprintf(fid, 'Total functions defined: %d\n', length(keys(allFunctions)));
+    fprintf(fid, 'Total unique function calls: %d\n', length(keys(allCalls)));
+    fprintf(fid, 'Classes detected: %d\n', length(keys(classInfo)));
+    fprintf(fid, 'Protected functions: %d\n', length(protectedFunctions));
+    fprintf(fid, 'Suspicious functions: %d\n', length(suspiciousFunctions));
+    fprintf(fid, 'Potentially unused functions: %d\n', length(unusedFunctions));
+
+    % Calculate code health metrics
+    totalFunctions = length(keys(allFunctions));
+    unusedCount = length(unusedFunctions);
+    codeHealthScore = round((1 - unusedCount/totalFunctions) * 100);
+    fprintf(fid, 'Code health score: %d%% (%d/%d functions actively used)\n\n', ...
+        codeHealthScore, totalFunctions - unusedCount, totalFunctions);
+
+    % Report unused functions with enhanced details
+    if ~isempty(unusedFunctions)
+        fprintf(fid, 'POTENTIALLY UNUSED FUNCTIONS\n');
+        fprintf(fid, '----------------------------\n');
+        fprintf(fid, 'These functions are defined but no calls were detected:\n\n');
+
+        for i = 1:length(unusedFunctions)
+            if isstruct(unusedFunctions{i})
+                funcName = unusedFunctions{i}.name;
+            else
+                funcName = unusedFunctions{i};
+            end
+            funcDefs = allFunctions(funcName);
+            fprintf(fid, '• %s\n', funcName);
+            for j = 1:length(funcDefs)
+                funcDef = funcDefs{j};
+                fprintf(fid, '  └─ %s (line %d, %s', funcDef.file, funcDef.line, funcDef.type);
+                if ~isempty(funcDef.class)
+                    fprintf(fid, ' in class %s', funcDef.class);
+                end
+                fprintf(fid, ')\n');
+            end
+            fprintf(fid, '\n');
+        end
+    else
+        fprintf(fid, 'POTENTIALLY UNUSED FUNCTIONS\n');
+        fprintf(fid, '----------------------------\n');
+        fprintf(fid, 'No unused functions detected! 🎉\n\n');
+    end
+
+    % Report suspicious functions
+    if ~isempty(suspiciousFunctions)
+        fprintf(fid, 'SUSPICIOUS FUNCTIONS (Review Recommended)\n');
+        fprintf(fid, '-----------------------------------------\n');
+        fprintf(fid, 'These functions may be used dynamically or as callbacks:\n\n');
+
+        for i = 1:length(suspiciousFunctions)
+            suspFunc = suspiciousFunctions{i};
+            if isstruct(suspFunc)
+                funcName = suspFunc.name;
+                reason = suspFunc.reason;
+            else
+                funcName = suspFunc;
+                reason = 'Requires manual review';
+            end
+            funcDefs = allFunctions(funcName);
+            fprintf(fid, '• %s (%s)\n', funcName, reason);
+            for j = 1:length(funcDefs)
+                funcDef = funcDefs{j};
+                fprintf(fid, '  └─ %s (line %d)\n', funcDef.file, funcDef.line);
+            end
+            fprintf(fid, '\n');
+        end
+    end
+
+    % Report protected functions
+    if ~isempty(protectedFunctions)
+        fprintf(fid, 'PROTECTED FUNCTIONS (Safe from Removal)\n');
+        fprintf(fid, '---------------------------------------\n');
+        fprintf(fid, 'These functions are automatically protected:\n\n');
+
+        for i = 1:length(protectedFunctions)
+            protFunc = protectedFunctions{i};
+            if isstruct(protFunc)
+                funcName = protFunc.name;
+                reason = protFunc.reason;
+            else
+                funcName = protFunc;
+                reason = 'System function';
+            end
+            fprintf(fid, '• %s (%s)\n', funcName, reason);
+        end
+        fprintf(fid, '\n');
+    end
+
+    fprintf(fid, 'RECOMMENDATIONS\n');
+    fprintf(fid, '---------------\n');
+    fprintf(fid, '1. Review potentially unused functions before removal\n');
+    fprintf(fid, '2. Search for dynamic calls (feval, str2func) for suspicious functions\n');
+    fprintf(fid, '3. Test thoroughly after removing any functions\n');
+    fprintf(fid, '4. Consider code coverage tools for verification\n\n');
+
+    fprintf(fid, 'Generated by analyze_dead_code.m\n');
+end
+
 function [sortedFunctions, fileGroups] = sortFunctionsByFile(unusedFunctions, allFunctions)
 % Sort unused functions by file for better organization
 fileGroups = containers.Map();
@@ -896,20 +1021,28 @@ results.rawData.calls = allCalls;
 results.rawData.classes = classInfo;
 end
 
-function exportResults(results, format, verbose)
-% Export results in specified format
-timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd_HH-mm-ss'));
+function exportResultsToFile(results, outputFile, verbose)
+% Export results to specified text file with enhanced content
 
-switch format
-    case 'txt'
-        filename = sprintf('dead_code_report_%s.txt', timestamp);
-        exportToText(results, filename, verbose);
-    case 'json'
-        filename = sprintf('dead_code_analysis_%s.json', timestamp);
-        exportToJson(results, filename, verbose);
-    case 'csv'
-        filename = sprintf('dead_code_summary_%s.csv', timestamp);
-        exportToCsv(results, filename, verbose);
+try
+    % Ensure output directory exists
+    outputDir = fileparts(outputFile);
+    if ~exist(outputDir, 'dir')
+        mkdir(outputDir);
+    end
+    
+    % Generate the report to file
+    generateEnhancedDeadCodeReportToFile(results.unused, results.suspicious, results.protected, ...
+        results.rawData.functions, results.rawData.calls, results.rawData.classes, results.fileStats, outputFile);
+    
+    if verbose
+        fprintf('   📁 Output directory: %s\n', outputDir);
+    end
+catch ME
+    fprintf('❌ Error writing to file: %s\n', ME.message);
+    fprintf('   Falling back to console output...\n');
+    generateEnhancedDeadCodeReport(results.unused, results.suspicious, results.protected, ...
+        results.rawData.functions, results.rawData.calls, results.rawData.classes, results.fileStats);
 end
 end
 

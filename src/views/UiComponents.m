@@ -70,7 +70,7 @@ classdef UiComponents
         % Main layout
         MAIN_PADDING = [1 1 1 1];
         MAIN_ROW_SPACING = 1;
-        MAIN_ROW_HEIGHTS = {'fit', 'fit', 'fit', 'fit', 'fit'};
+        MAIN_ROW_HEIGHTS = {'fit', 'fit', 'fit', 'fit', 'fit', 'fit'};
 
         % Status bar
         STATUS_BAR_COLUMN_WIDTHS = {'1x', 40, 40, 40, 40, 40};

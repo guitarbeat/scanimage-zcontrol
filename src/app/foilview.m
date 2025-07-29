@@ -13,6 +13,7 @@ classdef foilview < matlab.apps.AppBase
         ManualControls
         AutoControls
         StatusControls
+        HIDControls
         MetricsPlotControls
     end
     

@@ -64,6 +64,9 @@ classdef UiBuilder
             % Create status and utility components
             components.StatusControls = UiBuilder.createStatusBar(components.MainLayout);
 
+            % Create MJC3 HID Controller section
+            components.HIDControls = UiBuilder.createHIDControlsSection(components.MainLayout);
+
             % Create plot area
             components.MetricsPlotControls = UiBuilder.createMetricsPlotArea(components.UIFigure);
 
@@ -105,8 +108,8 @@ classdef UiBuilder
         end
 
         function mainLayout = createMainLayout(mainPanel)
-            % Creates the main grid layout with 5 rows for all components.
-            mainLayout = uigridlayout(mainPanel, [5, 1]);
+            % Creates the main grid layout with 6 rows for all components (added HID controls).
+            mainLayout = uigridlayout(mainPanel, [6, 1]);
             mainLayout.RowHeight = UiComponents.MAIN_ROW_HEIGHTS;
             mainLayout.ColumnWidth = {'1x'};
             mainLayout.Padding = UiComponents.MAIN_PADDING;
@@ -213,6 +216,67 @@ classdef UiBuilder
             % Create a dummy ShowPlotButton for compatibility - it will be overridden by MetricDisplay
             statusControls.ShowPlotButton = UiBuilder.createShowPlotButton(toolsGrid);
             statusControls.ShowPlotButton.Visible = 'off';
+        end
+
+        function hidControls = createHIDControlsSection(mainLayout)
+            % Creates the MJC3 HID Controller section for joystick control
+            hidCard = UiBuilder.createCard(mainLayout, 5, '🕹️ MJC3 Joystick Control', UiComponents.CONTROL_FONT_SIZE);
+            
+            hidGrid = uigridlayout(hidCard, [1, 4]);
+            hidGrid.ColumnWidth = {'fit', 'fit', '1x', 'fit'};
+            hidGrid.Padding = UiComponents.STANDARD_PADDING;
+            hidGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
+            
+            hidControls = struct();
+            
+            % Enable/Disable toggle
+            hidControls.EnableButton = UiBuilder.createStyledButton(hidGrid, 'success', '▶ Enable', 'Enable/Disable MJC3 joystick control', [1, 1]);
+            
+            % Status indicator
+            hidControls.StatusLabel = uilabel(hidGrid);
+            hidControls.StatusLabel.Text = '⚪ Disconnected';
+            hidControls.StatusLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            hidControls.StatusLabel.FontWeight = 'bold';
+            hidControls.StatusLabel.FontColor = UiComponents.COLORS.TextMuted;
+            hidControls.StatusLabel.Layout.Row = 1;
+            hidControls.StatusLabel.Layout.Column = 2;
+            
+            % Step factor control
+            stepFactorPanel = uipanel(hidGrid);
+            stepFactorPanel.Layout.Row = 1;
+            stepFactorPanel.Layout.Column = 3;
+            stepFactorPanel.BorderType = 'line';
+            stepFactorPanel.BackgroundColor = UiComponents.COLORS.Light;
+            
+            stepFactorGrid = uigridlayout(stepFactorPanel, [1, 3]);
+            stepFactorGrid.ColumnWidth = {'fit', 'fit', 'fit'};
+            stepFactorGrid.Padding = UiComponents.TIGHT_PADDING;
+            stepFactorGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
+            
+            stepFactorLabel = uilabel(stepFactorGrid);
+            stepFactorLabel.Text = 'Step Factor:';
+            stepFactorLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            stepFactorLabel.FontWeight = 'bold';
+            
+            hidControls.StepFactorField = uieditfield(stepFactorGrid, 'numeric');
+            hidControls.StepFactorField.Value = 5; % Default 5 μm per unit
+            hidControls.StepFactorField.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            hidControls.StepFactorField.Limits = [0.1 100];
+            hidControls.StepFactorField.Tooltip = 'Micrometers moved per unit of joystick deflection (0.1-100)';
+            
+            stepFactorUnits = uilabel(stepFactorGrid);
+            stepFactorUnits.Text = 'μm/unit';
+            stepFactorUnits.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            stepFactorUnits.FontColor = UiComponents.COLORS.TextMuted;
+            
+            % Settings button
+            hidControls.SettingsButton = UiBuilder.createIconButton(hidGrid, '⚙', 'Configure MJC3 settings', 'info');
+            hidControls.SettingsButton.Layout.Row = 1;
+            hidControls.SettingsButton.Layout.Column = 4;
+            hidControls.SettingsButton.Text = 'Settings';
+            
+            % Store controller reference (will be set by the main controller)
+            hidControls.Controller = [];
         end
 
         function metricsPlotControls = createMetricsPlotArea(uiFigure)

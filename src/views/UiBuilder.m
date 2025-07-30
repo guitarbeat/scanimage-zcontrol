@@ -739,5 +739,26 @@ classdef UiBuilder
             fieldPanel.BorderType = 'line';
             fieldPanel.BackgroundColor = UiComponents.COLORS.Light;
         end
+        
+        function [fieldGrid, label] = createLabeledGrid(parent, row, labelText)
+            % Helper method to create a labeled grid layout
+            % This extracts the duplicated logic from createArrowField and createFieldBase
+            % parent: parent container
+            % row: grid row position
+            % labelText: text for the label
+            % Returns: [fieldGrid, label] - the grid and label components
+            
+            fieldGrid = uigridlayout(parent, [1, 2]);
+            fieldGrid.Layout.Row = row;
+            fieldGrid.Layout.Column = 1;
+            fieldGrid.ColumnWidth = UiComponents.FIT_EXPAND_COLUMNS;
+            fieldGrid.Padding = UiComponents.TIGHT_PADDING;
+            fieldGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
+
+            label = uilabel(fieldGrid);
+            label.Text = labelText;
+            label.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            label.FontWeight = 'bold';
+        end
     end
 end

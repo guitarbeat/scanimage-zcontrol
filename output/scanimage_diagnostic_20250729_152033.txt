@@ -1,7 +1,7 @@
 
 ╔══════════════════════════════════════════════════════════════╗
 ║        Comprehensive ScanImage Diagnostic Report            ║
-║                  Generated: 29-Jul-2025 14:16:20          ║
+║                  Generated: 29-Jul-2025 15:20:33          ║
 ╚══════════════════════════════════════════════════════════════╝
 
 WHAT THIS COMPREHENSIVE DIAGNOSTIC DOES:
@@ -329,14 +329,7 @@ hSI.hDisplay: [scanimage.components.Display] [1 1]
   hSI.hDisplay.lastFrameNumberAcquisition: [double] [0 0]
   hSI.hDisplay.lastFrameTimestamp: [double] [0 0]
   hSI.hDisplay.lineScanHistoryLength: [double] = 1000
-  hSI.hDisplay.mouseHoverInfo: [struct] [1 1]
-    hSI.hDisplay.mouseHoverInfo.channel: [double] = 1
-    hSI.hDisplay.mouseHoverInfo.cornerpoints: [double] [4 2] = [-10.125 -10.125;10.125 -10.125;10.125 10.125;-10.125 10.125]
-    hSI.hDisplay.mouseHoverInfo.hRoi: [scanimage.mroi.Roi] [1 1]
-    hSI.hDisplay.mouseHoverInfo.hScanfield: [scanimage.mroi.scanfield.fields.RotatedRectangle] [1 1]
-    hSI.hDisplay.mouseHoverInfo.pixel: [double] [1 2] = [11 417]
-    hSI.hDisplay.mouseHoverInfo.pixelToRefTransform: [double] [3 3] = [0.03955078125 0 -10.144775390625;0 0.03955078125 -10.144775390625;0 0 1]
-    hSI.hDisplay.mouseHoverInfo.z: [double] = -18379.225
+  hSI.hDisplay.mouseHoverInfo: [double] [0 0]
   hSI.hDisplay.name: "SI Display"
   hSI.hDisplay.renderer: "auto"
   hSI.hDisplay.reserverInfo: ""
@@ -409,7 +402,7 @@ hSI.hMotionManager: [scanimage.components.MotionManager] [1 1]
   hSI.hMotionManager.warnMsg: ""
   hSI.hMotionManager.zStackAlignmentFcn: @scanimage.components.motionEstimators.util.alignZRoiData
 hSI.hMotors: [scanimage.components.Motors] [1 1]
-  hSI.hMotors.axesPosition: [double] [1 3] = [0 0 0]
+  hSI.hMotors.axesPosition: [double] [1 3] = [0 -43.64 0]
   hSI.hMotors.azimuth: [double] = 0
   hSI.hMotors.elevation: [double] = 0
   hSI.hMotors.errorMsg: ""
@@ -428,7 +421,7 @@ hSI.hMotors: [scanimage.components.Motors] [1 1]
   hSI.hMotors.moveTimeout_s: [double] = 10
   hSI.hMotors.name: "SI Motors"
   hSI.hMotors.reserverInfo: ""
-  hSI.hMotors.samplePosition: [double] [1 3] = [0 -51 -18379.225]
+  hSI.hMotors.samplePosition: [double] [1 3] = [0 -94.64 -18379.225]
   hSI.hMotors.simulatedAxes: [logical] [1 3] = [false false false]
   hSI.hMotors.userDefinedPositions: [struct] [0 1]
     hSI.hMotors.userDefinedPositions.coords: <error accessing: Insufficient number of outputs from right hand side of equal sign to satisfy assignment.>
@@ -1481,7 +1474,7 @@ hSICtl.guiLayoutInfo: [struct] [1 1]
     hSICtl.guiLayoutInfo.AlignmentControls.Units: "characters"
     hSICtl.guiLayoutInfo.AlignmentControls.Visible: [matlab.lang.OnOffSwitchState] [1 1]
   hSICtl.guiLayoutInfo.BeamControls: [struct] [1 1]
-    hSICtl.guiLayoutInfo.BeamControls.Position: [double] [1 4] = [-747 141 715 299]
+    hSICtl.guiLayoutInfo.BeamControls.Position: [double] [1 4] = [-739 151 715 299]
     hSICtl.guiLayoutInfo.BeamControls.Toggle: [double] [0 0]
     hSICtl.guiLayoutInfo.BeamControls.Units: "pixels"
     hSICtl.guiLayoutInfo.BeamControls.Visible: [matlab.lang.OnOffSwitchState] [1 1]
@@ -1536,7 +1529,7 @@ hSICtl.guiLayoutInfo: [struct] [1 1]
     hSICtl.guiLayoutInfo.channel_merge.Units: "pixels"
     hSICtl.guiLayoutInfo.channel_merge.Visible: [matlab.lang.OnOffSwitchState] [1 1]
   hSICtl.guiLayoutInfo.configControlsV4: [struct] [1 1]
-    hSICtl.guiLayoutInfo.configControlsV4.Position: [double] [1 4] = [-148.8 37.5384615384615 127 14.6923076923077]
+    hSICtl.guiLayoutInfo.configControlsV4.Position: [double] [1 4] = [-148.8 37.5384615384615 66.2 14.6923076923077]
     hSICtl.guiLayoutInfo.configControlsV4.Toggle: [double] [0 0]
     hSICtl.guiLayoutInfo.configControlsV4.Units: "characters"
     hSICtl.guiLayoutInfo.configControlsV4.Visible: [matlab.lang.OnOffSwitchState] [1 1]
@@ -1641,7 +1634,7 @@ hSICtl.hAuxGUIs: [matlab.ui.Figure] [7 1]
   hSICtl.hAuxGUIs.CurrentAxes: [matlab.graphics.GraphicsPlaceholder] [0 0]
   hSICtl.hAuxGUIs.CurrentCharacter: ""
   hSICtl.hAuxGUIs.CurrentObject: [matlab.graphics.GraphicsPlaceholder] [0 0]
-  hSICtl.hAuxGUIs.CurrentPoint: [double] [1 2] = [11 100]
+  hSICtl.hAuxGUIs.CurrentPoint: [double] [1 2] = [0 0]
   hSICtl.hAuxGUIs.DeleteFcn: ""
   hSICtl.hAuxGUIs.DockControls: [matlab.lang.OnOffSwitchState] [1 1]
   hSICtl.hAuxGUIs.FileName: ""
@@ -1674,7 +1667,7 @@ hSICtl.hAuxGUIs: [matlab.ui.Figure] [7 1]
     hSICtl.hAuxGUIs.Parent.HandleVisibility: "on"
     hSICtl.hAuxGUIs.Parent.MonitorPositions: [double] [3 4]
     hSICtl.hAuxGUIs.Parent.Parent: [matlab.graphics.GraphicsPlaceholder] [0 0]
-    hSICtl.hAuxGUIs.Parent.PointerLocation: [double] [1 2] = [2526 338]
+    hSICtl.hAuxGUIs.Parent.PointerLocation: [double] [1 2] = [552 1005]
     hSICtl.hAuxGUIs.Parent.ScreenDepth: [double] = 32
     hSICtl.hAuxGUIs.Parent.ScreenPixelsPerInch: [double] = 96
     hSICtl.hAuxGUIs.Parent.ScreenSize: [double] [1 4] = [1 1 1920 1080]
@@ -2310,7 +2303,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.AlignmentControls.NextPlot: "add"
     hSICtl.hGUIs.AlignmentControls.Number: [double] = 68
     hSICtl.hGUIs.AlignmentControls.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.AlignmentControls.OuterPosition: [double] [1 4] = [122 26.3846153846154 76.2 18.4615384615385]
+    hSICtl.hGUIs.AlignmentControls.OuterPosition: [double] [1 4] = [121.2 26.0769230769231 77.8 18.8461538461538]
     hSICtl.hGUIs.AlignmentControls.PaperOrientation: "portrait"
     hSICtl.hGUIs.AlignmentControls.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.AlignmentControls.PaperPositionMode: "manual"
@@ -2364,7 +2357,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.BeamControls.GraphicsSmoothing: [matlab.lang.OnOffSwitchState] [1 1]
     hSICtl.hGUIs.BeamControls.HandleVisibility: "callback"
     hSICtl.hGUIs.BeamControls.Icon: ""
-    hSICtl.hGUIs.BeamControls.InnerPosition: [double] [1 4] = [-743 150 715 299]
+    hSICtl.hGUIs.BeamControls.InnerPosition: [double] [1 4] = [-739 151 715 299]
     hSICtl.hGUIs.BeamControls.IntegerHandle: [matlab.lang.OnOffSwitchState] [1 1]
     hSICtl.hGUIs.BeamControls.Interruptible: [matlab.lang.OnOffSwitchState] [1 1]
     hSICtl.hGUIs.BeamControls.InvertHardcopy: [matlab.lang.OnOffSwitchState] [1 1]
@@ -2375,7 +2368,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.BeamControls.NextPlot: "add"
     hSICtl.hGUIs.BeamControls.Number: [double] = 69
     hSICtl.hGUIs.BeamControls.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.BeamControls.OuterPosition: [double] [1 4] = [-751 142 731 338]
+    hSICtl.hGUIs.BeamControls.OuterPosition: [double] [1 4] = [-747 143 731 338]
     hSICtl.hGUIs.BeamControls.PaperOrientation: "portrait"
     hSICtl.hGUIs.BeamControls.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.BeamControls.PaperPositionMode: "manual"
@@ -2386,7 +2379,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.BeamControls.Pointer: "arrow"
     hSICtl.hGUIs.BeamControls.PointerShapeCData: [double] [16 16]
     hSICtl.hGUIs.BeamControls.PointerShapeHotSpot: [double] [1 2] = [1 1]
-    hSICtl.hGUIs.BeamControls.Position: [double] [1 4] = [-743 150 715 299]
+    hSICtl.hGUIs.BeamControls.Position: [double] [1 4] = [-739 151 715 299]
     hSICtl.hGUIs.BeamControls.Renderer: "opengl"
     hSICtl.hGUIs.BeamControls.RendererMode: "auto"
     hSICtl.hGUIs.BeamControls.Resize: [matlab.lang.OnOffSwitchState] [1 1]
@@ -2440,7 +2433,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.DataScope.NextPlot: "add"
     hSICtl.hGUIs.DataScope.Number: [double] = 70
     hSICtl.hGUIs.DataScope.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.DataScope.OuterPosition: [double] [1 4] = [69.2 9.30769230769231 181.6 52.6153846153846]
+    hSICtl.hGUIs.DataScope.OuterPosition: [double] [1 4] = [68.4 9 183.2 53]
     hSICtl.hGUIs.DataScope.PaperOrientation: "portrait"
     hSICtl.hGUIs.DataScope.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.DataScope.PaperPositionMode: "manual"
@@ -2505,7 +2498,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.MotionDisplay.NextPlot: "add"
     hSICtl.hGUIs.MotionDisplay.Number: [double] = 71
     hSICtl.hGUIs.MotionDisplay.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.MotionDisplay.OuterPosition: [double] [1 4] = [59.2 9.30769230769231 201.6 52.6153846153846]
+    hSICtl.hGUIs.MotionDisplay.OuterPosition: [double] [1 4] = [58.4 9 203.2 53]
     hSICtl.hGUIs.MotionDisplay.PaperOrientation: "portrait"
     hSICtl.hGUIs.MotionDisplay.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.MotionDisplay.PaperPositionMode: "manual"
@@ -2559,7 +2552,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.MotorControls.GraphicsSmoothing: [matlab.lang.OnOffSwitchState] [1 1]
     hSICtl.hGUIs.MotorControls.HandleVisibility: "callback"
     hSICtl.hGUIs.MotorControls.Icon: ""
-    hSICtl.hGUIs.MotorControls.InnerPosition: [double] [1 4] = [-310 -231 275 300]
+    hSICtl.hGUIs.MotorControls.InnerPosition: [double] [1 4] = [-317 -228 275 300]
     hSICtl.hGUIs.MotorControls.IntegerHandle: [matlab.lang.OnOffSwitchState] [1 1]
     hSICtl.hGUIs.MotorControls.Interruptible: [matlab.lang.OnOffSwitchState] [1 1]
     hSICtl.hGUIs.MotorControls.InvertHardcopy: [matlab.lang.OnOffSwitchState] [1 1]
@@ -2570,7 +2563,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.MotorControls.NextPlot: "add"
     hSICtl.hGUIs.MotorControls.Number: [double] = 72
     hSICtl.hGUIs.MotorControls.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.MotorControls.OuterPosition: [double] [1 4] = [-318 -239 291 339]
+    hSICtl.hGUIs.MotorControls.OuterPosition: [double] [1 4] = [-325 -236 291 339]
     hSICtl.hGUIs.MotorControls.PaperOrientation: "portrait"
     hSICtl.hGUIs.MotorControls.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.MotorControls.PaperPositionMode: "manual"
@@ -2581,7 +2574,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.MotorControls.Pointer: "arrow"
     hSICtl.hGUIs.MotorControls.PointerShapeCData: [double] [16 16]
     hSICtl.hGUIs.MotorControls.PointerShapeHotSpot: [double] [1 2] = [1 1]
-    hSICtl.hGUIs.MotorControls.Position: [double] [1 4] = [-310 -231 275 300]
+    hSICtl.hGUIs.MotorControls.Position: [double] [1 4] = [-317 -228 275 300]
     hSICtl.hGUIs.MotorControls.Renderer: "opengl"
     hSICtl.hGUIs.MotorControls.RendererMode: "auto"
     hSICtl.hGUIs.MotorControls.Resize: [matlab.lang.OnOffSwitchState] [1 1]
@@ -2635,7 +2628,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.MotorsAlignmentControls.NextPlot: "add"
     hSICtl.hGUIs.MotorsAlignmentControls.Number: [double] = 73
     hSICtl.hGUIs.MotorsAlignmentControls.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.MotorsAlignmentControls.OuterPosition: [double] [1 4] = [615 317 371 105]
+    hSICtl.hGUIs.MotorsAlignmentControls.OuterPosition: [double] [1 4] = [611 313 379 110]
     hSICtl.hGUIs.MotorsAlignmentControls.PaperOrientation: "portrait"
     hSICtl.hGUIs.MotorsAlignmentControls.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.MotorsAlignmentControls.PaperPositionMode: "manual"
@@ -2700,7 +2693,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.PhotostimControls.NextPlot: "add"
     hSICtl.hGUIs.PhotostimControls.Number: [double] = 74
     hSICtl.hGUIs.PhotostimControls.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.PhotostimControls.OuterPosition: [double] [1 4] = [604 271 393 384]
+    hSICtl.hGUIs.PhotostimControls.OuterPosition: [double] [1 4] = [600 267 401 389]
     hSICtl.hGUIs.PhotostimControls.PaperOrientation: "portrait"
     hSICtl.hGUIs.PhotostimControls.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.PhotostimControls.PaperPositionMode: "manual"
@@ -2765,7 +2758,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.StackControls.NextPlot: "add"
     hSICtl.hGUIs.StackControls.Number: [double] = 75
     hSICtl.hGUIs.StackControls.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.StackControls.OuterPosition: [double] [1 4] = [140 99 348 446]
+    hSICtl.hGUIs.StackControls.OuterPosition: [double] [1 4] = [136 95 356 451]
     hSICtl.hGUIs.StackControls.PaperOrientation: "portrait"
     hSICtl.hGUIs.StackControls.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.StackControls.PaperPositionMode: "manual"
@@ -2830,7 +2823,7 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.WaveformControls.NextPlot: "add"
     hSICtl.hGUIs.WaveformControls.Number: [double] = 76
     hSICtl.hGUIs.WaveformControls.NumberTitle: [matlab.lang.OnOffSwitchState] [1 1]
-    hSICtl.hGUIs.WaveformControls.OuterPosition: [double] [1 4] = [12 87 1288 754]
+    hSICtl.hGUIs.WaveformControls.OuterPosition: [double] [1 4] = [8 83 1296 759]
     hSICtl.hGUIs.WaveformControls.PaperOrientation: "portrait"
     hSICtl.hGUIs.WaveformControls.PaperPosition: [double] [1 4] = [0.25 2.5 8 6]
     hSICtl.hGUIs.WaveformControls.PaperPositionMode: "manual"
@@ -3136,8 +3129,8 @@ hSICtl.hGUIs: [struct] [1 1]
     hSICtl.hGUIs.mainControlsV4.CreateFcn: @@(hObject,eventdata)mainControlsV4('figure1_CreateFcn',hObject,eventdata,guidata(hObject))
     hSICtl.hGUIs.mainControlsV4.CurrentAxes: [matlab.graphics.GraphicsPlaceholder] [0 0]
     hSICtl.hGUIs.mainControlsV4.CurrentCharacter: ""
-    hSICtl.hGUIs.mainControlsV4.CurrentObject: [matlab.graphics.GraphicsPlaceholder] [0 0]
-    hSICtl.hGUIs.mainControlsV4.CurrentPoint: [double] [1 2] = [1 1]
+    hSICtl.hGUIs.mainControlsV4.CurrentObject: [matlab.ui.container.Panel] [1 1]
+    hSICtl.hGUIs.mainControlsV4.CurrentPoint: [double] [1 2] = [234 284]
     hSICtl.hGUIs.mainControlsV4.DeleteFcn: ""
     hSICtl.hGUIs.mainControlsV4.DockControls: [matlab.lang.OnOffSwitchState] [1 1]
     hSICtl.hGUIs.mainControlsV4.FileName: "C:\Program Files\Vidrio\SI2023.1.0_2024-04-08-1..."
@@ -3497,7 +3490,7 @@ hSICtl.hGUIsArray: [matlab.ui.Figure] [1 18]
     hSICtl.hGUIsArray.Parent.HandleVisibility: "on"
     hSICtl.hGUIsArray.Parent.MonitorPositions: [double] [3 4]
     hSICtl.hGUIsArray.Parent.Parent: [matlab.graphics.GraphicsPlaceholder] [0 0]
-    hSICtl.hGUIsArray.Parent.PointerLocation: [double] [1 2] = [2526 338]
+    hSICtl.hGUIsArray.Parent.PointerLocation: [double] [1 2] = [552 1005]
     hSICtl.hGUIsArray.Parent.ScreenDepth: [double] = 32
     hSICtl.hGUIsArray.Parent.ScreenPixelsPerInch: [double] = 96
     hSICtl.hGUIsArray.Parent.ScreenSize: [double] [1 4] = [1 1 1920 1080]
@@ -3731,7 +3724,7 @@ hSICtl.hManagedGUIs: [matlab.ui.Figure] [25 1]
     hSICtl.hManagedGUIs.Parent.HandleVisibility: "on"
     hSICtl.hManagedGUIs.Parent.MonitorPositions: [double] [3 4]
     hSICtl.hManagedGUIs.Parent.Parent: [matlab.graphics.GraphicsPlaceholder] [0 0]
-    hSICtl.hManagedGUIs.Parent.PointerLocation: [double] [1 2] = [2526 338]
+    hSICtl.hManagedGUIs.Parent.PointerLocation: [double] [1 2] = [552 1005]
     hSICtl.hManagedGUIs.Parent.ScreenDepth: [double] = 32
     hSICtl.hManagedGUIs.Parent.ScreenPixelsPerInch: [double] = 96
     hSICtl.hManagedGUIs.Parent.ScreenSize: [double] [1 4] = [1 1 1920 1080]
@@ -3884,7 +3877,7 @@ hSICtl.hModel: [scanimage.SI] [1 1]
     hSICtl.hModel.hDisplay.lastFrameNumberAcquisition: [double] [0 0]
     hSICtl.hModel.hDisplay.lastFrameTimestamp: [double] [0 0]
     hSICtl.hModel.hDisplay.lineScanHistoryLength: [double] = 1000
-    hSICtl.hModel.hDisplay.mouseHoverInfo: [struct] [1 1]
+    hSICtl.hModel.hDisplay.mouseHoverInfo: [double] [0 0]
     hSICtl.hModel.hDisplay.name: "SI Display"
     hSICtl.hModel.hDisplay.renderer: "auto"
     hSICtl.hModel.hDisplay.reserverInfo: ""
@@ -3947,7 +3940,7 @@ hSICtl.hModel: [scanimage.SI] [1 1]
     hSICtl.hModel.hMotionManager.warnMsg: ""
     hSICtl.hModel.hMotionManager.zStackAlignmentFcn: @scanimage.components.motionEstimators.util.alignZRoiData
   hSICtl.hModel.hMotors: [scanimage.components.Motors] [1 1]
-    hSICtl.hModel.hMotors.axesPosition: [double] [1 3] = [0 0 0]
+    hSICtl.hModel.hMotors.axesPosition: [double] [1 3] = [0 -43.64 0]
     hSICtl.hModel.hMotors.azimuth: [double] = 0
     hSICtl.hModel.hMotors.elevation: [double] = 0
     hSICtl.hModel.hMotors.errorMsg: ""
@@ -3963,7 +3956,7 @@ hSICtl.hModel: [scanimage.SI] [1 1]
     hSICtl.hModel.hMotors.moveTimeout_s: [double] = 10
     hSICtl.hModel.hMotors.name: "SI Motors"
     hSICtl.hModel.hMotors.reserverInfo: ""
-    hSICtl.hModel.hMotors.samplePosition: [double] [1 3] = [0 -51 -18379.225]
+    hSICtl.hModel.hMotors.samplePosition: [double] [1 3] = [0 -94.64 -18379.225]
     hSICtl.hModel.hMotors.simulatedAxes: [logical] [1 3] = [false false false]
     hSICtl.hModel.hMotors.userDefinedPositions: [struct] [0 1]
     hSICtl.hModel.hMotors.userInfo: ""
@@ -4730,7 +4723,7 @@ hSICtl.robotMode: [logical] = 0
 Component details:
   • Class: scanimage.components.Display
   • Total properties: 31
-  • Data-related properties: 6
+  • Data-related properties: 7
   • Buffer properties: 0
 
 ┌─────────────────────────────────────────────────────────────┐

@@ -49,7 +49,7 @@ opts = p.Results;
 
 % Set up output - always save to file in output folder
 ts = datestr(now,'yyyymmdd_HHMMSS');
-outputDir = fullfile('dev-tools', 'output');
+outputDir = fullfile('output');
 if ~exist(outputDir, 'dir')
     mkdir(outputDir);
 end

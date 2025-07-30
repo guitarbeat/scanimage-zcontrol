@@ -446,63 +446,14 @@ classdef ScanImageManager < handle
         end
         
         function writeMetadataToFile(~, metadata, metadataFile, verbose)
+            % Write metadata to file (compatible with original format)
+            % Use the shared MetadataWriter utility to eliminate duplication
             if isempty(metadataFile) || ~exist(fileparts(metadataFile), 'dir')
                 return;
             end
             
-            try
-                % Handle bookmark fields - use empty strings if not present
-                bookmarkLabel = '';
-                bookmarkMetricType = '';
-                bookmarkMetricValue = '';
-                
-                if isfield(metadata, 'bookmarkLabel')
-                    bookmarkLabel = metadata.bookmarkLabel;
-                end
-                if isfield(metadata, 'bookmarkMetricType')
-                    bookmarkMetricType = metadata.bookmarkMetricType;
-                end
-                if isfield(metadata, 'bookmarkMetricValue')
-                    bookmarkMetricValue = metadata.bookmarkMetricValue;
-                end
-                
-                % Format the metadata string
-                if isstruct(metadata.feedbackValue)
-                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
-                        metadata.timestamp, metadata.filename, metadata.scanner, ...
-                        metadata.zoom, metadata.frameRate, metadata.averaging,...
-                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
-                        metadata.pockelsValue, metadata.feedbackValue.modulation,...
-                        metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
-                        metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
-                else
-                    % Handle case where feedbackValue is not a struct
-                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
-                        metadata.timestamp, metadata.filename, metadata.scanner, ...
-                        metadata.zoom, metadata.frameRate, metadata.averaging,...
-                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
-                        metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
-                end
-                
-                if verbose
-                    fprintf('Writing to file: %s\n', metadataFile);
-                end
-                
-                % Use a simple fopen/fprintf approach for speed
-                fid = fopen(metadataFile, 'a');
-                if fid == -1
-                    return; % Silently fail if file can't be opened
-                end
-                
-                % Write and close quickly
-                fprintf(fid, metadataStr);
-                fclose(fid);
-            catch
-                % Silently fail for performance reasons
-                if exist('fid', 'var') && fid ~= -1
-                    fclose(fid);
-                end
-            end
+            % Use the shared MetadataWriter utility
+            MetadataWriter.writeMetadataToFile(metadata, metadataFile, verbose);
         end
         
         function cleanupMetadataLogging(~)

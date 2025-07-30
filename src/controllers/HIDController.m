@@ -54,8 +54,8 @@ classdef HIDController < handle
                     error('Psychtoolbox not found. Please install Psychtoolbox to use MJC3 joystick control.');
                 end
                 
-                % Create and start HID controller
-                obj.hidController = MJC3_HID_Controller(obj.zController, obj.stepFactor);
+                % Create and start HID controller using factory
+                obj.hidController = MJC3ControllerFactory.createController(obj.zController, obj.stepFactor);
                 obj.hidController.start();
                 
                 obj.isEnabled = true;
@@ -76,7 +76,7 @@ classdef HIDController < handle
                     errordlg(sprintf('Failed to enable joystick control: %s', ME.message), 'HID Controller Error');
                 end
                 
-                warning('Failed to enable MJC3 HID Controller: %s', ME.message);
+                warning('MJC3Controller:EnableFailed', 'Failed to enable MJC3 HID Controller: %s', ME.message);
             end
         end
         
@@ -95,7 +95,7 @@ classdef HIDController < handle
                 fprintf('MJC3 HID Controller disabled\n');
                 
             catch ME
-                warning('Error disabling MJC3 HID Controller: %s', ME.message);
+                warning('MJC3Controller:DisableFailed', 'Error disabling MJC3 HID Controller: %s', ME.message);
             end
         end
         

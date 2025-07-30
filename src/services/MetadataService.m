@@ -53,67 +53,8 @@ classdef MetadataService < handle
         
         function success = writeMetadataToFile(metadata, filePath, verbose)
             % Write metadata to CSV file (compatible with original format)
-            if nargin < 3
-                verbose = false;
-            end
-            
-            success = false;
-            try
-                if isempty(filePath) || ~exist(fileparts(filePath), 'dir')
-                    return;
-                end
-                
-                % Extract bookmark fields with defaults
-                bookmarkLabel = '';
-                bookmarkMetricType = '';
-                bookmarkMetricValue = '';
-                if isfield(metadata, 'bookmarkLabel')
-                    bookmarkLabel = metadata.bookmarkLabel;
-                end
-                if isfield(metadata, 'bookmarkMetricType')
-                    bookmarkMetricType = metadata.bookmarkMetricType;
-                end
-                if isfield(metadata, 'bookmarkMetricValue')
-                    bookmarkMetricValue = metadata.bookmarkMetricValue;
-                end
-                
-                % Format metadata string (compatible with original format)
-                if isstruct(metadata.feedbackValue)
-                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,%s,%s,%s,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
-                        metadata.timestamp, metadata.filename, metadata.scanner, ...
-                        metadata.zoom, metadata.frameRate, metadata.averaging,...
-                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
-                        metadata.pockelsValue, metadata.feedbackValue.modulation,...
-                        metadata.feedbackValue.feedback, metadata.feedbackValue.power,...
-                        metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
-                else
-                    metadataStr = sprintf('%s,%s,%s,%.2f,%.1f,%d,%s,%s,%.1f,%.3f,NA,NA,NA,%.1f,%.1f,%.1f,%s,%s,%s,\n',...
-                        metadata.timestamp, metadata.filename, metadata.scanner, ...
-                        metadata.zoom, metadata.frameRate, metadata.averaging,...
-                        metadata.resolution, metadata.fov, metadata.powerPercent, ...
-                        metadata.pockelsValue, metadata.zPos, metadata.xPos, metadata.yPos, bookmarkLabel, bookmarkMetricType, bookmarkMetricValue);
-                end
-                
-                if verbose
-                    fprintf('Writing to file: %s\n', filePath);
-                end
-                
-                % Write to file
-                fid = fopen(filePath, 'a');
-                if fid == -1
-                    return;
-                end
-                fprintf(fid, metadataStr);
-                fclose(fid);
-                
-                success = true;
-                
-            catch ME
-                if exist('fid', 'var') && fid ~= -1
-                    fclose(fid);
-                end
-                FoilviewUtils.logException('MetadataService.writeMetadataToFile', ME);
-            end
+            % Use the shared MetadataWriter utility to eliminate duplication
+            success = MetadataWriter.writeMetadataToFile(metadata, filePath, verbose);
         end
         
         function success = saveBookmarkMetadata(label, xPos, yPos, zPos, metricStruct, metadataFile, controller)
@@ -153,27 +94,15 @@ classdef MetadataService < handle
                 if ~isempty(controller) && isvalid(controller)
                     if controller.SimulationMode
                         scannerInfo.scanner = 'Simulation';
-                        scannerInfo.zoom = 1.0;
-                        scannerInfo.frameRate = 30.0;
-                        scannerInfo.averaging = 1;
-                        scannerInfo.resolution = '512x512';
-                        scannerInfo.fov = '100.0x100.0';
-                        scannerInfo.powerPercent = 50.0;
-                        scannerInfo.pockelsValue = 0.5;
-                        scannerInfo.feedbackValue = struct('modulation', '2.5', 'feedback', '1.2', 'power', '0.025');
+                        % Use the common scanner info initialization
+                        scannerInfo = MetadataService.initializeScannerInfoFields(scannerInfo, true);
                     else
                         % Try to get real values from ScanImage
                         try
                             evalin('base', 'hSI'); % Check if hSI exists
                             scannerInfo.scanner = 'ScanImage';
-                            scannerInfo.zoom = 1.0;
-                            scannerInfo.frameRate = 30.0;
-                            scannerInfo.averaging = 1;
-                            scannerInfo.resolution = '512x512';
-                            scannerInfo.fov = '100.0x100.0';
-                            scannerInfo.powerPercent = 50.0;
-                            scannerInfo.pockelsValue = 0.5;
-                            scannerInfo.feedbackValue = struct('modulation', 'NA', 'feedback', 'NA', 'power', 'NA');
+                            % Use the common scanner info initialization
+                            scannerInfo = MetadataService.initializeScannerInfoFields(scannerInfo, false);
                         catch
                             % Fallback to simulation values
                             scannerInfo = MetadataService.createDefaultScannerInfo(true);
@@ -204,14 +133,8 @@ classdef MetadataService < handle
                 scannerInfo.scanner = 'ScanImage';
             end
             
-            scannerInfo.zoom = 1.0;
-            scannerInfo.frameRate = 30.0;
-            scannerInfo.averaging = 1;
-            scannerInfo.resolution = '512x512';
-            scannerInfo.fov = '100.0x100.0';
-            scannerInfo.powerPercent = 50.0;
-            scannerInfo.pockelsValue = 0.5;
-            scannerInfo.feedbackValue = struct('modulation', '2.5', 'feedback', '1.2', 'power', '0.025');
+            % Use the common scanner info initialization
+            scannerInfo = MetadataService.initializeScannerInfoFields(scannerInfo, simulationMode);
         end
         
         function stats = generateSessionStats(metadataFile)
@@ -285,6 +208,29 @@ classdef MetadataService < handle
                 end
             catch
                 duration = 0;
+            end
+        end
+        
+        function scannerInfo = initializeScannerInfoFields(scannerInfo, simulationMode)
+            % Helper method to initialize common scanner info fields
+            % This extracts the duplicated logic from extractScannerInfo and createDefaultScannerInfo
+            % scannerInfo: the scanner info struct to initialize
+            % simulationMode: boolean indicating if in simulation mode
+            
+            % Initialize common fields
+            scannerInfo.zoom = 1.0;
+            scannerInfo.frameRate = 30.0;
+            scannerInfo.averaging = 1;
+            scannerInfo.resolution = '512x512';
+            scannerInfo.fov = '100.0x100.0';
+            scannerInfo.powerPercent = 50.0;
+            scannerInfo.pockelsValue = 0.5;
+            
+            % Set feedback values based on simulation mode
+            if simulationMode
+                scannerInfo.feedbackValue = struct('modulation', '2.5', 'feedback', '1.2', 'power', '0.025');
+            else
+                scannerInfo.feedbackValue = struct('modulation', 'NA', 'feedback', 'NA', 'power', 'NA');
             end
         end
     end

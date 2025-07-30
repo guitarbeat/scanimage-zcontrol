@@ -637,6 +637,44 @@
                 obj.ScanImageManager.cleanup();
             end
         end
+        
+        function controller = createMJC3Controller(obj, stepFactor)
+            % Create MJC3 controller using the factory pattern
+            % Returns a controller that can work with the current stage control system
+            
+            if nargin < 2
+                stepFactor = 5; % Default step factor
+            end
+            
+            % Determine the appropriate Z-controller based on mode
+            if obj.ScanImageManager.isSimulationMode()
+                % Create simulation Z-controller
+                zController = ScanImageZController([]); % Empty for simulation
+                fprintf('Created simulation Z-controller for testing mode\n');
+            else
+                try
+                    % Create real ScanImage Z-controller
+                    hSI = evalin('base', 'hSI');
+                    zController = ScanImageZController(hSI.hMotors);
+                    fprintf('Created ScanImage Z-controller\n');
+                catch ME
+                    fprintf('Failed to create ScanImage Z-controller: %s\n', ME.message);
+                    % Fallback to simulation
+                    zController = ScanImageZController([]); % Empty for simulation
+                    fprintf('Falling back to simulation Z-controller\n');
+                end
+            end
+            
+            % Use the factory to create the best available controller
+            try
+                controller = MJC3ControllerFactory.createController(zController, stepFactor);
+                fprintf('MJC3 Controller created successfully using factory\n');
+            catch ME
+                fprintf('Failed to create MJC3 controller using factory: %s\n', ME.message);
+                fprintf('MJC3 functionality will be limited to manual testing\n');
+                controller = [];
+            end
+        end
     end
 
     methods (Access = private)

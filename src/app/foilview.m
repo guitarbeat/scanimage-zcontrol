@@ -15,6 +15,7 @@ classdef foilview < matlab.apps.AppBase
         StatusControls
         HIDControls
         MetricsPlotControls
+        ToolsWindow
     end
     
     properties (Access = public)
@@ -23,6 +24,7 @@ classdef foilview < matlab.apps.AppBase
         PlotManager                 PlotManager
         StageViewApp
         BookmarksViewApp
+        MJC3ViewApp
         ScanImageManager
         % * Tracks if the Metadata button has ever been pressed
         MetadataButtonPressed logical = false;
@@ -51,6 +53,12 @@ classdef foilview < matlab.apps.AppBase
             app.MetadataButtonPressed = false;
             % * Set initial Metadata button color
             app.updateMetadataButtonColor();
+            
+            % Set up MJC3 button callback
+            if isfield(app.StatusControls, 'MJC3Button') && ~isempty(app.StatusControls.MJC3Button)
+                app.StatusControls.MJC3Button.ButtonPushedFcn = @(~,~) app.onMJC3ButtonPushed();
+            end
+            
             if nargout == 0
                 clear app
             end
@@ -295,6 +303,16 @@ classdef foilview < matlab.apps.AppBase
             end
             app.updateWindowStatusButtons();
         end
+        
+        function onMJC3ButtonPushed(app, ~, ~)
+            if isempty(app.MJC3ViewApp) || ~isvalid(app.MJC3ViewApp) || ~isvalid(app.MJC3ViewApp.UIFigure)
+                app.launchMJC3View();
+            else
+                delete(app.MJC3ViewApp);
+                app.MJC3ViewApp = [];
+            end
+            app.updateWindowStatusButtons();
+        end
         function onWindowClose(app, varargin)
             delete(app);
         end
@@ -478,23 +496,34 @@ classdef foilview < matlab.apps.AppBase
         function updateAutoStepStatus(app)
             UiComponents.updateControlStates(app.ManualControls, app.AutoControls, app.Controller);
         end
-        %% Update window status buttons (Bookmarks/StageView)
+        %% Update window status buttons (Bookmarks/StageView/MJC3)
         function updateWindowStatusButtons(app)
             isBookmarksOpen = ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp.UIFigure);
             isStageViewOpen = ~isempty(app.StageViewApp) && isvalid(app.StageViewApp) && isvalid(app.StageViewApp.UIFigure);
+            isMJC3Open = ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp.UIFigure);
+            
             if isBookmarksOpen
-                app.StatusControls.BookmarksButton.Text = 'Close Bookmarks';
-                app.StatusControls.BookmarksButton.Icon = '';
+                app.StatusControls.BookmarksButton.Text = 'Bookmarks';
+                app.StatusControls.BookmarksButton.BackgroundColor = [0.16 0.68 0.38]; % Green when open
             else
-                app.StatusControls.BookmarksButton.Text = 'Open Bookmarks';
-                app.StatusControls.BookmarksButton.Icon = '';
+                app.StatusControls.BookmarksButton.Text = 'Bookmarks';
+                app.StatusControls.BookmarksButton.BackgroundColor = [0.2 0.6 0.8]; % Blue when closed
             end
+            
             if isStageViewOpen
-                app.StatusControls.StageViewButton.Text = 'Close Stage View';
-                app.StatusControls.StageViewButton.Icon = '';
+                app.StatusControls.StageViewButton.Text = 'Camera';
+                app.StatusControls.StageViewButton.BackgroundColor = [0.16 0.68 0.38]; % Green when open
             else
-                app.StatusControls.StageViewButton.Text = 'Open Stage View';
-                app.StatusControls.StageViewButton.Icon = '';
+                app.StatusControls.StageViewButton.Text = 'Camera';
+                app.StatusControls.StageViewButton.BackgroundColor = [0.2 0.6 0.8]; % Blue when closed
+            end
+            
+            if isMJC3Open
+                app.StatusControls.MJC3Button.Text = 'Joystick';
+                app.StatusControls.MJC3Button.BackgroundColor = [0.16 0.68 0.38]; % Green when open
+            else
+                app.StatusControls.MJC3Button.Text = 'Joystick';
+                app.StatusControls.MJC3Button.BackgroundColor = [0.2 0.6 0.8]; % Blue when closed
             end
         end
     end
@@ -555,6 +584,10 @@ classdef foilview < matlab.apps.AppBase
             if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp)
                 delete(app.StageViewApp);
                 app.StageViewApp = [];
+            end
+            if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp)
+                delete(app.MJC3ViewApp);
+                app.MJC3ViewApp = [];
             end
         end
         %% Clean up metadata logging and generate session stats
@@ -624,6 +657,36 @@ classdef foilview < matlab.apps.AppBase
                 end
             else
                 figure(app.BookmarksViewApp.UIFigure);
+            end
+        end
+        
+        %% Launch the MJC3 joystick control window
+        function launchMJC3View(app)
+            if isempty(app.MJC3ViewApp) || ~isvalid(app.MJC3ViewApp) || ~isvalid(app.MJC3ViewApp.UIFigure)
+                try
+                    app.MJC3ViewApp = MJC3View();
+                    
+                    % Create and set up the HID controller using the controller's method
+                    if ~isempty(app.Controller)
+                        hidController = app.Controller.createMJC3Controller(5);
+                        app.MJC3ViewApp.setController(hidController);
+                        
+                        if ~isempty(hidController)
+                            fprintf('MJC3 Controller integrated successfully\n');
+                        else
+                            fprintf('MJC3 View opened without controller (manual testing mode)\n');
+                        end
+                    else
+                        fprintf('Main controller not available, MJC3 View opened in manual mode\n');
+                        app.MJC3ViewApp.setController([]);
+                    end
+                    
+                catch ME
+                    FoilviewUtils.warn('FoilviewApp', 'Failed to launch MJC3 View: %s', ME.message);
+                    app.MJC3ViewApp = [];
+                end
+            else
+                app.MJC3ViewApp.bringToFront();
             end
         end
         %% Set up all UI callback functions

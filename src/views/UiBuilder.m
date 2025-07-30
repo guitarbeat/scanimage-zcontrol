@@ -61,17 +61,49 @@ classdef UiBuilder
             [components.ManualControls, components.AutoControls] = ...
                 UiBuilder.createCombinedControlsContainer(components.MainLayout);
 
-            % Create status and utility components
-            components.StatusControls = UiBuilder.createStatusBar(components.MainLayout);
-
-            % Create MJC3 HID Controller section
-            components.HIDControls = UiBuilder.createHIDControlsSection(components.MainLayout);
-
             % Create plot area
             components.MetricsPlotControls = UiBuilder.createMetricsPlotArea(components.UIFigure);
+            
+            % Create separate tools window
+            components.ToolsWindow = ToolsWindow(components.UIFigure);
+            
+            % Set up tools button callback
+            components.MetricDisplay.ToolsButton.ButtonPushedFcn = @(~,~) components.ToolsWindow.toggle();
+            
+            % Set up Show FoilView button callback
+            components.ToolsWindow.ShowFoilViewButton.ButtonPushedFcn = @(~,~) UiBuilder.toggleMainWindow(components.UIFigure, components.ToolsWindow.ShowFoilViewButton);
+            
+            % Create StatusControls struct for compatibility, referencing tools window buttons
+            components.StatusControls = struct();
+            components.StatusControls.ShowFoilViewButton = components.ToolsWindow.ShowFoilViewButton;
+            components.StatusControls.BookmarksButton = components.ToolsWindow.BookmarksButton;
+            components.StatusControls.StageViewButton = components.ToolsWindow.StageViewButton;
+            components.StatusControls.MJC3Button = components.ToolsWindow.MJC3Button;
+            components.StatusControls.RefreshButton = components.ToolsWindow.RefreshButton;
+            components.StatusControls.MetadataButton = components.ToolsWindow.MetadataButton;
+            
+            % Create dummy labels for compatibility (not in main layout)
+            dummyFigure = uifigure('Visible', 'off');
+            components.StatusControls.Label = uilabel(dummyFigure);
+            components.StatusControls.Label.Visible = 'off';
+            
+            % Create a dummy ShowPlotButton for compatibility (not in main layout)
+            dummyPanel = uipanel(dummyFigure);
+            dummyPanel.Visible = 'off';
+            components.StatusControls.ShowPlotButton = UiBuilder.createShowPlotButton(dummyPanel);
+            components.StatusControls.ShowPlotButton.Visible = 'off';
+            
+            % HIDControls compatibility
+            components.HIDControls = struct('MJC3Button', components.StatusControls.MJC3Button);
 
-            % Show the window
-            components.UIFigure.Visible = 'on';
+            % Set up main window resize callback to update tools window position
+            components.UIFigure.SizeChangedFcn = @(src,~) UiBuilder.onMainWindowResize(src, components.ToolsWindow);
+            
+            % Keep the main window hidden initially
+            components.UIFigure.Visible = 'off';
+            
+            % Show only the tools window initially
+            components.ToolsWindow.show();
         end
     end
 
@@ -108,9 +140,9 @@ classdef UiBuilder
         end
 
         function mainLayout = createMainLayout(mainPanel)
-            % Creates the main grid layout with 6 rows for all components (added HID controls).
-            mainLayout = uigridlayout(mainPanel, [6, 1]);
-            mainLayout.RowHeight = UiComponents.MAIN_ROW_HEIGHTS;
+            % Creates the main grid layout with 3 rows for all components (removed tools section).
+            mainLayout = uigridlayout(mainPanel, [3, 1]);
+            mainLayout.RowHeight = {'fit', 'fit', '1x'}; % Updated for 3 rows: metrics, position, controls
             mainLayout.ColumnWidth = {'1x'};
             mainLayout.Padding = UiComponents.MAIN_PADDING;
             mainLayout.RowSpacing = UiComponents.MAIN_ROW_SPACING;
@@ -121,8 +153,8 @@ classdef UiBuilder
         function metricDisplay = createMetricDisplay(mainLayout)
             % Creates the metric display section with enhanced modern styling.
             metricCard = UiBuilder.createCard(mainLayout, 1, '📊 Image Metrics', UiComponents.CONTROL_FONT_SIZE);
-            metricPanel = uigridlayout(metricCard, [1, 4]); % Changed to 4 columns to include plot button
-            metricPanel.ColumnWidth = {'fit', '1x', 'fit', 'fit'}; % Dropdown, Value, Refresh, Plot
+            metricPanel = uigridlayout(metricCard, [1, 5]); % Changed to 5 columns to include tools button
+            metricPanel.ColumnWidth = {'fit', '1x', 'fit', 'fit', 'fit'}; % Dropdown, Value, Refresh, Plot, Tools
             metricPanel.Padding = UiComponents.LOOSE_PADDING;
             metricPanel.ColumnSpacing = UiComponents.STANDARD_SPACING;
 
@@ -143,6 +175,10 @@ classdef UiBuilder
             % Plot button - logically grouped with metrics
             metricDisplay.ShowPlotButton = UiBuilder.createShowPlotButton(metricPanel);
             metricDisplay.ShowPlotButton.Text = 'Plot';
+            
+            % Tools button - toggle tools window
+            metricDisplay.ToolsButton = UiBuilder.createIconButton(metricPanel, '🔧', 'Show/Hide Tools Window', 'primary');
+            metricDisplay.ToolsButton.Text = 'Tools';
         end
 
         function positionDisplay = createPositionDisplay(mainLayout)
@@ -172,112 +208,9 @@ classdef UiBuilder
             UiComponents.applyButtonStyle(showPlotButton, 'primary');
         end
 
-        function statusControls = createStatusBar(mainLayout)
-            % Creates a clean tools section without system status clutter.
-            
-            % Tools Card - centered and focused
-            toolsCard = UiBuilder.createCard(mainLayout, 4, '🔧 Tools', UiComponents.CONTROL_FONT_SIZE);
-            
-            toolsGrid = uigridlayout(toolsCard, [2, 2]); % 2 rows, 2 columns (removed plot button)
-            toolsGrid.RowHeight = {'fit', 'fit'};
-            toolsGrid.ColumnWidth = {'1x', '1x'}; % Equal width columns for balance
-            toolsGrid.Padding = UiComponents.STANDARD_PADDING;
-            toolsGrid.RowSpacing = UiComponents.STANDARD_SPACING;
-            toolsGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
-            
-            statusControls = struct();
-            
-            % Top row: Main tools
-            statusControls.BookmarksButton = UiBuilder.createToolButton(toolsGrid, '📍', 'Toggle Bookmarks (Open/Close)');
-            statusControls.BookmarksButton.Layout.Row = 1;
-            statusControls.BookmarksButton.Layout.Column = 1;
-            statusControls.BookmarksButton.Text = 'Bookmarks';
-            
-            statusControls.StageViewButton = UiBuilder.createToolButton(toolsGrid, '📷', 'Toggle Camera (Open/Close)');
-            statusControls.StageViewButton.Layout.Row = 1;
-            statusControls.StageViewButton.Layout.Column = 2;
-            statusControls.StageViewButton.Text = 'Camera';
-            
-            % Bottom row: Utility tools
-            statusControls.RefreshButton = UiBuilder.createToolButton(toolsGrid, '↻', 'Refresh position and status');
-            statusControls.RefreshButton.Layout.Row = 2;
-            statusControls.RefreshButton.Layout.Column = 1;
-            statusControls.RefreshButton.Text = 'Refresh';
-            
-            statusControls.MetadataButton = UiBuilder.createToolButton(toolsGrid, '⚙', 'Metadata Logging');
-            statusControls.MetadataButton.Layout.Row = 2;
-            statusControls.MetadataButton.Layout.Column = 2;
-            statusControls.MetadataButton.Text = 'Metadata';
-            
-            % Keep Label and ShowPlotButton properties for compatibility (but hidden/unused)
-            statusControls.Label = uilabel(toolsGrid);
-            statusControls.Label.Visible = 'off';
-            
-            % Create a dummy ShowPlotButton for compatibility - it will be overridden by MetricDisplay
-            statusControls.ShowPlotButton = UiBuilder.createShowPlotButton(toolsGrid);
-            statusControls.ShowPlotButton.Visible = 'off';
-        end
 
-        function hidControls = createHIDControlsSection(mainLayout)
-            % Creates the MJC3 HID Controller section for joystick control
-            hidCard = UiBuilder.createCard(mainLayout, 5, '🕹️ MJC3 Joystick Control', UiComponents.CONTROL_FONT_SIZE);
-            
-            hidGrid = uigridlayout(hidCard, [1, 4]);
-            hidGrid.ColumnWidth = {'fit', 'fit', '1x', 'fit'};
-            hidGrid.Padding = UiComponents.STANDARD_PADDING;
-            hidGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
-            
-            hidControls = struct();
-            
-            % Enable/Disable toggle
-            hidControls.EnableButton = UiBuilder.createStyledButton(hidGrid, 'success', '▶ Enable', 'Enable/Disable MJC3 joystick control', [1, 1]);
-            
-            % Status indicator
-            hidControls.StatusLabel = uilabel(hidGrid);
-            hidControls.StatusLabel.Text = '⚪ Disconnected';
-            hidControls.StatusLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            hidControls.StatusLabel.FontWeight = 'bold';
-            hidControls.StatusLabel.FontColor = UiComponents.COLORS.TextMuted;
-            hidControls.StatusLabel.Layout.Row = 1;
-            hidControls.StatusLabel.Layout.Column = 2;
-            
-            % Step factor control
-            stepFactorPanel = uipanel(hidGrid);
-            stepFactorPanel.Layout.Row = 1;
-            stepFactorPanel.Layout.Column = 3;
-            stepFactorPanel.BorderType = 'line';
-            stepFactorPanel.BackgroundColor = UiComponents.COLORS.Light;
-            
-            stepFactorGrid = uigridlayout(stepFactorPanel, [1, 3]);
-            stepFactorGrid.ColumnWidth = {'fit', 'fit', 'fit'};
-            stepFactorGrid.Padding = UiComponents.TIGHT_PADDING;
-            stepFactorGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
-            
-            stepFactorLabel = uilabel(stepFactorGrid);
-            stepFactorLabel.Text = 'Step Factor:';
-            stepFactorLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            stepFactorLabel.FontWeight = 'bold';
-            
-            hidControls.StepFactorField = uieditfield(stepFactorGrid, 'numeric');
-            hidControls.StepFactorField.Value = 5; % Default 5 μm per unit
-            hidControls.StepFactorField.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            hidControls.StepFactorField.Limits = [0.1 100];
-            hidControls.StepFactorField.Tooltip = 'Micrometers moved per unit of joystick deflection (0.1-100)';
-            
-            stepFactorUnits = uilabel(stepFactorGrid);
-            stepFactorUnits.Text = 'μm/unit';
-            stepFactorUnits.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            stepFactorUnits.FontColor = UiComponents.COLORS.TextMuted;
-            
-            % Settings button
-            hidControls.SettingsButton = UiBuilder.createIconButton(hidGrid, '⚙', 'Configure MJC3 settings', 'info');
-            hidControls.SettingsButton.Layout.Row = 1;
-            hidControls.SettingsButton.Layout.Column = 4;
-            hidControls.SettingsButton.Text = 'Settings';
-            
-            % Store controller reference (will be set by the main controller)
-            hidControls.Controller = [];
-        end
+
+
 
         function metricsPlotControls = createMetricsPlotArea(uiFigure)
             % Creates the metrics plot panel with axes and buttons (initially hidden).
@@ -314,8 +247,9 @@ classdef UiBuilder
         end
 
         function [manualControls, autoControls] = createCombinedControlsContainer(mainLayout)
-            % Creates a two-column layout with manual and auto controls side-by-side
-            % Shared step size is positioned above manual controls on the left
+            % Creates a new layout: Left (numeric controls) | Right (action controls)
+            % Left: Step Size, Steps, Delay (stacked vertically)
+            % Right: Manual Control, Direction, Start Button (stacked vertically)
 
             % Create the combined controls container
             combinedCard = uipanel(mainLayout);
@@ -323,37 +257,54 @@ classdef UiBuilder
             combinedCard.BorderType = 'none';
             combinedCard.BackgroundColor = UiComponents.COLORS.Background;
 
-            % Two-column layout: Left (Step Size + Manual) | Right (Auto)
+            % Two-column layout: Left (Numeric Controls) | Right (Action Controls)
             twoColumnGrid = uigridlayout(combinedCard, [1, 2]);
             twoColumnGrid.ColumnWidth = UiComponents.STANDARD_COLUMN_WIDTHS;
             twoColumnGrid.Padding = UiComponents.TIGHT_PADDING;
-            twoColumnGrid.ColumnSpacing = UiComponents.TIGHT_SPACING;
+            twoColumnGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
 
-            % Left column: Step Size above Manual Controls
-            leftColumnGrid = uigridlayout(twoColumnGrid, [2, 1]);
+            % LEFT COLUMN: Numeric Controls (Step Size, Steps, Delay)
+            leftColumnGrid = uigridlayout(twoColumnGrid, [3, 1]);
             leftColumnGrid.Layout.Column = 1;
-            leftColumnGrid.RowHeight = UiComponents.FIT_EXPAND_ROWS;
+            leftColumnGrid.RowHeight = {'fit', 'fit', 'fit'};
             leftColumnGrid.Padding = UiComponents.TIGHT_PADDING;
             leftColumnGrid.RowSpacing = UiComponents.STANDARD_SPACING;
 
-            % Create shared step size control in left column
-            sharedStepSize = UiBuilder.createSharedStepSizeControl(leftColumnGrid);
+            % Create numeric controls in left column
+            sharedStepSize = UiBuilder.createSharedStepSizeControl(leftColumnGrid, 1);
+            stepsControl = UiBuilder.createStepsControl(leftColumnGrid, 2);
+            delayControl = UiBuilder.createDelayControl(leftColumnGrid, 3);
 
-            % Create Manual Controls below step size in left column
-            manualControls = UiBuilder.createCompactManualControls(leftColumnGrid);
+            % RIGHT COLUMN: Action Controls (Manual, Direction, Start)
+            rightColumnGrid = uigridlayout(twoColumnGrid, [3, 1]);
+            rightColumnGrid.Layout.Column = 2;
+            rightColumnGrid.RowHeight = {'fit', 'fit', 'fit'};
+            rightColumnGrid.Padding = UiComponents.TIGHT_PADDING;
+            rightColumnGrid.RowSpacing = UiComponents.STANDARD_SPACING;
 
-            % Create Auto Controls in right column
-            autoControls = UiBuilder.createCompactAutoControls(twoColumnGrid);
+            % Create action controls in right column
+            manualControls = UiBuilder.createCompactManualControls(rightColumnGrid, 1);
+            directionControl = UiBuilder.createDirectionControl(rightColumnGrid, 2);
+            startControl = UiBuilder.createStartControl(rightColumnGrid, 3);
+
+            % Create autoControls struct combining all the auto-related controls
+            autoControls = struct();
+            autoControls.StepsField = stepsControl;
+            autoControls.DelayField = delayControl;
+            autoControls.DirectionSwitch = directionControl.DirectionSwitch;
+            autoControls.StartStopButton = startControl.StartStopButton;
+            autoControls.TotalMoveLabel = startControl.TotalMoveLabel;
 
             % Add shared step size reference to both controls
             manualControls.SharedStepSize = sharedStepSize;
             autoControls.SharedStepSize = sharedStepSize;
         end
 
-        function manualControls = createCompactManualControls(parent)
+        function manualControls = createCompactManualControls(parent, row)
             % Creates compact manual controls - now without step size controls (uses shared)
+            if nargin < 2, row = 2; end
             manualCard = uipanel(parent);
-            manualCard.Layout.Column = 1;
+            manualCard.Layout.Row = row;
             manualCard.Title = 'Manual Control';
             manualCard.FontSize = UiComponents.CARD_TITLE_FONT_SIZE;
             manualCard.FontWeight = 'bold';
@@ -379,80 +330,13 @@ classdef UiBuilder
             manualControls.CurrentStepIndex = find(manualControls.StepSizes == FoilviewController.DEFAULT_STEP_SIZE, 1);
         end
 
-        function autoControls = createCompactAutoControls(parent)
-            % Creates auto step controls with reorganized layout
-            autoCard = uipanel(parent);
-            autoCard.Layout.Column = 2;
-            autoCard.Title = 'Auto Step Control';
-            autoCard.FontSize = UiComponents.CARD_TITLE_FONT_SIZE;
-            autoCard.FontWeight = 'bold';
-            autoCard.BorderType = 'line';
-            autoCard.BackgroundColor = UiComponents.COLORS.Card;
 
-            % Main grid: 3 rows - START button, controls row, status row
-            grid = uigridlayout(autoCard, [3, 1]);
-            grid.RowHeight = UiComponents.THREE_FIT_ROWS;
-            grid.Padding = UiComponents.CONTROL_GRID_PADDING;
-            grid.RowSpacing = UiComponents.CONTROL_GRID_SPACING;
 
-            autoControls = struct();
-
-            % Row 1: START button with icon
-            autoControls.StartStopButton = UiBuilder.createStyledButton(grid, 'success', '▶ START', 'Start/Stop auto stepping', [1, 1]);
-            autoControls.StartStopButton.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            autoControls.StartStopButton.FontWeight = 'bold';
-
-            % Row 2: Controls row - Left side (Steps, Delay) | Right side (Direction)
-            controlsGrid = uigridlayout(grid, [2, 2]);
-            controlsGrid.Layout.Row = 2;
-            controlsGrid.RowHeight = UiComponents.ALL_FIT_ROWS;
-            controlsGrid.ColumnWidth = {'fit', 'fit'};
-            controlsGrid.Padding = UiComponents.TIGHT_PADDING;
-            controlsGrid.RowSpacing = UiComponents.STANDARD_SPACING;
-            controlsGrid.ColumnSpacing = UiComponents.LOOSE_SPACING;
-
-            % LEFT SIDE - Create input fields with arrow buttons
-            autoControls.StepsField = UiBuilder.createArrowField(controlsGrid, 1, 'Steps     :', ...
-                FoilviewController.DEFAULT_AUTO_STEPS, 'Number of steps', [], 1, 100);
-            autoControls.DelayField = UiBuilder.createArrowField(controlsGrid, 2, 'Delay     :', ...
-                1, 'Delay between steps (seconds)', 's', 0.1, 10);
-
-            % RIGHT SIDE - Direction (spans both rows)
-            directionGrid = uigridlayout(controlsGrid, [3, 1]);
-            directionGrid.Layout.Row = [1 2];
-            directionGrid.Layout.Column = 2;
-            directionGrid.RowHeight = UiComponents.THREE_FIT_ROWS;
-            directionGrid.Padding = UiComponents.TIGHT_PADDING;
-            directionGrid.RowSpacing = UiComponents.STANDARD_SPACING;
-
-            directionLabel = uilabel(directionGrid);
-            directionLabel.Text = 'Direction';
-            directionLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            directionLabel.FontWeight = 'bold';
-            directionLabel.HorizontalAlignment = 'center';
-            directionLabel.Layout.Row = 1;
-
-            autoControls.DirectionSwitch = uiswitch(directionGrid, 'toggle');
-            autoControls.DirectionSwitch.Items = {'Down', 'Up'};
-            autoControls.DirectionSwitch.Value = 'Up';
-            autoControls.DirectionSwitch.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            autoControls.DirectionSwitch.Tooltip = 'Toggle direction (Up/Down)';
-            autoControls.DirectionSwitch.Layout.Row = 2;
-
-            % Row 3: Total Move
-            totalLabel = uilabel(grid);
-            totalLabel.Text = 'Total Move : 100 μm ↑';
-            totalLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            totalLabel.FontWeight = 'bold';
-            totalLabel.FontColor = UiComponents.COLORS.TextMuted;
-            totalLabel.Layout.Row = 3;
-            autoControls.TotalMoveLabel = totalLabel;
-        end
-
-        function sharedStepSize = createSharedStepSizeControl(parent)
+        function sharedStepSize = createSharedStepSizeControl(parent, row)
             % Creates a shared step size control that both Manual and Auto controls use
+            if nargin < 2, row = 1; end
             stepCard = uipanel(parent);
-            stepCard.Layout.Row = 1;
+            stepCard.Layout.Row = row;
             stepCard.Title = 'Step Size';
             stepCard.FontSize = UiComponents.CARD_TITLE_FONT_SIZE;
             stepCard.FontWeight = 'bold';
@@ -616,99 +500,39 @@ classdef UiBuilder
 
         function fieldStruct = createArrowField(parent, row, labelText, defaultValue, tooltip, units, minValue, maxValue)
             % Creates a field with arrow buttons for increment/decrement, similar to step size control.
-            fieldGrid = uigridlayout(parent, [1, 2]);
-            fieldGrid.Layout.Row = row;
-            fieldGrid.Layout.Column = 1;
-            fieldGrid.ColumnWidth = UiComponents.FIT_EXPAND_COLUMNS;
-            fieldGrid.Padding = UiComponents.TIGHT_PADDING;
-            fieldGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
-
-            % Label
-            label = uilabel(fieldGrid);
-            label.Text = labelText;
-            label.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            label.FontWeight = 'bold';
-
-            % Field panel with arrow buttons
-            fieldPanel = uipanel(fieldGrid);
-            fieldPanel.BorderType = 'line';
-            fieldPanel.BackgroundColor = UiComponents.COLORS.Light;
-
-            % Inner grid: < [value units] >
-            fieldInnerGrid = uigridlayout(fieldPanel, [1, 3]);
-            fieldInnerGrid.ColumnWidth = {30, '1x', 30}; % Small arrow buttons with expanding center
-            fieldInnerGrid.Padding = UiComponents.TIGHT_PADDING;
-            fieldInnerGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
-
-            % Create struct to return multiple components
-            fieldStruct = struct();
-
-            % Decrease button
-            fieldStruct.DecreaseButton = UiBuilder.createStyledButton(fieldInnerGrid, 'muted', '<', 'Decrease value', [1, 1]);
-
-            % Center panel for value and units
-            centerPanel = uipanel(fieldInnerGrid);
-            centerPanel.Layout.Row = 1;
-            centerPanel.Layout.Column = 2;
-            centerPanel.BorderType = 'none';
-            centerPanel.BackgroundColor = UiComponents.COLORS.Light;
-
-            centerGrid = uigridlayout(centerPanel, [1, 2]);
-            if nargin > 5 && ~isempty(units)
-                centerGrid.ColumnWidth = {'1x', 'fit'};
-            else
-                centerGrid.ColumnWidth = {'1x'};
-            end
-            centerGrid.Padding = UiComponents.TIGHT_PADDING;
-            centerGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
-
-            % Value field
-            fieldStruct.Field = uieditfield(centerGrid, 'numeric');
-            fieldStruct.Field.Value = defaultValue;
-            fieldStruct.Field.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            fieldStruct.Field.Tooltip = tooltip;
-            fieldStruct.Field.HorizontalAlignment = 'center';
             
-            % Set limits if provided
-            if nargin > 6 && ~isempty(minValue)
-                fieldStruct.Field.Limits = [minValue, maxValue];
+            % If no label text, create field panel directly in parent
+            if isempty(labelText)
+                fieldPanel = uipanel(parent);
+                fieldPanel.Layout.Row = row;
+            else
+                            % Create grid with label and field
+            [fieldGrid, label] = UiBuilder.createLabeledGrid(parent, row, labelText);
+
+                            % Field panel with arrow buttons
+            fieldPanel = uipanel(fieldGrid);
             end
+            fieldPanel = UiBuilder.createFieldPanel(fieldPanel);
 
-            % Units label if provided
-            if nargin > 5 && ~isempty(units)
-                unitsLabel = uilabel(centerGrid);
-                unitsLabel.Text = units;
-                unitsLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
-                unitsLabel.FontWeight = 'bold';
-                unitsLabel.FontColor = UiComponents.COLORS.TextMuted;
-            end
+            % Use the common arrow field components creation
+            fieldStruct = UiBuilder.createArrowFieldComponents(fieldPanel, defaultValue, tooltip, units, minValue, maxValue);
+        end
+        
+        function fieldStruct = createArrowFieldDirect(parent, defaultValue, tooltip, units, minValue, maxValue)
+            % Creates an arrow field directly in the parent (no label, no grid)
+            
+            % Create field panel with standard styling
+            fieldPanel = UiBuilder.createFieldPanel(parent);
 
-            % Increase button
-            fieldStruct.IncreaseButton = UiBuilder.createStyledButton(fieldInnerGrid, 'muted', '>', 'Increase value', [1, 3]);
-
-            % Store configuration for easy access
-            fieldStruct.MinValue = minValue;
-            fieldStruct.MaxValue = maxValue;
-            fieldStruct.DefaultValue = defaultValue;
+            % Use the common arrow field components creation
+            fieldStruct = UiBuilder.createArrowFieldComponents(fieldPanel, defaultValue, tooltip, units, minValue, maxValue);
         end
 
         function field = createFieldBase(parent, row, labelText, defaultValue, tooltip)
             % Creates the base structure for labeled input fields.
-            fieldGrid = uigridlayout(parent, [1, 2]);
-            fieldGrid.Layout.Row = row;
-            fieldGrid.Layout.Column = 1;
-            fieldGrid.ColumnWidth = UiComponents.FIT_EXPAND_COLUMNS;
-            fieldGrid.Padding = UiComponents.TIGHT_PADDING;
-            fieldGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
+            [fieldGrid, label] = UiBuilder.createLabeledGrid(parent, row, labelText);
 
-            label = uilabel(fieldGrid);
-            label.Text = labelText;
-            label.FontSize = UiComponents.CONTROL_FONT_SIZE;
-            label.FontWeight = 'bold';
-
-            fieldPanel = uipanel(fieldGrid);
-            fieldPanel.BorderType = 'line';
-            fieldPanel.BackgroundColor = UiComponents.COLORS.Light;
+            fieldPanel = UiBuilder.createFieldPanel(uipanel(fieldGrid));
 
             fieldInnerGrid = uigridlayout(fieldPanel, [1, 2]);
             fieldInnerGrid.ColumnWidth = UiComponents.STANDARD_COLUMN_WIDTHS;
@@ -732,6 +556,188 @@ classdef UiBuilder
             end
 
             UiComponents.applyButtonStyle(button, style);
+        end
+        
+        function stepsControl = createStepsControl(parent, row)
+            % Creates the steps control (similar to step size but for number of steps)
+            [stepsCard, stepsGrid] = UiBuilder.createControlCard(parent, row, 'Steps');
+            
+            % Create arrow field structure for steps (without label since it's in the card title)
+            stepsControl = UiBuilder.createArrowFieldDirect(stepsGrid, ...
+                FoilviewController.DEFAULT_AUTO_STEPS, 'Number of steps', [], 1, 100);
+        end
+        
+        function delayControl = createDelayControl(parent, row)
+            % Creates the delay control (similar to step size but for delay)
+            [delayCard, delayGrid] = UiBuilder.createControlCard(parent, row, 'Delay');
+            
+            % Create arrow field structure for delay (without label since it's in the card title)
+            delayControl = UiBuilder.createArrowFieldDirect(delayGrid, ...
+                1, 'Delay between steps (seconds)', 's', 0.1, 10);
+        end
+        
+        function directionControl = createDirectionControl(parent, row)
+            % Creates the direction control
+            [directionCard, directionGrid] = UiBuilder.createControlCard(parent, row, 'Direction');
+
+            directionControl = struct();
+            directionControl.DirectionSwitch = uiswitch(directionGrid, 'toggle');
+            directionControl.DirectionSwitch.Items = {'Down', 'Up'};
+            directionControl.DirectionSwitch.Value = 'Up';
+            directionControl.DirectionSwitch.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            directionControl.DirectionSwitch.Tooltip = 'Toggle direction (Up/Down)';
+        end
+        
+        function startControl = createStartControl(parent, row)
+            % Creates the start/stop control with total move display
+            [startCard, startGrid] = UiBuilder.createControlCard(parent, row, 'Control');
+            
+            % Override grid layout for start control (needs 2 rows)
+            startGrid.RowHeight = {'fit', 'fit'};
+            startGrid.RowSpacing = UiComponents.CONTROL_GRID_SPACING;
+
+            startControl = struct();
+            
+            % Start/Stop button
+            startControl.StartStopButton = UiBuilder.createStyledButton(startGrid, 'success', '▶ START', 'Start/Stop auto stepping', [1, 1]);
+            startControl.StartStopButton.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            startControl.StartStopButton.FontWeight = 'bold';
+
+            % Total move label
+            startControl.TotalMoveLabel = uilabel(startGrid);
+            startControl.TotalMoveLabel.Text = 'Total Move : 100 μm ↑';
+            startControl.TotalMoveLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            startControl.TotalMoveLabel.FontWeight = 'bold';
+            startControl.TotalMoveLabel.FontColor = UiComponents.COLORS.TextMuted;
+            startControl.TotalMoveLabel.HorizontalAlignment = 'center';
+            startControl.TotalMoveLabel.Layout.Row = 2;
+        end
+        
+        function onMainWindowResize(mainWindow, toolsWindow)
+            % Callback for main window resize - updates tools window position
+            if ~isempty(toolsWindow) && isvalid(toolsWindow) && toolsWindow.isVisible()
+                toolsWindow.updatePosition();
+            end
+        end
+        
+        function toggleMainWindow(mainWindow, showButton)
+            % Toggle main window visibility and update button text
+            if ~isvalid(mainWindow) || ~isvalid(showButton)
+                return;
+            end
+            
+            if strcmp(mainWindow.Visible, 'on')
+                % Hide main window
+                mainWindow.Visible = 'off';
+                showButton.Text = '🚀 Show FoilView';
+                showButton.Tooltip = 'Show Main FoilView Window';
+                UiComponents.applyButtonStyle(showButton, 'success');
+            else
+                % Show main window
+                mainWindow.Visible = 'on';
+                showButton.Text = '📦 Hide FoilView';
+                showButton.Tooltip = 'Hide Main FoilView Window';
+                UiComponents.applyButtonStyle(showButton, 'warning');
+            end
+        end
+        
+        function fieldStruct = createArrowFieldComponents(fieldPanel, defaultValue, tooltip, units, minValue, maxValue)
+            % Helper method to create the common arrow field components
+            % This extracts the duplicated logic from createArrowField and createArrowFieldDirect
+            % fieldPanel: the panel to contain the arrow field components
+            % defaultValue: initial value for the field
+            % tooltip: tooltip text
+            % units: units text (optional)
+            % minValue, maxValue: limits (optional)
+            
+            % Inner grid: < [value units] >
+            fieldInnerGrid = uigridlayout(fieldPanel, [1, 3]);
+            fieldInnerGrid.ColumnWidth = {30, '1x', 30}; % Small arrow buttons with expanding center
+            fieldInnerGrid.Padding = UiComponents.TIGHT_PADDING;
+            fieldInnerGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
+
+            % Create struct to return multiple components
+            fieldStruct = struct();
+
+            % Decrease button
+            fieldStruct.DecreaseButton = UiBuilder.createStyledButton(fieldInnerGrid, 'muted', '<', 'Decrease value', [1, 1]);
+
+            % Center panel for value and units
+            centerPanel = uipanel(fieldInnerGrid);
+            centerPanel.Layout.Row = 1;
+            centerPanel.Layout.Column = 2;
+            centerPanel.BorderType = 'none';
+            centerPanel.BackgroundColor = UiComponents.COLORS.Light;
+
+            centerGrid = uigridlayout(centerPanel, [1, 2]);
+            if nargin > 3 && ~isempty(units)
+                centerGrid.ColumnWidth = {'1x', 'fit'};
+            else
+                centerGrid.ColumnWidth = {'1x'};
+            end
+            centerGrid.Padding = UiComponents.TIGHT_PADDING;
+            centerGrid.ColumnSpacing = UiComponents.STANDARD_SPACING;
+
+            % Value field
+            fieldStruct.Field = uieditfield(centerGrid, 'numeric');
+            fieldStruct.Field.Value = defaultValue;
+            fieldStruct.Field.FontSize = UiComponents.CONTROL_FONT_SIZE;
+            fieldStruct.Field.Tooltip = tooltip;
+            fieldStruct.Field.HorizontalAlignment = 'center';
+            
+            % Set limits if provided
+            if nargin > 4 && ~isempty(minValue)
+                fieldStruct.Field.Limits = [minValue, maxValue];
+            end
+
+            % Units label if provided
+            if nargin > 3 && ~isempty(units)
+                unitsLabel = uilabel(centerGrid);
+                unitsLabel.Text = units;
+                unitsLabel.FontSize = UiComponents.CONTROL_FONT_SIZE;
+                unitsLabel.FontWeight = 'bold';
+                unitsLabel.FontColor = UiComponents.COLORS.TextMuted;
+            end
+
+            % Increase button
+            fieldStruct.IncreaseButton = UiBuilder.createStyledButton(fieldInnerGrid, 'muted', '>', 'Increase value', [1, 3]);
+
+            % Store configuration for easy access
+            fieldStruct.MinValue = minValue;
+            fieldStruct.MaxValue = maxValue;
+            fieldStruct.DefaultValue = defaultValue;
+        end
+        
+        function [card, grid] = createControlCard(parent, row, title)
+            % Helper method to create a control card with standard styling
+            % This extracts the duplicated logic from createStepsControl and createDelayControl
+            % parent: parent container
+            % row: grid row position
+            % title: card title
+            % Returns: [card, grid] - the card panel and its inner grid
+            
+            card = uipanel(parent);
+            card.Layout.Row = row;
+            card.Title = title;
+            card.FontSize = UiComponents.CARD_TITLE_FONT_SIZE;
+            card.FontWeight = 'bold';
+            card.BorderType = 'line';
+            card.BackgroundColor = UiComponents.COLORS.Card;
+
+            % Create grid layout for the control
+            grid = uigridlayout(card, [1, 1]);
+            grid.Padding = UiComponents.CONTROL_GRID_PADDING;
+        end
+        
+        function fieldPanel = createFieldPanel(panel)
+            % Helper method to apply standard styling to a field panel
+            % This extracts the duplicated logic from createArrowField and createArrowFieldDirect
+            % panel: the panel to style
+            % Returns: the styled panel
+            
+            fieldPanel = panel;
+            fieldPanel.BorderType = 'line';
+            fieldPanel.BackgroundColor = UiComponents.COLORS.Light;
         end
     end
 end

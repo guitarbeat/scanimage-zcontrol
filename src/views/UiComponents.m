@@ -54,6 +54,9 @@ classdef UiComponents
         MIN_WINDOW_WIDTH = 500
         MIN_WINDOW_HEIGHT = 400
         PLOT_WIDTH = 400
+        TOOLS_WINDOW_WIDTH = 280
+        TOOLS_WINDOW_HEIGHT = 250
+        TOOLS_WINDOW_OFFSET = 20
 
         % ===== LAYOUT CONSTANTS =====
         % Common dimensions
@@ -220,6 +223,11 @@ classdef UiComponents
         function stageViewApp = createStageView()
             % Creates and returns a StageView instance.
             stageViewApp = StageView();
+        end
+        
+        function toolsWindow = createToolsWindow(mainWindowHandle)
+            % Creates and returns a ToolsWindow instance.
+            toolsWindow = ToolsWindow(mainWindowHandle);
         end
 
         % ===== UI UPDATE FUNCTIONS =====

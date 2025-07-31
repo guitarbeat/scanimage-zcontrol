@@ -667,10 +667,25 @@
             
             % Use the factory to create the best available controller
             try
+                % Check if MEX controller is available
+                availableTypes = MJC3ControllerFactory.getAvailableTypes();
+                if ismember('MEX', availableTypes)
+                    fprintf('Using high-performance MEX controller (50Hz polling)\n');
+                else
+                    fprintf('MEX controller not available, using: %s\n', availableTypes{1});
+                end
+                
                 controller = MJC3ControllerFactory.createController(zController, stepFactor);
-                fprintf('MJC3 Controller created successfully using factory\n');
+                fprintf('✅ MJC3 Controller created successfully using factory\n');
+                
             catch ME
-                fprintf('Failed to create MJC3 controller using factory: %s\n', ME.message);
+                fprintf('❌ Failed to create MJC3 controller using factory: %s\n', ME.message);
+                
+                % Show helpful error message
+                if contains(ME.message, 'MEX') || contains(ME.message, 'mjc3_joystick_mex')
+                    fprintf('💡 To enable high-performance MEX controller, run: install_mjc3()\n');
+                end
+                
                 fprintf('MJC3 functionality will be limited to manual testing\n');
                 controller = [];
             end

@@ -44,6 +44,9 @@ classdef foilview < matlab.apps.AppBase
     
     methods (Access = public)
         function app = foilview()
+            % Add MJC3 MEX controller paths
+            app.addMJC3Paths();
+            
             components = UiBuilder.build();
             app.copyComponentsFromStruct(components);
             app.setupCallbacks();
@@ -606,6 +609,39 @@ classdef foilview < matlab.apps.AppBase
 
     % === Utility/Helper Methods ===
     methods (Access = private)
+        %% Add MJC3 MEX controller paths
+        function addMJC3Paths(app)
+            % Add paths for the high-performance MEX-based MJC3 controller
+            try
+                currentDir = fileparts(mfilename('fullpath'));
+                srcDir = fileparts(currentDir); % Go up one level from app/ to src/
+                
+                % Add required paths
+                addpath(fullfile(srcDir, 'controllers', 'mjc3'));
+                addpath(fullfile(srcDir, 'controllers'));
+                addpath(fullfile(srcDir, 'views'));
+                
+                % Verify MEX controller is available
+                if exist('mjc3_joystick_mex', 'file') == 3
+                    fprintf('✅ MJC3 MEX controller paths added successfully\n');
+                    
+                    % Test MEX function
+                    try
+                        result = mjc3_joystick_mex('test');
+                        if result
+                            fprintf('✅ MJC3 MEX controller is functional\n');
+                        end
+                    catch
+                        fprintf('⚠️  MJC3 MEX controller paths added but function not responding\n');
+                    end
+                else
+                    fprintf('⚠️  MJC3 MEX controller not found. Run install_mjc3() to build.\n');
+                end
+                
+            catch ME
+                fprintf('⚠️  Error adding MJC3 paths: %s\n', ME.message);
+            end
+        end
         %% Copy UI components from struct
         function copyComponentsFromStruct(app, components)
             fields = fieldnames(components);

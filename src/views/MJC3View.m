@@ -62,6 +62,19 @@ classdef MJC3View < handle
         function setController(obj, controller)
             % Set the HID controller reference
             obj.HIDController = controller;
+            
+            % Display controller type information
+            if ~isempty(controller)
+                controllerType = class(controller);
+                if contains(controllerType, 'MEX')
+                    fprintf('🚀 MJC3View: Using high-performance MEX controller\n');
+                else
+                    fprintf('ℹ️  MJC3View: Using %s controller\n', controllerType);
+                end
+            else
+                fprintf('⚠️  MJC3View: No controller provided (manual mode)\n');
+            end
+            
             obj.updateConnectionStatus();
             obj.detectHardware(); % Check hardware detection status
         end
@@ -541,19 +554,48 @@ classdef MJC3View < handle
         end
         
         function updateJoystickVisualizer(obj)
-            % Update the joystick position visualization
-            % Placeholder - would need actual joystick data
-            % For now, just demonstrate the concept
+            % Update the joystick position visualization with real data
+            if isempty(obj.HIDController) || ~obj.IsEnabled
+                return;
+            end
             
-            % Find existing position indicator
+            % Try to get real joystick data if MEX controller is available
+            try
+                if isa(obj.HIDController, 'MJC3_MEX_Controller')
+                    % Get real-time joystick data from MEX controller
+                    data = obj.HIDController.readJoystick();
+                    if length(data) >= 5
+                        xPos = data(1);  % X position (-127 to 127)
+                        zPos = data(3);  % Z position (-127 to 127)
+                        
+                        % Find existing position indicator
+                        posIndicator = findobj(obj.JoystickVisualizer, 'Tag', 'PositionIndicator');
+                        if ~isempty(posIndicator)
+                            set(posIndicator, 'XData', xPos, 'YData', zPos);
+                            
+                            % Update color based on movement
+                            if abs(xPos) > 5 || abs(zPos) > 5
+                                set(posIndicator, 'CData', [1 0 0]); % Red when moving
+                            else
+                                set(posIndicator, 'CData', [0 1 0]); % Green when centered
+                            end
+                        end
+                        
+                        % Update position display with actual values
+                        obj.PositionDisplay.Text = sprintf('X: %d, Z: %d', xPos, zPos);
+                        return;
+                    end
+                end
+            catch
+                % Fall back to placeholder if real data unavailable
+            end
+            
+            % Placeholder implementation for non-MEX controllers
             posIndicator = findobj(obj.JoystickVisualizer, 'Tag', 'PositionIndicator');
             if ~isempty(posIndicator)
-                % Update position (placeholder values)
-                % In real implementation, get actual joystick X,Z values
-                xPos = 0;  % Would come from joystick
-                zPos = 0;  % Would come from joystick
-                
-                set(posIndicator, 'XData', xPos, 'YData', zPos);
+                % Keep current position or return to center
+                set(posIndicator, 'XData', 0, 'YData', 0);
+                set(posIndicator, 'CData', [0.5 0.5 0.5]); % Gray when no data
             end
         end
         

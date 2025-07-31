@@ -1,11 +1,11 @@
 classdef HIDController < handle
-    % HIDController - Manages MJC3 HID joystick integration with ScanImage
+    % HIDController - Manages MJC3 joystick integration with ScanImage
     %
-    % This controller bridges the MJC3_HID_Controller with the main application,
+    % This controller bridges the MJC3_MEX_Controller with the main application,
     % providing UI integration and status management for joystick-based Z-control.
     
     properties (Access = private)
-        hidController    % Instance of MJC3_HID_Controller
+        hidController    % Instance of MJC3_MEX_Controller
         zController     % Z-axis controller (must implement relativeMove method)
         uiComponents    % UI components for HID controls
         isEnabled       % Current enable/disable state
@@ -49,34 +49,29 @@ classdef HIDController < handle
                     return; % Already enabled
                 end
                 
-                % Check if Psychtoolbox is available
-                if ~exist('PsychHID', 'file')
-                    error('Psychtoolbox not found. Please install Psychtoolbox to use MJC3 joystick control.');
-                end
-                
-                % Create and start HID controller using factory
+                % Create and start MEX controller using factory
                 obj.hidController = MJC3ControllerFactory.createController(obj.zController, obj.stepFactor);
                 obj.hidController.start();
                 
                 obj.isEnabled = true;
                 obj.updateUI();
                 
-                fprintf('MJC3 HID Controller enabled (Step factor: %.1f μm/unit)\n', obj.stepFactor);
+                fprintf('MJC3 Controller enabled (Step factor: %.1f μm/unit)\n', obj.stepFactor);
                 
             catch ME
                 obj.isEnabled = false;
                 obj.updateUI();
                 
                 % Show user-friendly error message
-                if contains(ME.message, 'MJC3 HID joystick not found')
+                if contains(ME.message, 'MEX function') || contains(ME.message, 'mjc3_joystick_mex')
+                    errordlg('MEX controller not available. Please run build_mjc3_mex() to compile the MEX function.', 'MEX Not Found');
+                elseif contains(ME.message, 'MJC3 device not connected')
                     errordlg('MJC3 joystick not detected. Please check USB connection.', 'Joystick Not Found');
-                elseif contains(ME.message, 'Psychtoolbox')
-                    errordlg('Psychtoolbox is required for joystick control. Please install Psychtoolbox.', 'Missing Dependency');
                 else
-                    errordlg(sprintf('Failed to enable joystick control: %s', ME.message), 'HID Controller Error');
+                    errordlg(sprintf('Failed to enable joystick control: %s', ME.message), 'Controller Error');
                 end
                 
-                warning('MJC3Controller:EnableFailed', 'Failed to enable MJC3 HID Controller: %s', ME.message);
+                warning('MJC3Controller:EnableFailed', 'Failed to enable MJC3 Controller: %s', ME.message);
             end
         end
         
@@ -92,10 +87,10 @@ classdef HIDController < handle
                 obj.isEnabled = false;
                 obj.updateUI();
                 
-                fprintf('MJC3 HID Controller disabled\n');
+                fprintf('MJC3 Controller disabled\n');
                 
             catch ME
-                warning('MJC3Controller:DisableFailed', 'Error disabling MJC3 HID Controller: %s', ME.message);
+                warning('MJC3Controller:DisableFailed', 'Error disabling MJC3 Controller: %s', ME.message);
             end
         end
         

@@ -1,10 +1,10 @@
 classdef MJC3ControllerFactory < handle
     % MJC3ControllerFactory - Factory for creating MJC3 joystick controllers
-    % Automatically selects the best available controller implementation
+    % Primary implementation uses high-performance MEX controller
     
     properties (Constant)
-        % Controller types in order of preference
-        CONTROLLER_TYPES = {'HID', 'Native', 'Windows_HID', 'Keyboard', 'Simulation'};
+        % Controller types in order of preference (MEX is primary)
+        CONTROLLER_TYPES = {'MEX', 'Simulation'};
         
         % Default step factor
         DEFAULT_STEP_FACTOR = 5;
@@ -40,14 +40,8 @@ classdef MJC3ControllerFactory < handle
             
             % Create controller based on type
             switch selectedType
-                case 'HID'
-                    controller = MJC3_HID_Controller(zController, stepFactor);
-                case 'Native'
-                    controller = MJC3_Native_Controller(zController, stepFactor);
-                case 'Windows_HID'
-                    controller = MJC3_Windows_HID_Controller(zController, stepFactor);
-                case 'Keyboard'
-                    controller = MJC3_Keyboard_Controller(zController, stepFactor);
+                case 'MEX'
+                    controller = MJC3_MEX_Controller(zController, stepFactor);
                 case 'Simulation'
                     controller = MJC3_Simulation_Controller(zController, stepFactor);
                 otherwise
@@ -61,22 +55,27 @@ classdef MJC3ControllerFactory < handle
             % Get list of available controller types in order of preference
             types = {};
             
-            % Check for HID controller (requires PsychHID)
-            if exist('PsychHID', 'file')
-                types{end+1} = 'HID';
+            % Check for MEX controller (primary implementation)
+            if exist('mjc3_joystick_mex', 'file') == 3  % 3 = MEX file
+                try
+                    % Test if MEX function works
+                    result = mjc3_joystick_mex('test');
+                    if ~isempty(result) && result
+                        types{end+1} = 'MEX';
+                    end
+                catch
+                    % MEX exists but doesn't work - show warning
+                    warning('MJC3:MEXNotWorking', 'MEX function exists but not working. Run build_mjc3_mex() to rebuild.');
+                end
             end
             
-            % Check for Native controller (Windows API)
-            if ispc
-                types{end+1} = 'Native';
-                types{end+1} = 'Windows_HID';
-            end
-            
-            % Keyboard controller is always available
-            types{end+1} = 'Keyboard';
-            
-            % Simulation controller is always available
+            % Simulation controller is always available as fallback
             types{end+1} = 'Simulation';
+            
+            % If no MEX controller, show setup message
+            if ~ismember('MEX', types)
+                fprintf('ℹ MEX controller not available. Run build_mjc3_mex() to enable high-performance controller.\n');
+            end
         end
         
         function listAvailableTypes()
@@ -89,16 +88,10 @@ classdef MJC3ControllerFactory < handle
             for i = 1:length(availableTypes)
                 type = availableTypes{i};
                 switch type
-                    case 'HID'
-                        desc = 'Direct HID access via PsychHID (recommended)';
-                    case 'Native'
-                        desc = 'Windows native joystick API';
-                    case 'Windows_HID'
-                        desc = 'Windows HID API (simplified)';
-                    case 'Keyboard'
-                        desc = 'Keyboard shortcuts as joystick alternative';
+                    case 'MEX'
+                        desc = 'High-performance MEX with direct HID access (primary)';
                     case 'Simulation'
-                        desc = 'Simulated joystick for testing';
+                        desc = 'Simulated joystick for testing and development';
                 end
                 fprintf('%d. %s: %s\n', i, type, desc);
             end

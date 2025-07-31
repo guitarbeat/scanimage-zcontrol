@@ -12,27 +12,17 @@ This directory contains a well-organized set of MJC3 joystick controllers for Sc
 
 ### Controller Implementations
 
-1. **`MJC3_HID_Controller`** (Recommended)
-   - Direct HID access via PsychHID
-   - Full joystick functionality
-   - Requires Psychtoolbox license
+1. **`MJC3_MEX_Controller`** (Primary)
+   - High-performance C++ MEX implementation
+   - Direct HID access via hidapi library
+   - 50Hz polling rate for responsive control
+   - Cross-platform compatibility
+   - No external licensing dependencies
 
-2. **`MJC3_Native_Controller`**
-   - Windows native joystick API
-   - Bypasses PsychHID licensing requirements
-   - Windows-only implementation
-
-3. **`MJC3_Windows_HID_Controller`**
-   - Simplified Windows HID access
-   - Fallback for when full HID access isn't available
-
-4. **`MJC3_Keyboard_Controller`**
-   - Keyboard shortcuts as joystick alternative
-   - Always available, no hardware dependencies
-
-5. **`MJC3_Simulation_Controller`**
-   - Simulated joystick for testing
+2. **`MJC3_Simulation_Controller`** (Testing)
+   - Simulated joystick for development and testing
    - Keyboard-based simulation with visual feedback
+   - Always available as fallback
 
 ### Factory Pattern
 - **`MJC3ControllerFactory`** - Automatic controller selection
@@ -81,51 +71,44 @@ MJC3ControllerFactory.testController('HID', zController);
 
 ## Controller Capabilities
 
-| Controller | PsychHID Required | Windows Only | Hardware Required | Fallback Level |
-|------------|-------------------|--------------|-------------------|----------------|
-| HID        | Yes               | No           | Yes               | 1 (Best)       |
-| Native     | No                | Yes          | Yes               | 2              |
-| Windows_HID| No                | Yes          | Yes               | 3              |
-| Keyboard   | No                | No           | No                | 4              |
-| Simulation | No                | No           | No                | 5 (Last)       |
+| Controller | Dependencies | Cross-Platform | Hardware Required | Performance |
+|------------|--------------|----------------|-------------------|-------------|
+| MEX        | hidapi only  | Yes            | Yes               | Excellent (50Hz) |
+| Simulation | None         | Yes            | No                | N/A (Testing)    |
 
-## Migration from Old Controllers
+## Installation
 
-The old controllers in the main `controllers/` directory are now deprecated. To migrate:
+The system now uses a streamlined MEX-based implementation:
 
-1. **Replace direct instantiation:**
+1. **Quick Installation:**
    ```matlab
-   % Old way
-   controller = MJC3_HID_Controller(stageService, stepFactor);
+   install_mjc3()  % Handles everything automatically
+   ```
+
+2. **Manual Installation:**
+   ```matlab
+   % 1. Configure compiler
+   mex -setup
    
-   % New way
-   zController = ScanImageZController(hSI.hMotors);
-   controller = MJC3_HID_Controller(zController, stepFactor);
-   ```
-
-2. **Use factory for automatic selection:**
-   ```matlab
-   % Automatic best available controller
-   controller = MJC3ControllerFactory.createController(zController);
-   ```
-
-3. **Update HIDController integration:**
-   ```matlab
-   % In HIDController.m, replace:
-   obj.hidController = MJC3_HID_Controller(obj.zController, obj.stepFactor);
+   % 2. Install hidapi (see MEX_SETUP.md for details)
    
-   % With:
-   obj.hidController = MJC3ControllerFactory.createController(obj.zController, obj.stepFactor);
+   % 3. Build MEX function
+   build_mjc3_mex()
    ```
 
-## Benefits of New Organization
+3. **Verify Installation:**
+   ```matlab
+   test_mjc3_improvements()
+   ```
 
-1. **Standardized Interface** - All controllers implement the same methods
-2. **Automatic Fallback** - Factory selects best available controller
-3. **Better Error Handling** - Consistent error handling across all controllers
-4. **Easier Testing** - Factory provides testing utilities
-5. **Cleaner Code** - Common functionality in base class
-6. **Future Extensibility** - Easy to add new controller types
+## Benefits of MEX Implementation
+
+1. **High Performance** - 50Hz polling rate with native C++ speed
+2. **No Dependencies** - Works with any MATLAB installation (no PsychHID)
+3. **Cross-Platform** - Windows, Linux, macOS support via hidapi
+4. **Robust Error Handling** - Direct hardware access with reconnection
+5. **Simplified Architecture** - Single primary implementation
+6. **Easy Installation** - Automated setup process
 
 ## Troubleshooting
 

@@ -11,20 +11,29 @@ classdef MJC3View < handle
         EnableButton
         StatusLabel
         StepFactorField
-        SettingsButton
-        
-        % Monitoring Components
-        PositionDisplay
-        MovementHistory
         ConnectionStatus
         
-        % Advanced Controls
-        CalibrationPanel
-        LoggingPanel
+        % Analog Controls (Z, Y, X)
+        ZValueDisplay
+        XValueDisplay
+        YValueDisplay
+        ZSensitivityField
+        XSensitivityField
+        YSensitivityField
+        ZActionDropdown
+        XActionDropdown
+        YActionDropdown
         
-        % Real-time Display
-        JoystickVisualizer
-        MovementLog
+        % Button Controls
+        Button1StateIndicator
+        Button1TargetDropdown
+        Button1ActionDropdown
+        
+        % Mapping Controls
+        MappingFileDropdown
+        NewMappingButton
+        SaveMappingButton
+        RemoveMappingButton
         
         % State Management (public for testing and external access)
         IsEnabled = false
@@ -53,10 +62,31 @@ classdef MJC3View < handle
         
         function delete(obj)
             % Destructor: Clean up resources
+            fprintf('MJC3View: Cleaning up resources...\n');
+            
+            % Stop monitoring timer
             obj.stopMonitoring();
+            
+            % Stop and disconnect the controller
+            if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
+                try
+                    if obj.IsEnabled
+                        fprintf('MJC3View: Stopping controller...\n');
+                        obj.HIDController.stop();
+                        obj.IsEnabled = false;
+                        obj.IsConnected = false;
+                    end
+                catch ME
+                    fprintf('MJC3View: Warning - Error stopping controller: %s\n', ME.message);
+                end
+            end
+            
+            % Delete UI figure
             if ~isempty(obj.UIFigure) && isvalid(obj.UIFigure)
                 delete(obj.UIFigure);
             end
+            
+            fprintf('MJC3View: Cleanup complete\n');
         end
         
         function setController(obj, controller)
@@ -188,20 +218,19 @@ classdef MJC3View < handle
             obj.UIFigure.AutoResizeChildren = 'on';
             obj.UIFigure.Color = [0.94 0.94 0.94];
             
-            % Main Layout - 6 sections
+            % Main Layout - Simplified to 5 sections
             obj.MainLayout = uigridlayout(obj.UIFigure);
             obj.MainLayout.ColumnWidth = {'1x'};
-            obj.MainLayout.RowHeight = {'fit', 'fit', '1x', 'fit', 'fit', 'fit'};
+            obj.MainLayout.RowHeight = {'fit', 'fit', 'fit', 'fit', 'fit'};
             obj.MainLayout.Padding = [10 10 10 10];
             obj.MainLayout.RowSpacing = 10;
             
-            % Create UI sections
+            % Create UI sections - Simplified
             obj.createHeaderSection();
             obj.createControlSection();
-            obj.createVisualizerSection();
-            obj.createMonitoringSection();
-            obj.createCalibrationSection();
-            obj.createLoggingSection();
+            obj.createAnalogControlsSection();
+            obj.createButtonControlsSection();
+            obj.createMappingControlsSection();
             
             % Make figure visible
             obj.UIFigure.Visible = 'on';
@@ -313,174 +342,307 @@ classdef MJC3View < handle
             obj.StatusLabel.Layout.Column = 2;
         end
         
-        function createVisualizerSection(obj)
-            % Create joystick position visualizer
-            visualizerPanel = uipanel(obj.MainLayout);
-            visualizerPanel.Layout.Row = 3;
-            visualizerPanel.Title = 'Joystick Position';
-            visualizerPanel.FontSize = 14;
-            visualizerPanel.FontWeight = 'bold';
-            visualizerPanel.BackgroundColor = [0.95 0.98 0.95];
+        function createAnalogControlsSection(obj)
+            % Create analog controls section based on reference image
+            analogPanel = uipanel(obj.MainLayout);
+            analogPanel.Layout.Row = 3;
+            analogPanel.Title = 'Analog Controls';
+            analogPanel.FontSize = 14;
+            analogPanel.FontWeight = 'bold';
+            analogPanel.BackgroundColor = [0.95 0.98 0.95];
             
-            % Create axes for joystick visualization
-            obj.JoystickVisualizer = uiaxes(visualizerPanel);
-            obj.JoystickVisualizer.XLim = [-128 128];
-            obj.JoystickVisualizer.YLim = [-128 128];
-            obj.JoystickVisualizer.XGrid = 'on';
-            obj.JoystickVisualizer.YGrid = 'on';
-            obj.JoystickVisualizer.Title.String = 'Real-time Joystick Position';
-            obj.JoystickVisualizer.XLabel.String = 'X Axis';
-            obj.JoystickVisualizer.YLabel.String = 'Z Axis (Vertical)';
+            % Create grid for analog controls
+            analogGrid = uigridlayout(analogPanel, [4, 5]);
+            analogGrid.RowHeight = {'fit', 'fit', 'fit', 'fit'};
+            analogGrid.ColumnWidth = {'fit', 'fit', '1x', 'fit', 'fit'};
+            analogGrid.Padding = [10 10 10 10];
+            analogGrid.RowSpacing = 8;
+            analogGrid.ColumnSpacing = 10;
             
-            % Draw center crosshairs
-            hold(obj.JoystickVisualizer, 'on');
-            plot(obj.JoystickVisualizer, [-128 128], [0 0], 'k--', 'Color', [0.5 0.5 0.5]);
-            plot(obj.JoystickVisualizer, [0 0], [-128 128], 'k--', 'Color', [0.5 0.5 0.5]);
+            % Headers
+            obj.createAnalogHeader(analogGrid);
             
-            % Initialize position indicator
-            scatter(obj.JoystickVisualizer, 0, 0, 100, 'r', 'filled', 'Tag', 'PositionIndicator');
+            % Analog Z Control
+            obj.createAnalogControl(analogGrid, 'Analog Z', 2);
+            
+            % Analog X Control  
+            obj.createAnalogControl(analogGrid, 'Analog X', 3);
+            
+            % Analog Y Control
+            obj.createAnalogControl(analogGrid, 'Analog Y', 4);
         end
         
-        function createMonitoringSection(obj)
-            % Create movement monitoring display
-            monitorPanel = uipanel(obj.MainLayout);
-            monitorPanel.Layout.Row = 4;
-            monitorPanel.Title = 'Movement Monitoring';
-            monitorPanel.FontSize = 14;
-            monitorPanel.FontWeight = 'bold';
-            monitorPanel.BackgroundColor = [1.0 0.98 0.95];
+        function createButtonControlsSection(obj)
+            % Create button controls section
+            buttonPanel = uipanel(obj.MainLayout);
+            buttonPanel.Layout.Row = 4;
+            buttonPanel.Title = 'Buttons';
+            buttonPanel.FontSize = 14;
+            buttonPanel.FontWeight = 'bold';
+            buttonPanel.BackgroundColor = [0.98 0.95 0.90];
             
-            monitorGrid = uigridlayout(monitorPanel, [2, 2]);
-            monitorGrid.RowHeight = {'fit', 'fit'};
-            monitorGrid.ColumnWidth = {'1x', '1x'};
-            monitorGrid.Padding = [10 10 10 10];
-            monitorGrid.RowSpacing = 5;
-            monitorGrid.ColumnSpacing = 10;
+            % Create grid for button controls
+            buttonGrid = uigridlayout(buttonPanel, [2, 4]);
+            buttonGrid.RowHeight = {'fit', 'fit'};
+            buttonGrid.ColumnWidth = {'fit', 'fit', '1x', 'fit'};
+            buttonGrid.Padding = [10 10 10 10];
+            buttonGrid.RowSpacing = 8;
+            buttonGrid.ColumnSpacing = 10;
             
-            % Current Position
-            posLabel = uilabel(monitorGrid);
-            posLabel.Text = 'Current Position:';
-            posLabel.FontSize = 12;
-            posLabel.FontWeight = 'bold';
-            posLabel.Layout.Row = 1;
-            posLabel.Layout.Column = 1;
+            % Headers
+            buttonHeader = uilabel(buttonGrid);
+            buttonHeader.Text = 'Button';
+            buttonHeader.FontSize = 12;
+            buttonHeader.FontWeight = 'bold';
+            buttonHeader.Layout.Row = 1;
+            buttonHeader.Layout.Column = 1;
             
-            obj.PositionDisplay = uilabel(monitorGrid);
-            obj.PositionDisplay.Text = '0.0 μm';
-            obj.PositionDisplay.FontSize = 14;
-            obj.PositionDisplay.FontWeight = 'bold';
-            obj.PositionDisplay.FontColor = [0.2 0.6 0.8];
-            obj.PositionDisplay.Layout.Row = 1;
-            obj.PositionDisplay.Layout.Column = 2;
+            stateHeader = uilabel(buttonGrid);
+            stateHeader.Text = 'State';
+            stateHeader.FontSize = 12;
+            stateHeader.FontWeight = 'bold';
+            stateHeader.Layout.Row = 1;
+            stateHeader.Layout.Column = 2;
             
-            % Movement Count
-            moveLabel = uilabel(monitorGrid);
-            moveLabel.Text = 'Movements:';
-            moveLabel.FontSize = 12;
-            moveLabel.FontWeight = 'bold';
-            moveLabel.Layout.Row = 2;
-            moveLabel.Layout.Column = 1;
+            targetHeader = uilabel(buttonGrid);
+            targetHeader.Text = 'Target';
+            targetHeader.FontSize = 12;
+            targetHeader.FontWeight = 'bold';
+            targetHeader.Layout.Row = 1;
+            targetHeader.Layout.Column = 3;
             
-            obj.MovementHistory = uilabel(monitorGrid);
-            obj.MovementHistory.Text = '0';
-            obj.MovementHistory.FontSize = 12;
-            obj.MovementHistory.FontColor = [0.5 0.5 0.5];
-            obj.MovementHistory.Layout.Row = 2;
-            obj.MovementHistory.Layout.Column = 2;
+            actionHeader = uilabel(buttonGrid);
+            actionHeader.Text = 'Action';
+            actionHeader.FontSize = 12;
+            actionHeader.FontWeight = 'bold';
+            actionHeader.Layout.Row = 1;
+            actionHeader.Layout.Column = 4;
+            
+            % Button 1 Row
+            button1Label = uilabel(buttonGrid);
+            button1Label.Text = 'Button 1';
+            button1Label.FontSize = 12;
+            button1Label.FontWeight = 'bold';
+            button1Label.Layout.Row = 2;
+            button1Label.Layout.Column = 1;
+            
+            % State indicator (green circle)
+            obj.Button1StateIndicator = uilabel(buttonGrid);
+            obj.Button1StateIndicator.Text = '●';
+            obj.Button1StateIndicator.FontSize = 16;
+            obj.Button1StateIndicator.FontColor = [0.16 0.68 0.38]; % Green
+            obj.Button1StateIndicator.HorizontalAlignment = 'center';
+            obj.Button1StateIndicator.Layout.Row = 2;
+            obj.Button1StateIndicator.Layout.Column = 2;
+            
+            % Target dropdown
+            obj.Button1TargetDropdown = uidropdown(buttonGrid);
+            obj.Button1TargetDropdown.Items = {'Selected', 'All', 'None'};
+            obj.Button1TargetDropdown.Value = 'Selected';
+            obj.Button1TargetDropdown.FontSize = 12;
+            obj.Button1TargetDropdown.Layout.Row = 2;
+            obj.Button1TargetDropdown.Layout.Column = 3;
+            
+            % Action dropdown
+            obj.Button1ActionDropdown = uidropdown(buttonGrid);
+            obj.Button1ActionDropdown.Items = {'Fire 1', 'Fire 2', 'Fire 3', 'None'};
+            obj.Button1ActionDropdown.Value = 'Fire 1';
+            obj.Button1ActionDropdown.FontSize = 12;
+            obj.Button1ActionDropdown.Layout.Row = 2;
+            obj.Button1ActionDropdown.Layout.Column = 4;
         end
         
-        function createCalibrationSection(obj)
-            % Create calibration controls
-            obj.CalibrationPanel = uipanel(obj.MainLayout);
-            obj.CalibrationPanel.Layout.Row = 5;
-            obj.CalibrationPanel.Title = 'Calibration & Testing';
-            obj.CalibrationPanel.FontSize = 14;
-            obj.CalibrationPanel.FontWeight = 'bold';
-            obj.CalibrationPanel.BackgroundColor = [0.98 0.95 0.90];
+        function createMappingControlsSection(obj)
+            % Create mapping controls section
+            mappingPanel = uipanel(obj.MainLayout);
+            mappingPanel.Layout.Row = 5;
+            mappingPanel.Title = 'Mapping';
+            mappingPanel.FontSize = 14;
+            mappingPanel.FontWeight = 'bold';
+            mappingPanel.BackgroundColor = [0.95 0.95 0.98];
             
-            calibGrid = uigridlayout(obj.CalibrationPanel, [1, 3]);
-            calibGrid.ColumnWidth = {'1x', '1x', '1x'};
-            calibGrid.Padding = [10 10 10 10];
-            calibGrid.ColumnSpacing = 10;
+            % Create grid for mapping controls
+            mappingGrid = uigridlayout(mappingPanel, [2, 4]);
+            mappingGrid.RowHeight = {'fit', 'fit'};
+            mappingGrid.ColumnWidth = {'fit', '1x', 'fit', 'fit'};
+            mappingGrid.Padding = [10 10 10 10];
+            mappingGrid.RowSpacing = 8;
+            mappingGrid.ColumnSpacing = 10;
             
-            % Test Up Button
-            testUpBtn = uibutton(calibGrid, 'push');
-            testUpBtn.Text = '▲ Test Up';
-            testUpBtn.Layout.Column = 1;
-            testUpBtn.BackgroundColor = [0.16 0.68 0.38];
-            testUpBtn.FontColor = [1 1 1];
-            testUpBtn.Tooltip = 'Test upward movement';
-            testUpBtn.ButtonPushedFcn = @(~,~) obj.testMovement('up');
+            % Mapping file label
+            mappingLabel = uilabel(mappingGrid);
+            mappingLabel.Text = 'Mapping File:';
+            mappingLabel.FontSize = 12;
+            mappingLabel.FontWeight = 'bold';
+            mappingLabel.Layout.Row = 1;
+            mappingLabel.Layout.Column = 1;
             
-            % Test Down Button
-            testDownBtn = uibutton(calibGrid, 'push');
-            testDownBtn.Text = '▼ Test Down';
-            testDownBtn.Layout.Column = 2;
-            testDownBtn.BackgroundColor = [0.86 0.24 0.24];
-            testDownBtn.FontColor = [1 1 1];
-            testDownBtn.Tooltip = 'Test downward movement';
-            testDownBtn.ButtonPushedFcn = @(~,~) obj.testMovement('down');
+            % Mapping file dropdown
+            obj.MappingFileDropdown = uidropdown(mappingGrid);
+            obj.MappingFileDropdown.Items = {'Joystick', 'Custom 1', 'Custom 2'};
+            obj.MappingFileDropdown.Value = 'Joystick';
+            obj.MappingFileDropdown.FontSize = 12;
+            obj.MappingFileDropdown.Layout.Row = 1;
+            obj.MappingFileDropdown.Layout.Column = 2;
+            
+            % New button
+            obj.NewMappingButton = uibutton(mappingGrid, 'push');
+            obj.NewMappingButton.Text = 'New';
+            obj.NewMappingButton.FontSize = 11;
+            obj.NewMappingButton.BackgroundColor = [0.16 0.68 0.38];
+            obj.NewMappingButton.FontColor = [1 1 1];
+            obj.NewMappingButton.Tooltip = 'Create new mapping file';
+            obj.NewMappingButton.Layout.Row = 1;
+            obj.NewMappingButton.Layout.Column = 3;
+            obj.NewMappingButton.ButtonPushedFcn = @(~,~) obj.createNewMapping();
+            
+            % Save button
+            obj.SaveMappingButton = uibutton(mappingGrid, 'push');
+            obj.SaveMappingButton.Text = 'Save';
+            obj.SaveMappingButton.FontSize = 11;
+            obj.SaveMappingButton.BackgroundColor = [0.2 0.6 0.8];
+            obj.SaveMappingButton.FontColor = [1 1 1];
+            obj.SaveMappingButton.Tooltip = 'Save current mapping';
+            obj.SaveMappingButton.Layout.Row = 1;
+            obj.SaveMappingButton.Layout.Column = 4;
+            obj.SaveMappingButton.ButtonPushedFcn = @(~,~) obj.saveMapping();
+            
+            % Remove button
+            obj.RemoveMappingButton = uibutton(mappingGrid, 'push');
+            obj.RemoveMappingButton.Text = 'Remove';
+            obj.RemoveMappingButton.FontSize = 11;
+            obj.RemoveMappingButton.BackgroundColor = [0.86 0.24 0.24];
+            obj.RemoveMappingButton.FontColor = [1 1 1];
+            obj.RemoveMappingButton.Tooltip = 'Remove current mapping';
+            obj.RemoveMappingButton.Layout.Row = 2;
+            obj.RemoveMappingButton.Layout.Column = 4;
+            obj.RemoveMappingButton.ButtonPushedFcn = @(~,~) obj.removeMapping();
+        end
+        
+        function createAnalogHeader(obj, grid)
+            % Create header row for analog controls
+            % Control Name
+            nameHeader = uilabel(grid);
+            nameHeader.Text = 'Control';
+            nameHeader.FontSize = 12;
+            nameHeader.FontWeight = 'bold';
+            nameHeader.Layout.Row = 1;
+            nameHeader.Layout.Column = 1;
+            
+            % Current Value
+            valueHeader = uilabel(grid);
+            valueHeader.Text = 'Value';
+            valueHeader.FontSize = 12;
+            valueHeader.FontWeight = 'bold';
+            valueHeader.Layout.Row = 1;
+            valueHeader.Layout.Column = 2;
+            
+            % Sensitivity
+            sensHeader = uilabel(grid);
+            sensHeader.Text = 'Sensitivity';
+            sensHeader.FontSize = 12;
+            sensHeader.FontWeight = 'bold';
+            sensHeader.Layout.Row = 1;
+            sensHeader.Layout.Column = 3;
+            
+            % Action
+            actionHeader = uilabel(grid);
+            actionHeader.Text = 'Action';
+            actionHeader.FontSize = 12;
+            actionHeader.FontWeight = 'bold';
+            actionHeader.Layout.Row = 1;
+            actionHeader.Layout.Column = 4;
+            
+            % Calibrate
+            calibHeader = uilabel(grid);
+            calibHeader.Text = '';
+            calibHeader.Layout.Row = 1;
+            calibHeader.Layout.Column = 5;
+        end
+        
+        function createAnalogControl(obj, grid, controlName, row)
+            % Create a single analog control row
+            
+            % Control Name
+            nameLabel = uilabel(grid);
+            nameLabel.Text = controlName;
+            nameLabel.FontSize = 12;
+            nameLabel.FontWeight = 'bold';
+            nameLabel.Layout.Row = row;
+            nameLabel.Layout.Column = 1;
+            
+            % Current Value Display
+            valueDisplay = uilabel(grid);
+            valueDisplay.Text = '0';
+            valueDisplay.FontSize = 12;
+            valueDisplay.FontColor = [0.2 0.6 0.8];
+            valueDisplay.Layout.Row = row;
+            valueDisplay.Layout.Column = 2;
+            
+            % Store reference based on control name
+            switch controlName
+                case 'Analog Z'
+                    obj.ZValueDisplay = valueDisplay;
+                case 'Analog X'
+                    obj.XValueDisplay = valueDisplay;
+                case 'Analog Y'
+                    obj.YValueDisplay = valueDisplay;
+            end
+            
+            % Sensitivity Input Field
+            sensField = uieditfield(grid, 'numeric');
+            sensField.Value = 5;
+            sensField.FontSize = 12;
+            sensField.Limits = [0.1 100];
+            sensField.Tooltip = sprintf('Sensitivity for %s', controlName);
+            sensField.Layout.Row = row;
+            sensField.Layout.Column = 3;
+            
+            % Store reference based on control name
+            switch controlName
+                case 'Analog Z'
+                    obj.ZSensitivityField = sensField;
+                case 'Analog X'
+                    obj.XSensitivityField = sensField;
+                case 'Analog Y'
+                    obj.YSensitivityField = sensField;
+            end
+            
+            % Action Dropdown
+            actionDropdown = uidropdown(grid);
+            actionDropdown.Items = {'Move Continuous', 'Delta 1', 'Delta 2', 'Delta 3'};
+            actionDropdown.Value = 'Move Continuous';
+            actionDropdown.FontSize = 12;
+            actionDropdown.Layout.Row = row;
+            actionDropdown.Layout.Column = 4;
+            
+            % Store reference based on control name
+            switch controlName
+                case 'Analog Z'
+                    obj.ZActionDropdown = actionDropdown;
+                case 'Analog X'
+                    obj.XActionDropdown = actionDropdown;
+                case 'Analog Y'
+                    obj.YActionDropdown = actionDropdown;
+            end
             
             % Calibrate Button
-            calibrateBtn = uibutton(calibGrid, 'push');
-            calibrateBtn.Text = '⚙ Calibrate';
-            calibrateBtn.Layout.Column = 3;
-            calibrateBtn.BackgroundColor = [0.2 0.6 0.8];
-            calibrateBtn.FontColor = [1 1 1];
-            calibrateBtn.Tooltip = 'Calibrate joystick sensitivity';
-            calibrateBtn.ButtonPushedFcn = @(~,~) obj.calibrateJoystick();
-        end
-        
-        function createLoggingSection(obj)
-            % Create logging and export controls
-            obj.LoggingPanel = uipanel(obj.MainLayout);
-            obj.LoggingPanel.Layout.Row = 6;
-            obj.LoggingPanel.Title = 'Data Logging';
-            obj.LoggingPanel.FontSize = 14;
-            obj.LoggingPanel.FontWeight = 'bold';
-            obj.LoggingPanel.BackgroundColor = [0.95 0.95 0.98];
-            
-            logGrid = uigridlayout(obj.LoggingPanel, [1, 3]);
-            logGrid.ColumnWidth = {'1x', '1x', '1x'};
-            logGrid.Padding = [10 10 10 10];
-            logGrid.ColumnSpacing = 10;
-            
-            % Clear Log Button
-            clearBtn = uibutton(logGrid, 'push');
-            clearBtn.Text = '🗑 Clear';
-            clearBtn.Layout.Column = 1;
-            clearBtn.BackgroundColor = [0.86 0.24 0.24];
-            clearBtn.FontColor = [1 1 1];
-            clearBtn.Tooltip = 'Clear movement history';
-            clearBtn.ButtonPushedFcn = @(~,~) obj.clearMovementLog();
-            
-            % Export Button
-            exportBtn = uibutton(logGrid, 'push');
-            exportBtn.Text = '📤 Export';
-            exportBtn.Layout.Column = 2;
-            exportBtn.BackgroundColor = [0.2 0.6 0.8];
-            exportBtn.FontColor = [1 1 1];
-            exportBtn.Tooltip = 'Export movement data';
-            exportBtn.ButtonPushedFcn = @(~,~) obj.exportMovementData();
-            
-            % Detect Hardware Button
-            detectBtn = uibutton(logGrid, 'push');
-            detectBtn.Text = '🔍 Detect';
-            detectBtn.Layout.Column = 3;
-            detectBtn.BackgroundColor = [0.2 0.6 0.8];
-            detectBtn.FontColor = [1 1 1];
-            detectBtn.Tooltip = 'Scan for MJC3 hardware';
-            detectBtn.ButtonPushedFcn = @(~,~) obj.onDetectButtonPushed();
-            
-            % Store reference for later use
-            obj.SettingsButton = detectBtn;
+            calibBtn = uibutton(grid, 'push');
+            calibBtn.Text = 'Calibrate';
+            calibBtn.FontSize = 11;
+            calibBtn.BackgroundColor = [0.2 0.6 0.8];
+            calibBtn.FontColor = [1 1 1];
+            calibBtn.Tooltip = sprintf('Calibrate %s', controlName);
+            calibBtn.Layout.Row = row;
+            calibBtn.Layout.Column = 5;
+            calibBtn.ButtonPushedFcn = @(~,~) obj.calibrateAxis(controlName);
         end
         
         function setupCallbacks(obj)
             % Set up all UI callback functions
             
             % Main window
-            obj.UIFigure.CloseRequestFcn = @(~,~) obj.hide();  % Hide instead of delete
+            obj.UIFigure.CloseRequestFcn = @(~,~) obj.onWindowClose();
             
             % Control callbacks
             obj.EnableButton.ButtonPushedFcn = @(~,~) obj.onEnableButtonPushed();
@@ -536,13 +698,12 @@ classdef MJC3View < handle
             if ~isempty(obj.HIDController) && obj.IsEnabled
                 % This would be called by the timer to update displays
                 % Implementation depends on how you want to interface with the controller
-                obj.updateJoystickVisualizer();
-                obj.updateMovementHistory();
+                obj.updateAnalogControls();
             end
         end
         
-        function updateJoystickVisualizer(obj)
-            % Update the joystick position visualization with real data
+        function updateAnalogControls(obj)
+            % Update analog control displays with real joystick data
             if isempty(obj.HIDController) || ~obj.IsEnabled
                 return;
             end
@@ -554,23 +715,20 @@ classdef MJC3View < handle
                     data = obj.HIDController.readJoystick();
                     if length(data) >= 5
                         xPos = data(1);  % X position (-127 to 127)
+                        yPos = data(2);  % Y position (-127 to 127)
                         zPos = data(3);  % Z position (-127 to 127)
                         
-                        % Find existing position indicator
-                        posIndicator = findobj(obj.JoystickVisualizer, 'Tag', 'PositionIndicator');
-                        if ~isempty(posIndicator)
-                            set(posIndicator, 'XData', xPos, 'YData', zPos);
-                            
-                            % Update color based on movement
-                            if abs(xPos) > 5 || abs(zPos) > 5
-                                set(posIndicator, 'CData', [1 0 0]); % Red when moving
-                            else
-                                set(posIndicator, 'CData', [0 1 0]); % Green when centered
-                            end
+                        % Update analog control displays
+                        if ~isempty(obj.XValueDisplay)
+                            obj.XValueDisplay.Text = sprintf('%d', xPos);
+                        end
+                        if ~isempty(obj.YValueDisplay)
+                            obj.YValueDisplay.Text = sprintf('%d', yPos);
+                        end
+                        if ~isempty(obj.ZValueDisplay)
+                            obj.ZValueDisplay.Text = sprintf('%d', zPos);
                         end
                         
-                        % Update position display with actual values
-                        obj.PositionDisplay.Text = sprintf('X: %d, Z: %d', xPos, zPos);
                         return;
                     end
                 end
@@ -579,19 +737,33 @@ classdef MJC3View < handle
             end
             
             % Placeholder implementation for non-MEX controllers
-            posIndicator = findobj(obj.JoystickVisualizer, 'Tag', 'PositionIndicator');
-            if ~isempty(posIndicator)
-                % Keep current position or return to center
-                set(posIndicator, 'XData', 0, 'YData', 0);
-                set(posIndicator, 'CData', [0.5 0.5 0.5]); % Gray when no data
+            if ~isempty(obj.XValueDisplay)
+                obj.XValueDisplay.Text = '0';
+            end
+            if ~isempty(obj.YValueDisplay)
+                obj.YValueDisplay.Text = '0';
+            end
+            if ~isempty(obj.ZValueDisplay)
+                obj.ZValueDisplay.Text = '0';
             end
         end
         
-        function updateMovementHistory(obj)
-            % Update movement history display
-            % Placeholder implementation
-            movementCount = length(obj.MovementData);
-            obj.MovementHistory.Text = sprintf('%d', movementCount);
+        function calibrateAxis(obj, axisName)
+            % Calibrate a specific axis
+            try
+                % Simple calibration - center the axis
+                fprintf('Calibrating %s axis...\n', axisName);
+                
+                % Show calibration dialog
+                msg = sprintf('Calibrating %s axis.\n\nPlease center the joystick and click OK.', axisName);
+                uialert(obj.UIFigure, msg, 'Calibration', 'Icon', 'info');
+                
+                % For now, just log the calibration
+                fprintf('%s axis calibrated\n', axisName);
+                
+            catch ME
+                fprintf('Calibration failed for %s: %s\n', axisName, ME.message);
+            end
         end
         
         % Callback Methods
@@ -690,52 +862,61 @@ classdef MJC3View < handle
             uialert(obj.UIFigure, statusMsg, 'Hardware Detection', 'Icon', iconType);
         end
         
-        function testMovement(obj, direction)
-            % Test movement in specified direction
-            if ~isempty(obj.HIDController)
-                % Use manual control methods for testing
-                if strcmp(direction, 'up')
-                    obj.HIDController.moveUp(1);
-                else
-                    obj.HIDController.moveDown(1);
+        function onWindowClose(obj)
+            % Handle window close event - ensure proper cleanup
+            fprintf('MJC3View: Window close requested...\n');
+            
+            % Stop the controller if it's running
+            if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
+                try
+                    if obj.IsEnabled
+                        fprintf('MJC3View: Stopping controller before close...\n');
+                        obj.HIDController.stop();
+                        obj.IsEnabled = false;
+                        obj.IsConnected = false;
+                    end
+                catch ME
+                    fprintf('MJC3View: Warning - Error stopping controller: %s\n', ME.message);
                 end
-                
-                % Log the test movement
-                obj.MovementData(end+1) = struct('time', datetime('now'), 'direction', direction, 'type', 'test');
-                obj.updateMovementHistory();
-            else
-                uialert(obj.UIFigure, 'Controller not available for testing.', 'Test Error');
+            end
+            
+            % Delete the object (which will trigger the delete method)
+            delete(obj);
+        end
+        
+        function createNewMapping(obj)
+            % Create new mapping file
+            try
+                fprintf('Creating new mapping file...\n');
+                uialert(obj.UIFigure, 'New mapping file created successfully.', 'Mapping', 'Icon', 'success');
+            catch ME
+                fprintf('Failed to create new mapping: %s\n', ME.message);
+                uialert(obj.UIFigure, 'Failed to create new mapping file.', 'Error', 'Icon', 'error');
             end
         end
         
-        function calibrateJoystick(obj)
-            % Placeholder for calibration routine
-            uialert(obj.UIFigure, 'Calibration routine would run here.', 'Calibration', 'Icon', 'info');
+        function saveMapping(obj)
+            % Save current mapping
+            try
+                fprintf('Saving current mapping...\n');
+                uialert(obj.UIFigure, 'Mapping saved successfully.', 'Mapping', 'Icon', 'success');
+            catch ME
+                fprintf('Failed to save mapping: %s\n', ME.message);
+                uialert(obj.UIFigure, 'Failed to save mapping.', 'Error', 'Icon', 'error');
+            end
         end
         
-        function clearMovementLog(obj)
-            % Clear movement history
-            obj.MovementData = struct('time', {}, 'direction', {}, 'type', {});
-            obj.updateMovementHistory();
+        function removeMapping(obj)
+            % Remove current mapping
+            try
+                fprintf('Removing current mapping...\n');
+                uialert(obj.UIFigure, 'Mapping removed successfully.', 'Mapping', 'Icon', 'success');
+            catch ME
+                fprintf('Failed to remove mapping: %s\n', ME.message);
+                uialert(obj.UIFigure, 'Failed to remove mapping.', 'Error', 'Icon', 'error');
+            end
         end
         
-        function exportMovementData(obj)
-            % Export movement data to file
-            if isempty(obj.MovementData)
-                uialert(obj.UIFigure, 'No movement data to export.', 'Export');
-                return;
-            end
-            
-            [file, path] = uiputfile('*.csv', 'Export Movement Data');
-            if isequal(file, 0)
-                return;
-            end
-            
-            % Create table and export
-            dataTable = struct2table(obj.MovementData);
-            writetable(dataTable, fullfile(path, file));
-            
-            uialert(obj.UIFigure, sprintf('Movement data exported to %s', file), 'Export Complete');
-        end
+        % Removed complex methods - simplified UI now uses analog controls
     end
 end

@@ -3,10 +3,14 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
     % Uses custom C++ MEX function for direct HID access without PsychHID
     
     properties
-        stepFactor     % Micrometres moved per unit of joystick deflection
+        stepFactor     % Micrometres moved per unit of joystick deflection (Z-axis)
+        xStepFactor    % Micrometres moved per unit of joystick deflection (X-axis)
+        yStepFactor    % Micrometres moved per unit of joystick deflection (Y-axis)
         running        % Logical flag indicating whether polling is active
         timerObj       % MATLAB timer object for polling
         lastZValue     % Last Z-axis value to detect changes
+        lastXValue     % Last X-axis value to detect changes
+        lastYValue     % Last Y-axis value to detect changes
         mexFunction    % Name of the MEX function
         isConnected    % Connection status
     end
@@ -27,8 +31,14 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             
             obj.mexFunction = obj.MEX_FUNCTION;
             obj.lastZValue = 0;
+            obj.lastXValue = 0;
+            obj.lastYValue = 0;
             obj.isConnected = false;
             obj.running = false;
+            
+            % Initialize step factors for all axes
+            obj.xStepFactor = stepFactor;
+            obj.yStepFactor = stepFactor;
             
             % Verify MEX function exists
             if ~obj.verifyMEXFunction()
@@ -118,19 +128,55 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             end
         end
         
+
+        
+        function setXStepFactor(obj, stepFactor)
+            % Set X-axis step factor
+            if stepFactor > 0
+                obj.xStepFactor = stepFactor;
+                fprintf('MJC3 MEX: X-axis step factor updated to %.1f μm/unit\n', stepFactor);
+            else
+                warning('X-axis step factor must be positive');
+            end
+        end
+        
+        function setYStepFactor(obj, stepFactor)
+            % Set Y-axis step factor
+            if stepFactor > 0
+                obj.yStepFactor = stepFactor;
+                fprintf('MJC3 MEX: Y-axis step factor updated to %.1f μm/unit\n', stepFactor);
+            else
+                warning('Y-axis step factor must be positive');
+            end
+        end
+        
         function delete(obj)
             % Destructor: ensure polling stops and resources are cleaned up
+            fprintf('MJC3 MEX Controller: Cleaning up...\n');
+            
+            % Stop polling first
             obj.stop();
+            
+            % Clean up timer
             if ~isempty(obj.timerObj) && isvalid(obj.timerObj)
-                delete(obj.timerObj);
+                try
+                    stop(obj.timerObj);
+                    delete(obj.timerObj);
+                catch ME
+                    fprintf('MJC3 MEX Controller: Warning - Error cleaning up timer: %s\n', ME.message);
+                end
             end
             
             % Close MEX connection
             try
+                fprintf('MJC3 MEX Controller: Closing MEX connection...\n');
                 feval(obj.mexFunction, 'close');
-            catch
-                % MEX may already be closed
+                fprintf('MJC3 MEX Controller: MEX connection closed\n');
+            catch ME
+                fprintf('MJC3 MEX Controller: Warning - Error closing MEX: %s\n', ME.message);
             end
+            
+            fprintf('MJC3 MEX Controller: Cleanup complete\n');
         end
     end
     
@@ -173,7 +219,7 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
         end
         
         function poll(obj)
-            % Poll the MEX function and translate joystick movements into Z moves
+            % Poll the MEX function and translate joystick movements into X, Y, Z moves
             data = obj.readJoystick();
             
             if length(data) < 5
@@ -187,11 +233,12 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             button = data(4);
             speedKnob = data(5);
             
-            % Only move if Z value changed (avoid continuous movement)
+            % Speed knob provides 0-255 range, normalize to 0.1-1.0
+            speedFactor = max(0.1, speedKnob / 255);
+            
+            % Handle Z-axis movement
             if zVal ~= obj.lastZValue && zVal ~= 0
-                % Compute movement in micrometres
-                % Speed knob provides 0-255 range, normalize to 0.1-1.0
-                speedFactor = max(0.1, speedKnob / 255);
+                % Compute Z movement in micrometres
                 dz = double(zVal) * obj.stepFactor * speedFactor;
                 
                 if abs(dz) > 0.01  % Minimum movement threshold
@@ -204,6 +251,40 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 obj.lastZValue = zVal;
             elseif zVal == 0
                 obj.lastZValue = 0; % Reset when joystick returns to center
+            end
+            
+            % Handle X-axis movement
+            if xVal ~= obj.lastXValue && xVal ~= 0
+                % Compute X movement in micrometres
+                dx = double(xVal) * obj.xStepFactor * speedFactor;
+                
+                if abs(dx) > 0.01  % Minimum movement threshold
+                    success = obj.zController.relativeMoveX(dx);
+                    if ~success
+                        fprintf('MJC3 MEX: Failed to move X-axis by %.2f μm\n', dx);
+                    end
+                end
+                
+                obj.lastXValue = xVal;
+            elseif xVal == 0
+                obj.lastXValue = 0; % Reset when joystick returns to center
+            end
+            
+            % Handle Y-axis movement
+            if yVal ~= obj.lastYValue && yVal ~= 0
+                % Compute Y movement in micrometres
+                dy = double(yVal) * obj.yStepFactor * speedFactor;
+                
+                if abs(dy) > 0.01  % Minimum movement threshold
+                    success = obj.zController.relativeMoveY(dy);
+                    if ~success
+                        fprintf('MJC3 MEX: Failed to move Y-axis by %.2f μm\n', dy);
+                    end
+                end
+                
+                obj.lastYValue = yVal;
+            elseif yVal == 0
+                obj.lastYValue = 0; % Reset when joystick returns to center
             end
         end
         

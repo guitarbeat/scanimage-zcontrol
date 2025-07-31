@@ -589,6 +589,7 @@ classdef foilview < matlab.apps.AppBase
                 app.StageViewApp = [];
             end
             if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp)
+                fprintf('FoilviewApp: Cleaning up MJC3View...\n');
                 delete(app.MJC3ViewApp);
                 app.MJC3ViewApp = [];
             end

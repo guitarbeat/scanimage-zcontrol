@@ -1,9 +1,11 @@
-classdef ScanImageZController < handle
-    % ScanImageZController - Interface to ScanImage's Z-axis motor control
-    % Provides a simple relativeMove(dz) interface for MJC3 controllers
+classdef ScanImageController < handle
+    % ScanImageController - Interface to ScanImage's motor control
+    % Provides a simple relativeMove interface for MJC3 controllers (X, Y, Z axes)
     
     properties (Access = private)
         hMotors     % ScanImage motors handle
+        xAxisIndex  % Index of X-axis (typically 1)
+        yAxisIndex  % Index of Y-axis (typically 2)
         zAxisIndex  % Index of Z-axis (typically 3)
     end
     

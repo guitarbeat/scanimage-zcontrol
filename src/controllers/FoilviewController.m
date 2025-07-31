@@ -648,20 +648,20 @@
             
             % Determine the appropriate Z-controller based on mode
             if obj.ScanImageManager.isSimulationMode()
-                % Create simulation Z-controller
-                zController = ScanImageZController([]); % Empty for simulation
-                fprintf('Created simulation Z-controller for testing mode\n');
+                % Create simulation controller
+                zController = ScanImageController([]); % Empty for simulation
+                fprintf('Created simulation controller for testing mode\n');
             else
                 try
-                    % Create real ScanImage Z-controller
+                    % Create real ScanImage controller
                     hSI = evalin('base', 'hSI');
-                    zController = ScanImageZController(hSI.hMotors);
-                    fprintf('Created ScanImage Z-controller\n');
+                    zController = ScanImageController(hSI.hMotors);
+                    fprintf('Created ScanImage controller\n');
                 catch ME
-                    fprintf('Failed to create ScanImage Z-controller: %s\n', ME.message);
+                    fprintf('Failed to create ScanImage controller: %s\n', ME.message);
                     % Fallback to simulation
-                    zController = ScanImageZController([]); % Empty for simulation
-                    fprintf('Falling back to simulation Z-controller\n');
+                    zController = ScanImageController([]); % Empty for simulation
+                    fprintf('Falling back to simulation controller\n');
                 end
             end
             

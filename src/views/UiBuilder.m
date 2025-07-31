@@ -521,8 +521,9 @@ classdef UiBuilder
         function fieldStruct = createArrowFieldDirect(parent, defaultValue, tooltip, units, minValue, maxValue)
             % Creates an arrow field directly in the parent (no label, no grid)
             
-            % Create field panel with standard styling
-            fieldPanel = UiBuilder.createFieldPanel(parent);
+            % Create a uipanel first, then apply field panel styling
+            panel = uipanel(parent);
+            fieldPanel = UiBuilder.createFieldPanel(panel);
 
             % Use the common arrow field components creation
             fieldStruct = UiBuilder.createArrowFieldComponents(fieldPanel, defaultValue, tooltip, units, minValue, maxValue);

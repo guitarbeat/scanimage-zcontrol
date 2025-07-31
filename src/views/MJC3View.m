@@ -106,19 +106,7 @@ classdef MJC3View < handle
             isDetected = false;
             
             try
-                % Method 1: Try PsychHID detection (most reliable)
-                try
-                    devs = PsychHID('Devices');
-                    idx = find([devs.vendorID] == hex2dec('1313') & [devs.productID] == hex2dec('9000'), 1);
-                    if ~isempty(idx)
-                        isDetected = true;
-                        return;
-                    end
-                catch
-                    % PsychHID not available, continue to next method
-                end
-                
-                % Method 2: Try Windows API detection
+                % Method 1: Try Windows API detection (most reliable)
                 try
                     cmd = 'powershell "Get-WmiObject Win32_PnPEntity | Where-Object {$_.DeviceID -like ''*VID_1313*'' -and $_.DeviceID -like ''*PID_9000*''} | Select-Object Name, DeviceID"';
                     [status, result] = system(cmd);
@@ -131,7 +119,7 @@ classdef MJC3View < handle
                     % Windows API failed, continue
                 end
                 
-                % Method 3: Check if controller reports detection
+                % Method 2: Check if controller reports detection
                 if ~isempty(obj.HIDController)
                     % Try the connectToMJC3 method to check detection
                     isDetected = obj.HIDController.connectToMJC3();

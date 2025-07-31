@@ -10,21 +10,25 @@ classdef ScanImageZController < handle
     methods
         function obj = ScanImageZController(hMotors)
             % Constructor
-            % hMotors: ScanImage motors handle (hSI.hMotors)
+            % hMotors: ScanImage motors handle (hSI.hMotors) or empty for simulation
             
-            if nargin < 1 || isempty(hMotors)
-                error('ScanImageZController requires a valid hMotors handle');
+            if nargin < 1
+                hMotors = [];
             end
             
             obj.hMotors = hMotors;
             obj.zAxisIndex = 3; % Z is typically the 3rd axis in ScanImage
             
-            % Verify the motors handle is valid
-            if ~isprop(hMotors, 'axesPosition')
-                error('Invalid hMotors handle - missing axesPosition property');
+            % Check if we're in simulation mode
+            if isempty(hMotors)
+                fprintf('ScanImageZController initialized in simulation mode\n');
+            else
+                % Verify the motors handle is valid
+                if ~isprop(hMotors, 'axesPosition')
+                    error('Invalid hMotors handle - missing axesPosition property');
+                end
+                fprintf('ScanImageZController initialized for Z-axis control\n');
             end
-            
-            fprintf('ScanImageZController initialized for Z-axis control\n');
         end
         
         function success = relativeMove(obj, dz)
@@ -35,10 +39,18 @@ classdef ScanImageZController < handle
             success = false;
             
             try
+                % Check if we're in simulation mode
+                if isempty(obj.hMotors)
+                    % Simulation mode - just log the movement
+                    fprintf('SIMULATION: Z-axis would move by %.2f μm\n', dz);
+                    success = true;
+                    return;
+                end
+                
                 % Get current position
                 currentPos = obj.getCurrentPosition();
                 if isempty(currentPos)
-                    warning('Could not get current Z position');
+                    warning('ScanImageZController:NoPosition', 'Could not get current Z position');
                     return;
                 end
                 
@@ -51,11 +63,11 @@ classdef ScanImageZController < handle
                 if success
                     fprintf('Z-axis moved by %.2f μm (to %.2f μm)\n', dz, targetPos);
                 else
-                    warning('Failed to move Z-axis by %.2f μm', dz);
+                    warning('ScanImageZController:MoveFailed', 'Failed to move Z-axis by %.2f μm', dz);
                 end
                 
             catch ME
-                warning('ScanImageZController relativeMove error: %s', ME.message);
+                warning('ScanImageZController:RelativeMoveError', 'relativeMove error: %s', ME.message);
             end
         end
         
@@ -67,10 +79,18 @@ classdef ScanImageZController < handle
             success = false;
             
             try
+                % Check if we're in simulation mode
+                if isempty(obj.hMotors)
+                    % Simulation mode - just log the movement
+                    fprintf('SIMULATION: Z-axis would move to %.2f μm\n', zPos);
+                    success = true;
+                    return;
+                end
+                
                 % Get current axes positions
                 currentAxes = obj.hMotors.axesPosition;
                 if length(currentAxes) < obj.zAxisIndex
-                    warning('Z-axis index %d not available in axes position array', obj.zAxisIndex);
+                    warning('ScanImageZController:InvalidAxis', 'Z-axis index %d not available in axes position array', obj.zAxisIndex);
                     return;
                 end
                 
@@ -87,7 +107,7 @@ classdef ScanImageZController < handle
                 success = true;
                 
             catch ME
-                warning('ScanImageZController moveToAbsolute error: %s', ME.message);
+                warning('ScanImageZController:MoveToAbsoluteError', 'moveToAbsolute error: %s', ME.message);
             end
         end
         
@@ -98,12 +118,19 @@ classdef ScanImageZController < handle
             pos = [];
             
             try
+                % Check if we're in simulation mode
+                if isempty(obj.hMotors)
+                    % Simulation mode - return a dummy position
+                    pos = 0.0;
+                    return;
+                end
+                
                 currentAxes = obj.hMotors.axesPosition;
                 if length(currentAxes) >= obj.zAxisIndex
                     pos = currentAxes(obj.zAxisIndex);
                 end
             catch ME
-                warning('ScanImageZController getCurrentPosition error: %s', ME.message);
+                warning('ScanImageZController:GetCurrentPositionError', 'getCurrentPosition error: %s', ME.message);
             end
         end
         
@@ -114,11 +141,17 @@ classdef ScanImageZController < handle
             isMoving = false;
             
             try
+                % Check if we're in simulation mode
+                if isempty(obj.hMotors)
+                    % Simulation mode - always return false (not moving)
+                    return;
+                end
+                
                 if isprop(obj.hMotors, 'moveInProgress')
                     isMoving = obj.hMotors.moveInProgress;
                 end
             catch ME
-                warning('ScanImageZController isInMotion error: %s', ME.message);
+                warning('ScanImageZController:IsInMotionError', 'isInMotion error: %s', ME.message);
             end
         end
         
@@ -130,13 +163,20 @@ classdef ScanImageZController < handle
                 timeout = 5;
             end
             
+            % Check if we're in simulation mode
+            if isempty(obj.hMotors)
+                % Simulation mode - no need to wait
+                fprintf('SIMULATION: Z-axis move completed instantly\n');
+                return;
+            end
+            
             startTime = tic;
             while obj.isInMotion() && toc(startTime) < timeout
                 pause(0.05);
             end
             
             if obj.isInMotion()
-                warning('Z-axis move did not complete within %.1f seconds', timeout);
+                warning('ScanImageZController:MoveTimeout', 'Z-axis move did not complete within %.1f seconds', timeout);
             end
         end
     end

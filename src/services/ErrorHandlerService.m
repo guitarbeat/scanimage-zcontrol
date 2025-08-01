@@ -171,8 +171,8 @@ classdef ErrorHandlerService < handle
         function initializeLogging(obj)
             % Initialize logging system
             
-            % Create logs directory if it doesn't exist
-            logDir = fullfile(pwd, 'logs');
+                    % Create logs directory if it doesn't exist
+        logDir = fullfile(pwd, 'dev-tools', 'logs');
             if ~exist(logDir, 'dir')
                 mkdir(logDir);
             end

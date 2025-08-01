@@ -249,13 +249,31 @@ classdef MJC3View < handle
             headerGrid.Padding = [5 5 5 5];
             headerGrid.RowSpacing = 5;
             
-            % Title
-            titleLabel = uilabel(headerGrid);
+            % Title and Help Button
+            titlePanel = uipanel(headerGrid);
+            titlePanel.Layout.Row = 1;
+            titlePanel.BorderType = 'none';
+            titlePanel.BackgroundColor = [0.94 0.94 0.94];
+            
+            titleGrid = uigridlayout(titlePanel, [1, 2]);
+            titleGrid.ColumnWidth = {'1x', 'fit'};
+            titleGrid.Padding = [0 0 0 0];
+            titleGrid.ColumnSpacing = 10;
+            
+            titleLabel = uilabel(titleGrid);
             titleLabel.Text = '🕹️ MJC3 Joystick Control';
             titleLabel.FontSize = 18;
             titleLabel.FontWeight = 'bold';
             titleLabel.HorizontalAlignment = 'center';
-            titleLabel.Layout.Row = 1;
+            
+            helpButton = uibutton(titleGrid, 'push');
+            helpButton.Text = '❓';
+            helpButton.FontSize = 16;
+            helpButton.FontWeight = 'bold';
+            helpButton.BackgroundColor = [0.2 0.6 0.8];
+            helpButton.FontColor = [1 1 1];
+            helpButton.Tooltip = 'Show help and usage instructions';
+            helpButton.ButtonPushedFcn = @(~,~) obj.showHelp();
             
             % Connection Status
             obj.ConnectionStatus = uilabel(headerGrid);
@@ -292,7 +310,7 @@ classdef MJC3View < handle
             obj.EnableButton.FontColor = [1 1 1];
             obj.EnableButton.FontSize = 14;
             obj.EnableButton.FontWeight = 'bold';
-            obj.EnableButton.Tooltip = 'Enable/Disable MJC3 joystick control';
+            obj.EnableButton.Tooltip = 'Enable/Disable MJC3 joystick control. When enabled, the joystick will control stage movement.';
             
             % Step Factor Control
             stepLabel = uilabel(controlGrid);
@@ -318,7 +336,7 @@ classdef MJC3View < handle
             obj.StepFactorField.Value = 5;
             obj.StepFactorField.FontSize = 12;
             obj.StepFactorField.Limits = [0.1 100];
-            obj.StepFactorField.Tooltip = 'Micrometers moved per unit of joystick deflection';
+            obj.StepFactorField.Tooltip = 'Micrometers moved per unit of joystick deflection. Higher values = faster movement.';
             
             stepUnits = uilabel(stepGrid);
             stepUnits.Text = 'μm/unit';
@@ -594,7 +612,7 @@ classdef MJC3View < handle
             sensField.Value = 5;
             sensField.FontSize = 12;
             sensField.Limits = [0.1 100];
-            sensField.Tooltip = sprintf('Sensitivity for %s', controlName);
+            sensField.Tooltip = sprintf('Sensitivity for %s. Controls how much the joystick movement affects stage position.', controlName);
             sensField.Layout.Row = row;
             sensField.Layout.Column = 3;
             
@@ -613,6 +631,7 @@ classdef MJC3View < handle
             actionDropdown.Items = {'Move Continuous', 'Delta 1', 'Delta 2', 'Delta 3'};
             actionDropdown.Value = 'Move Continuous';
             actionDropdown.FontSize = 12;
+            actionDropdown.Tooltip = sprintf('Action type for %s. Move Continuous = real-time movement, Delta = fixed step sizes.', controlName);
             actionDropdown.Layout.Row = row;
             actionDropdown.Layout.Column = 4;
             
@@ -632,7 +651,7 @@ classdef MJC3View < handle
             calibBtn.FontSize = 11;
             calibBtn.BackgroundColor = [0.2 0.6 0.8];
             calibBtn.FontColor = [1 1 1];
-            calibBtn.Tooltip = sprintf('Calibrate %s', controlName);
+            calibBtn.Tooltip = sprintf('Calibrate %s. Move the joystick through its full range to improve accuracy.', controlName);
             calibBtn.Layout.Row = row;
             calibBtn.Layout.Column = 5;
             calibBtn.ButtonPushedFcn = @(~,~) obj.calibrateAxis(controlName);
@@ -703,7 +722,7 @@ classdef MJC3View < handle
         end
         
         function updateAnalogControls(obj)
-            % Update analog control displays with real joystick data
+            % Update analog control displays with real joystick data and calibration
             if isempty(obj.HIDController) || ~obj.IsEnabled
                 return;
             end
@@ -714,55 +733,148 @@ classdef MJC3View < handle
                     % Get real-time joystick data from MEX controller
                     data = obj.HIDController.readJoystick();
                     if length(data) >= 5
-                        xPos = data(1);  % X position (-127 to 127)
-                        yPos = data(2);  % Y position (-127 to 127)
-                        zPos = data(3);  % Z position (-127 to 127)
+                        xPos = data(1);  % X position (0-255)
+                        yPos = data(2);  % Y position (0-255)
+                        zPos = data(3);  % Z position (0-255)
                         
-                        % Update analog control displays
-                        if ~isempty(obj.XValueDisplay)
-                            obj.XValueDisplay.Text = sprintf('%d', xPos);
-                        end
-                        if ~isempty(obj.YValueDisplay)
-                            obj.YValueDisplay.Text = sprintf('%d', yPos);
-                        end
-                        if ~isempty(obj.ZValueDisplay)
-                            obj.ZValueDisplay.Text = sprintf('%d', zPos);
+                        % Apply calibration if available
+                        if isprop(obj.HIDController, 'CalibrationService') && ~isempty(obj.HIDController.CalibrationService)
+                            % Get calibrated values
+                            calibratedX = obj.HIDController.CalibrationService.applyCalibration('X', xPos);
+                            calibratedY = obj.HIDController.CalibrationService.applyCalibration('Y', yPos);
+                            calibratedZ = obj.HIDController.CalibrationService.applyCalibration('Z', zPos);
+                            
+                            % Update displays with calibrated values (-1.0 to 1.0)
+                            if ~isempty(obj.XValueDisplay)
+                                obj.XValueDisplay.Text = sprintf('%.2f', calibratedX);
+                                % Color code based on activity
+                                if abs(calibratedX) > 0.01
+                                    obj.XValueDisplay.FontColor = [0.2 0.8 0.2]; % Green for active
+                                else
+                                    obj.XValueDisplay.FontColor = [0.2 0.6 0.8]; % Blue for inactive
+                                end
+                            end
+                            
+                            if ~isempty(obj.YValueDisplay)
+                                obj.YValueDisplay.Text = sprintf('%.2f', calibratedY);
+                                % Color code based on activity
+                                if abs(calibratedY) > 0.01
+                                    obj.YValueDisplay.FontColor = [0.2 0.8 0.2]; % Green for active
+                                else
+                                    obj.YValueDisplay.FontColor = [0.2 0.6 0.8]; % Blue for inactive
+                                end
+                            end
+                            
+                            if ~isempty(obj.ZValueDisplay)
+                                obj.ZValueDisplay.Text = sprintf('%.2f', calibratedZ);
+                                % Color code based on activity
+                                if abs(calibratedZ) > 0.01
+                                    obj.ZValueDisplay.FontColor = [0.2 0.8 0.2]; % Green for active
+                                else
+                                    obj.ZValueDisplay.FontColor = [0.2 0.6 0.8]; % Blue for inactive
+                                end
+                            end
+                        else
+                            % Fallback to raw values if no calibration service
+                            if ~isempty(obj.XValueDisplay)
+                                obj.XValueDisplay.Text = sprintf('%d', xPos);
+                                obj.XValueDisplay.FontColor = [0.2 0.6 0.8];
+                            end
+                            if ~isempty(obj.YValueDisplay)
+                                obj.YValueDisplay.Text = sprintf('%d', yPos);
+                                obj.YValueDisplay.FontColor = [0.2 0.6 0.8];
+                            end
+                            if ~isempty(obj.ZValueDisplay)
+                                obj.ZValueDisplay.Text = sprintf('%d', zPos);
+                                obj.ZValueDisplay.FontColor = [0.2 0.6 0.8];
+                            end
                         end
                         
                         return;
                     end
                 end
-            catch
-                % Fall back to placeholder if real data unavailable
+            catch ME
+                % Log error and fall back to placeholder
+                fprintf('Error updating analog controls: %s\n', ME.message);
             end
             
-            % Placeholder implementation for non-MEX controllers
+            % Placeholder implementation for non-MEX controllers or errors
             if ~isempty(obj.XValueDisplay)
                 obj.XValueDisplay.Text = '0';
+                obj.XValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
             end
             if ~isempty(obj.YValueDisplay)
                 obj.YValueDisplay.Text = '0';
+                obj.YValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
             end
             if ~isempty(obj.ZValueDisplay)
                 obj.ZValueDisplay.Text = '0';
+                obj.ZValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
             end
         end
         
         function calibrateAxis(obj, axisName)
-            % Calibrate a specific axis
+            % Calibrate a specific axis using the new calibration system
             try
-                % Simple calibration - center the axis
-                fprintf('Calibrating %s axis...\n', axisName);
+                % Show calibration instructions
+                msg = sprintf(['Calibrating %s axis...\n\n' ...
+                    'Instructions:\n' ...
+                    '1. Move the joystick through its FULL range\n' ...
+                    '2. Include all directions (left, right, up, down)\n' ...
+                    '3. The system will collect 100 samples\n' ...
+                    '4. This will take about 1 second\n\n' ...
+                    'Click OK to start calibration.'], axisName);
                 
-                % Show calibration dialog
-                msg = sprintf('Calibrating %s axis.\n\nPlease center the joystick and click OK.', axisName);
-                uialert(obj.UIFigure, msg, 'Calibration', 'Icon', 'info');
+                response = uialert(obj.UIFigure, msg, 'Calibration', ...
+                    'Icon', 'info', 'Options', {'OK', 'Cancel'});
                 
-                % For now, just log the calibration
-                fprintf('%s axis calibrated\n', axisName);
+                if strcmp(response, 'Cancel')
+                    return;
+                end
+                
+                % Show progress dialog
+                progressDlg = uiprogressdlg(obj.UIFigure, ...
+                    'Title', sprintf('Calibrating %s Axis', axisName), ...
+                    'Message', 'Collecting joystick samples...', ...
+                    'Cancelable', 'off');
+                
+                try
+                    % Perform calibration using the controller
+                    if ~isempty(obj.HIDController) && ismethod(obj.HIDController, 'calibrateAxis')
+                        obj.HIDController.calibrateAxis(axisName, 100);
+                        
+                        % Update progress
+                        progressDlg.Message = 'Saving calibration data...';
+                        drawnow;
+                        
+                        % Show success message
+                        successMsg = sprintf(['✅ %s Axis Calibrated Successfully!\n\n' ...
+                            'Calibration data has been saved.\n' ...
+                            'The joystick will now use calibrated values for this axis.'], axisName);
+                        uialert(obj.UIFigure, successMsg, 'Calibration Complete', 'Icon', 'success');
+                        
+                    else
+                        error('Controller does not support calibration');
+                    end
+                    
+                catch ME
+                    % Show error message
+                    errorMsg = sprintf(['❌ Calibration Failed\n\n' ...
+                        'Error: %s\n\n' ...
+                        'Please try again or check hardware connection.'], ME.message);
+                    uialert(obj.UIFigure, errorMsg, 'Calibration Error', 'Icon', 'error');
+                    
+                finally
+                    % Close progress dialog
+                    if isvalid(progressDlg)
+                        close(progressDlg);
+                    end
+                end
                 
             catch ME
                 fprintf('Calibration failed for %s: %s\n', axisName, ME.message);
+                uialert(obj.UIFigure, sprintf('Calibration failed: %s', ME.message), ...
+                    'Calibration Error', 'Icon', 'error');
             end
         end
         
@@ -918,5 +1030,33 @@ classdef MJC3View < handle
         end
         
         % Removed complex methods - simplified UI now uses analog controls
+        
+        function showHelp(obj)
+            % Show help dialog with usage instructions
+            helpText = sprintf(['🕹️ MJC3 Joystick Control - Help\n\n' ...
+                'Getting Started:\n' ...
+                '1. Connect your Thorlabs MJC3 joystick\n' ...
+                '2. Click "Enable" to start control\n' ...
+                '3. Move the joystick to control stage position\n\n' ...
+                'Analog Controls:\n' ...
+                '• Z-axis: Up/down joystick movement\n' ...
+                '• X-axis: Left/right joystick movement\n' ...
+                '• Y-axis: Forward/backward joystick movement\n' ...
+                '• Sensitivity: Adjust movement speed\n' ...
+                '• Action: Choose movement type\n' ...
+                '• Calibrate: Improve accuracy\n\n' ...
+                'Calibration:\n' ...
+                '• Click "Calibrate" for any axis\n' ...
+                '• Move joystick through full range\n' ...
+                '• System will collect samples automatically\n' ...
+                '• Calibration data is saved permanently\n\n' ...
+                'Troubleshooting:\n' ...
+                '• If joystick not detected, check USB connection\n' ...
+                '• Adjust step factor for different movement speeds\n' ...
+                '• Use calibration for precise control\n' ...
+                '• Check ScanImage integration if stage not moving']);
+            
+            uialert(obj.UIFigure, helpText, 'Help', 'Icon', 'info');
+        end
     end
 end

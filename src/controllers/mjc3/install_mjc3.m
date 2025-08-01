@@ -26,7 +26,11 @@ function install_mjc3()
     % Step 3: Build MEX function
     fprintf('Step 3: Building MEX function...\n');
     try
+        % Change to the mjc3 directory for building
+        currentDir = pwd;
+        cd(fileparts(mfilename('fullpath')));
         build_mjc3_mex();
+        cd(currentDir);
         fprintf('✅ MEX function built successfully\n\n');
     catch ME
         fprintf('❌ MEX build failed: %s\n', ME.message);

@@ -13,10 +13,11 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
         lastYValue     % Last Y-axis value to detect changes
         mexFunction    % Name of the MEX function
         isConnected    % Connection status
+        CalibrationService  % Calibration service for X, Y, Z axes
     end
     
     properties (Constant)
-        MEX_FUNCTION = 'mjc3_joystick_mex';  % MEX function name
+        MEX_FUNCTION = 'mjc3_joystick_mex';  % MEX function name (now in controllers/mjc3/)
         POLL_RATE = 0.02;  % 50Hz polling (faster than current 20Hz)
     end
     
@@ -39,6 +40,9 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             % Initialize step factors for all axes
             obj.xStepFactor = stepFactor;
             obj.yStepFactor = stepFactor;
+            
+            % Initialize calibration service
+            obj.CalibrationService = CalibrationService();
             
             % Verify MEX function exists
             if ~obj.verifyMEXFunction()
@@ -236,10 +240,15 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             % Speed knob provides 0-255 range, normalize to 0.1-1.0
             speedFactor = max(0.1, speedKnob / 255);
             
-            % Handle Z-axis movement
-            if zVal ~= obj.lastZValue && zVal ~= 0
-                % Compute Z movement in micrometres
-                dz = double(zVal) * obj.stepFactor * speedFactor;
+            % Apply calibration to raw joystick values
+            calibratedX = obj.CalibrationService.applyCalibration('X', xVal);
+            calibratedY = obj.CalibrationService.applyCalibration('Y', yVal);
+            calibratedZ = obj.CalibrationService.applyCalibration('Z', zVal);
+            
+            % Handle Z-axis movement with calibrated values
+            if abs(calibratedZ) > 0.01 && zVal ~= obj.lastZValue
+                % Compute Z movement in micrometres using calibrated value
+                dz = calibratedZ * obj.stepFactor * speedFactor;
                 
                 if abs(dz) > 0.01  % Minimum movement threshold
                     success = obj.zController.relativeMove(dz);
@@ -249,14 +258,14 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 end
                 
                 obj.lastZValue = zVal;
-            elseif zVal == 0
+            elseif abs(calibratedZ) <= 0.01
                 obj.lastZValue = 0; % Reset when joystick returns to center
             end
             
-            % Handle X-axis movement
-            if xVal ~= obj.lastXValue && xVal ~= 0
-                % Compute X movement in micrometres
-                dx = double(xVal) * obj.xStepFactor * speedFactor;
+            % Handle X-axis movement with calibrated values
+            if abs(calibratedX) > 0.01 && xVal ~= obj.lastXValue
+                % Compute X movement in micrometres using calibrated value
+                dx = calibratedX * obj.xStepFactor * speedFactor;
                 
                 if abs(dx) > 0.01  % Minimum movement threshold
                     success = obj.zController.relativeMoveX(dx);
@@ -266,14 +275,14 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 end
                 
                 obj.lastXValue = xVal;
-            elseif xVal == 0
+            elseif abs(calibratedX) <= 0.01
                 obj.lastXValue = 0; % Reset when joystick returns to center
             end
             
-            % Handle Y-axis movement
-            if yVal ~= obj.lastYValue && yVal ~= 0
-                % Compute Y movement in micrometres
-                dy = double(yVal) * obj.yStepFactor * speedFactor;
+            % Handle Y-axis movement with calibrated values
+            if abs(calibratedY) > 0.01 && yVal ~= obj.lastYValue
+                % Compute Y movement in micrometres using calibrated value
+                dy = calibratedY * obj.yStepFactor * speedFactor;
                 
                 if abs(dy) > 0.01  % Minimum movement threshold
                     success = obj.zController.relativeMoveY(dy);
@@ -283,7 +292,7 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 end
                 
                 obj.lastYValue = yVal;
-            elseif yVal == 0
+            elseif abs(calibratedY) <= 0.01
                 obj.lastYValue = 0; % Reset when joystick returns to center
             end
         end
@@ -293,6 +302,85 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             fprintf('MJC3 MEX Controller: Timer error occurred, stopping controller\n');
             obj.running = false;
             obj.isConnected = false;
+        end
+        
+        % Calibration Methods
+        function calibrateAxis(obj, axisName, samples)
+            % Calibrate a specific axis using joystick samples
+            % axisName: 'X', 'Y', or 'Z'
+            % samples: Number of samples to collect (default: 100)
+            
+            if nargin < 3
+                samples = 100;
+            end
+            
+            try
+                fprintf('Calibrating %s axis... Please move the joystick through its full range.\n', axisName);
+                
+                % Collect samples
+                rawValues = [];
+                for i = 1:samples
+                    data = obj.readJoystick();
+                    if length(data) >= 3
+                        switch upper(axisName)
+                            case 'X'
+                                rawValues = [rawValues, data(1)];
+                            case 'Y'
+                                rawValues = [rawValues, data(2)];
+                            case 'Z'
+                                rawValues = [rawValues, data(3)];
+                        end
+                    end
+                    pause(0.01); % 10ms delay between samples
+                end
+                
+                % Perform calibration
+                obj.CalibrationService.calibrateAxis(axisName, rawValues);
+                
+                fprintf('%s axis calibration completed successfully\n', axisName);
+                
+            catch ME
+                fprintf('Calibration failed for %s axis: %s\n', axisName, ME.message);
+                error('Calibration failed: %s', ME.message);
+            end
+        end
+        
+        function resetCalibration(obj, axisName)
+            % Reset calibration for a specific axis or all axes
+            % axisName: 'X', 'Y', 'Z', or 'all'
+            
+            try
+                obj.CalibrationService.resetCalibration(axisName);
+                fprintf('Calibration reset for %s\n', axisName);
+            catch ME
+                fprintf('Failed to reset calibration: %s\n', ME.message);
+                error('Reset failed: %s', ME.message);
+            end
+        end
+        
+        function status = getCalibrationStatus(obj)
+            % Get calibration status for all axes
+            % Returns: Structure with calibration status
+            
+            try
+                status = obj.CalibrationService.getCalibrationStatus();
+            catch ME
+                fprintf('Failed to get calibration status: %s\n', ME.message);
+                status = [];
+            end
+        end
+        
+        function isCalibrated = isAxisCalibrated(obj, axisName)
+            % Check if an axis has been calibrated
+            % axisName: 'X', 'Y', or 'Z'
+            % Returns: true if calibrated, false otherwise
+            
+            try
+                isCalibrated = obj.CalibrationService.isAxisCalibrated(axisName);
+            catch ME
+                fprintf('Failed to check calibration status: %s\n', ME.message);
+                isCalibrated = false;
+            end
         end
     end
 end

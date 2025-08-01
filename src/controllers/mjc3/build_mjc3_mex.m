@@ -67,7 +67,7 @@ function build_mjc3_mex()
     % Source file
     source_file = 'mjc3_joystick_mex.cpp';
     if ~exist(source_file, 'file')
-        error('Source file %s not found', source_file);
+        error('Source file %s not found in current directory', source_file);
     end
     
     % Build command

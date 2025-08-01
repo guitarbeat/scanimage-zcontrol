@@ -213,7 +213,7 @@ classdef UserNotificationService < handle
                        '   • Close unnecessary applications\n' ...
                        '   • Increase MATLAB memory allocation\n' ...
                        '   • Check system resources\n\n' ...
-                       'For additional help, check the application logs in the logs/ directory.'];
+                       'For additional help, check the application logs in the dev-tools/logs/ directory.'];
             
             obj.showDialog(title, helpText, obj.ICON_INFO);
         end
@@ -291,7 +291,7 @@ classdef UserNotificationService < handle
                 'Check MATLAB version (R2019b or later required)',
                 'Verify all required files are in the MATLAB path',
                 'Check system resources (memory, disk space)',
-                'Review error logs in the logs/ directory',
+                'Review error logs in the dev-tools/logs/ directory',
                 'Contact support if the problem persists'
             };
         end

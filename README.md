@@ -20,8 +20,7 @@ This repository contains a complete MATLAB-based control system that bridges Tho
 ```
 scanimage-zcontrol/
 ├── src/                          # Main source code
-│   ├── app/                      # Main application
-│   │   └── foilview.m           # Primary MATLAB App Designer application
+│   ├── foilview.m               # Primary MATLAB App Designer application
 │   ├── controllers/              # Control logic and hardware interfaces
 │   │   ├── FoilviewController.m  # Main application controller
 │   │   ├── ScanImageController.m # ScanImage integration
@@ -237,10 +236,339 @@ mex -setup  % Configure C++ compiler
 
 ## 📚 Documentation
 
-- **[MJC3 Controller Documentation](src/controllers/mjc3/README.md)** - Detailed joystick controller setup
-- **[MEX Setup Guide](src/controllers/mjc3/MEX_SETUP.md)** - Manual MEX compilation instructions
-- **[Services Documentation](src/services/README.md)** - Service layer architecture
-- **[Task List](TASK_LIST_JOYSTICK_UI_SIMPLIFICATION.md)** - Development roadmap and progress
+## 🎮 MJC3 Controller Architecture
+
+The MJC3 joystick controllers are designed with a common interface and automatic fallback system.
+
+### Controller Architecture
+
+#### Base Class
+- **`BaseMJC3Controller`** - Abstract base class defining the common interface
+  - Standardized constructor with Z-controller and step factor
+  - Common methods: `start()`, `stop()`, `connectToMJC3()`, `moveUp()`, `moveDown()`
+  - Automatic resource cleanup
+
+#### Controller Implementations
+
+1. **`MJC3_MEX_Controller`** (Primary)
+   - High-performance C++ MEX implementation
+   - Direct HID access via hidapi library
+   - 50Hz polling rate for responsive control
+   - Cross-platform compatibility
+   - No external licensing dependencies
+
+2. **`MJC3_Simulation_Controller`** (Testing)
+   - Simulated joystick for development and testing
+   - Keyboard-based simulation with visual feedback
+   - Always available as fallback
+
+#### Factory Pattern
+- **`MJC3ControllerFactory`** - Automatic controller selection
+  - Detects available capabilities
+  - Creates best available controller
+  - Provides testing and diagnostics
+
+### Controller Usage
+
+#### Basic Usage
+```matlab
+% Create Z-controller
+zController = ScanImageZController(hSI.hMotors);
+
+% Let factory choose best available controller
+controller = MJC3ControllerFactory.createController(zController);
+
+% Start the controller
+controller.start();
+
+% Manual control
+controller.moveUp(2);    % Move up 2 steps
+controller.moveDown(1);  % Move down 1 step
+
+% Stop when done
+controller.stop();
+```
+
+#### Specific Controller Selection
+```matlab
+% Force specific controller type
+controller = MJC3ControllerFactory.createController(zController, 5, 'MEX');
+
+% Or create directly
+controller = MJC3_MEX_Controller(zController, 5);
+```
+
+#### Diagnostics
+```matlab
+% List available controller types
+MJC3ControllerFactory.listAvailableTypes();
+
+% Test specific controller
+MJC3ControllerFactory.testController('MEX', zController);
+```
+
+### Controller Capabilities
+
+| Controller | Dependencies | Cross-Platform | Hardware Required | Performance |
+|------------|--------------|----------------|-------------------|-------------|
+| MEX        | hidapi only  | Yes            | Yes               | Excellent (50Hz) |
+| Simulation | None         | Yes            | No                | N/A (Testing)    |
+
+### Benefits of MEX Implementation
+
+1. **High Performance** - 50Hz polling rate with native C++ speed
+2. **No Dependencies** - Works with any MATLAB installation (no PsychHID)
+3. **Cross-Platform** - Windows, Linux, macOS support via hidapi
+4. **Robust Error Handling** - Direct hardware access with reconnection
+5. **Simplified Architecture** - Single primary implementation
+6. **Easy Installation** - Automated setup process
+
+### MJC3 Troubleshooting
+
+#### Controller Not Working
+1. Check available types: `MJC3ControllerFactory.listAvailableTypes()`
+2. Test specific controller: `MJC3ControllerFactory.testController('MEX', zController)`
+3. Verify Z-controller: Ensure `zController.relativeMove(dz)` works
+
+#### Hardware Issues
+- If MEX controller is not available, the factory will automatically fall back to Simulation controller
+- For testing without hardware, use Simulation controller
+- Ensure hidapi library is properly installed
+
+## 🔧 MEX Controller Setup
+
+The high-performance MEX-based MJC3 controller provides direct HID access without PsychHID dependencies.
+
+### Benefits of MEX Controller
+
+- **No PsychHID dependency** - Works with any MATLAB installation
+- **Better performance** - 50Hz polling vs 20Hz, native C++ speed
+- **Cross-platform** - Windows, Linux, macOS support
+- **Simplified architecture** - Single robust implementation
+- **Direct HID access** - No licensing or driver issues
+
+### Prerequisites
+
+#### 1. MATLAB C++ Compiler
+```matlab
+% Check if compiler is configured
+mex -setup
+
+% If not configured, MATLAB will guide you through setup
+% On Windows: Install Visual Studio Community (free)
+% On Linux: Install gcc/g++
+% On macOS: Install Xcode Command Line Tools
+```
+
+#### 2. hidapi Library
+
+**Windows (Recommended: vcpkg)**
+```cmd
+# Install vcpkg if not already installed
+git clone https://github.com/Microsoft/vcpkg.git
+cd vcpkg
+.\bootstrap-vcpkg.bat
+
+# Install hidapi
+.\vcpkg install hidapi:x64-windows
+```
+
+**Windows (Alternative: Manual)**
+1. Download hidapi from: https://github.com/libusb/hidapi/releases
+2. Extract to `C:\hidapi\`
+3. Ensure you have both include and lib directories
+
+**Linux (Ubuntu/Debian)**
+```bash
+sudo apt-get install libhidapi-dev
+```
+
+**Linux (CentOS/RHEL)**
+```bash
+sudo yum install hidapi-devel
+```
+
+**macOS**
+```bash
+# Using Homebrew
+brew install hidapi
+
+# Using MacPorts
+sudo port install hidapi
+```
+
+### Installation Steps
+
+#### 1. Build the MEX Function
+```matlab
+% Navigate to your source directory
+cd src
+
+% Run the build script
+build_mjc3_mex()
+```
+
+The build script will:
+- Detect your compiler configuration
+- Find hidapi installation
+- Compile the MEX function
+- Test the compiled function
+- Verify MJC3 device connection
+
+#### 2. Verify Installation
+```matlab
+% Test MEX function directly
+result = mjc3_joystick_mex('test')  % Should return true
+
+% Get device info
+info = mjc3_joystick_mex('info')
+disp(info)
+
+% Test controller creation
+zController = ScanImageZController(hSI.hMotors);  % Your Z-controller
+controller = MJC3_MEX_Controller(zController, 5);
+
+% Check if MEX is preferred controller
+MJC3ControllerFactory.listAvailableTypes()
+```
+
+#### 3. Integration with Existing System
+The MEX controller integrates seamlessly with your existing architecture:
+
+```matlab
+% Factory automatically selects MEX controller if available
+controller = MJC3ControllerFactory.createController(zController);
+
+% Or force MEX controller specifically
+controller = MJC3ControllerFactory.createController(zController, 5, 'MEX');
+
+% Use with existing HIDController
+hidController = HIDController(uiComponents, zController);
+hidController.enable();  % Will use MEX controller automatically
+```
+
+### Troubleshooting
+
+#### Build Issues
+
+**"No C++ compiler configured"**
+```matlab
+mex -setup
+% Follow MATLAB's instructions to install/configure compiler
+```
+
+**"hidapi not found"**
+1. Verify hidapi installation
+2. Update paths in `build_mjc3_mex.m`
+3. Check library naming (hidapi vs hidapi_ms vs hid)
+
+**Windows: "LNK2019: unresolved external symbol"**
+- Ensure correct library architecture (x64 vs x86)
+- Try different library names: hidapi, hidapi_ms, hid
+- Check Visual Studio installation
+
+**Linux: "cannot find -lhidapi"**
+```bash
+# Install development packages
+sudo apt-get install libhidapi-dev pkg-config
+
+# Check library location
+pkg-config --libs hidapi-libusb
+```
+
+#### Runtime Issues
+
+**"MEX function not found"**
+- Ensure MEX file compiled successfully
+- Check MATLAB path includes MEX file location
+- Verify file permissions
+
+**"Cannot open MJC3 joystick"**
+- Check USB connection
+- Verify device VID:1313, PID:9000
+- On Linux: Check udev rules for HID access
+- Try running MATLAB as administrator (Windows)
+
+**"HID read error"**
+- Device may be in use by another application
+- Try unplugging/reconnecting USB
+- Check device manager (Windows)
+
+### Linux-Specific Setup
+
+#### udev Rules for Non-Root Access
+Create `/etc/udev/rules.d/99-mjc3.rules`:
+```
+# Thorlabs MJC3 Joystick
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1313", ATTRS{idProduct}=="9000", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1313", ATTRS{idProduct}=="9000", MODE="0666"
+```
+
+Then reload udev rules:
+```bash
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+### Performance Comparison
+
+| Controller Type | Poll Rate | Dependencies | Licensing | Performance |
+|----------------|-----------|--------------|-----------|-------------|
+| MEX            | 50 Hz     | hidapi only  | None      | Excellent   |
+| HID (PsychHID) | 20 Hz     | Psychtoolbox | Required  | Good        |
+| Native         | 20 Hz     | Windows API  | None      | Fair        |
+| Windows_HID    | 10 Hz     | PowerShell   | None      | Poor        |
+
+### Advanced Configuration
+
+#### Custom Polling Rate
+```matlab
+% Modify MJC3_MEX_Controller.m
+properties (Constant)
+    POLL_RATE = 0.01;  % 100Hz polling (very fast)
+end
+```
+
+#### Timeout Adjustment
+```matlab
+% In readJoystick method
+data = feval(obj.mexFunction, 'read', 25); % 25ms timeout
+```
+
+#### Debug Mode
+```matlab
+% Enable verbose output in MEX controller
+controller.setDebugMode(true);
+```
+
+### Testing and Validation
+
+#### Basic Functionality Test
+```matlab
+% Test MEX function
+data = mjc3_joystick_mex('read', 100);
+fprintf('Joystick data: X=%d Y=%d Z=%d Btn=%d Spd=%d\n', data);
+```
+
+#### Performance Test
+```matlab
+% Measure polling performance
+tic;
+for i = 1:1000
+    data = mjc3_joystick_mex('read', 10);
+end
+elapsed = toc;
+fprintf('Average read time: %.2f ms\n', elapsed);
+```
+
+#### Integration Test
+```matlab
+% Full system test
+controller = MJC3ControllerFactory.createController(zController);
+controller.start();
+pause(5);  % Let it run for 5 seconds
+controller.stop();
+```
 
 ## 🤝 Contributing
 

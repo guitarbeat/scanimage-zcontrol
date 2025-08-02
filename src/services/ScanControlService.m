@@ -1,3 +1,39 @@
+%==============================================================================
+% SCANCONTROLSERVICE.M
+%==============================================================================
+% Scan control service for the Foilview application.
+%
+% This service provides pure business logic for scan control operations,
+% including parameter validation and execution for auto-stepping and
+% other scanning operations. It has no UI dependencies and focuses on
+% core scan control functionality.
+%
+% Key Features:
+%   - Auto-stepping parameter validation
+%   - Direction parsing and conversion
+%   - Parameter structure creation and validation
+%   - Metrics collection and session summarization
+%
+% Parameter Constraints:
+%   - Step size: 0.01 to 1000 μm
+%   - Number of steps: 1 to 1000
+%   - Delay: 0.1 to 10.0 seconds
+%
+% Dependencies:
+%   - FoilviewUtils: Error handling and logging
+%   - MATLAB: Core functionality and data structures
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   [valid, errorMsg] = ScanControlService.validateAutoStepParameters(stepSize, numSteps, delay);
+%   params = ScanControlService.createAutoStepParams(stepSize, numSteps, delay, direction);
+%
+%==============================================================================
+
 classdef ScanControlService < handle
     % ScanControlService - Pure business logic for scan control operations
     % No UI dependencies, focused on scan parameter validation and execution

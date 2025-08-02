@@ -1,3 +1,51 @@
+%==============================================================================
+% FOILVIEW.M
+%==============================================================================
+% Main application class for the Foilview Z-control system.
+%
+% This is the primary application class that orchestrates the entire Foilview
+% system, including UI management, controller coordination, and service
+% integration. It serves as the central hub that connects all components
+% of the system and manages the application lifecycle.
+%
+% Key Features:
+%   - Complete UI management with tabbed interface
+%   - Controller coordination and event handling
+%   - Real-time position and metric display
+%   - Auto-stepping functionality with plotting
+%   - Bookmark management and metadata logging
+%   - MJC3 joystick integration
+%   - ScanImage connection management
+%   - Application lifecycle management
+%
+% UI Components:
+%   - Position Display: Real-time X, Y, Z position display
+%   - Metric Display: Focus metric calculation and display
+%   - Manual Controls: Manual stage movement controls
+%   - Auto Controls: Automated stepping controls
+%   - Status Controls: Connection status and system controls
+%   - HID Controls: MJC3 joystick integration
+%   - Metrics Plot: Real-time plotting of metrics during auto-stepping
+%   - Tools Window: Additional tools and utilities
+%
+% Dependencies:
+%   - FoilviewController: Main business logic controller
+%   - UIController: UI state management
+%   - PlotManager: Real-time plotting
+%   - Various Services: Stage control, metrics, metadata, etc.
+%   - UiBuilder: UI component construction
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   foilview();  % Launch the application
+%   app = foilview();  % Launch and get handle
+%
+%==============================================================================
+
 classdef foilview < matlab.apps.AppBase
     
     properties (Access = public)
@@ -615,7 +663,7 @@ classdef foilview < matlab.apps.AppBase
             % Add paths for the high-performance MEX-based MJC3 controller
             try
                 currentDir = fileparts(mfilename('fullpath'));
-                srcDir = fileparts(currentDir); % Go up one level from app/ to src/
+                srcDir = currentDir; % We're already in the src/ directory
                 
                 % Add required paths
                 addpath(fullfile(srcDir, 'controllers', 'mjc3'));

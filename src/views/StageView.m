@@ -1,3 +1,34 @@
+%==============================================================================
+% STAGEVIEW.M
+%==============================================================================
+% Stage view UI class for Foilview application.
+%
+% This class implements the stage view, providing visualization and control
+% of the microscope stage within the Foilview application. It supports
+% real-time position display, manual and automated movement, and integration
+% with controller and service layers.
+%
+% Key Features:
+%   - Real-time stage position visualization
+%   - Manual and automated stage movement controls
+%   - Integration with controller and service layers
+%   - UI layout and style management
+%
+% Dependencies:
+%   - FoilviewController: Main controller
+%   - UIController: UI state management
+%   - MATLAB App Designer: UI components
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   view = StageView(app, controller);
+%
+%==============================================================================
+
 classdef StageView < handle
     % Manages the Stage View - Microscope Camera Feed window
 

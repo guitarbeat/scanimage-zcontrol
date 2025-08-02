@@ -1,51 +1,32 @@
-% UI RUNTIME MANAGEMENT & STYLING - Dynamic UI operations for FoilView application
+%==============================================================================
+% UICOMPONENTS.M
+%==============================================================================
+% UI component definitions for Foilview application.
 %
-% RESPONSIBILITY: Runtime UI management, styling, and dynamic updates
-% - Provides all UI constants (colors, dimensions, layout values)
-% - Handles dynamic UI updates during application runtime
-% - Manages responsive behavior and font scaling
-% - Applies styling and state changes to existing components
-% - Runs continuously throughout application lifecycle
+% This class defines and manages the UI components used throughout the
+% Foilview application, providing a centralized location for component
+% configuration and access. It supports modular UI design and consistent
+% component usage across different views.
 %
-% ARCHITECTURE:
-% - UiBuilder: Static UI construction & layout (uses constants from here)
-% - UiComponents (this class): Runtime management, styling, and dynamic updates
-% - All UI constants are centralized here for consistency
+% Key Features:
+%   - Centralized UI component definitions
+%   - Modular and reusable component structures
+%   - Property and event configuration
+%   - Integration with controller and service layers
 %
-% ===== CONTAINER RUNTIME RESPONSIBILITIES =====
-% This class UPDATES and MANAGES the behavior of:
+% Dependencies:
+%   - MATLAB App Designer: UI components
+%   - FoilviewUtils: UI style constants
 %
-% 1. "Manual Control" Container:
-%    - Method: updateControlStates() -> setControlsEnabled()
-%    - Updates: Enable/disable buttons during auto-stepping
-%    - Updates: Step size display text and styling
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
 %
-% 2. "Auto Step Control" Container:
-%    - Method: updateControlStates() -> updateAutoStepButton()
-%    - Method: updateDirectionButtons() -> updateDirectionButtonStyling()
-%    - Method: updateAutoStepStatusDisplay()
-%    - Updates: START/STOP button text and colors
-%    - Updates: Direction switch and button styling
-%    - Updates: Enable/disable input fields during operation
-%    - Updates: Status text and progress display
+% Usage:
+%   components = UiComponents.create();
 %
-% 3. "Current Position" Container:
-%    - Method: updatePositionDisplay()
-%    - Method: updateStatusDisplay()
-%    - Updates: Position value text and window title
-%    - Updates: Status text (Ready/Auto-stepping progress)
-%    - Updates: Font scaling for responsive design
-%
-% 4. "System Status & Tools" Container:
-%    - Method: updateStatusDisplay()
-%    - Updates: ScanImage connection status text
-%    - Updates: Status label colors (simulation vs connected)
-%
-% Main runtime sections:
-% - Constants: All UI dimensions, colors, layout values, and text
-% - Adjustment utilities: Responsive scaling and positioning
-% - Sub-view creation: Factory methods for additional windows
-% - Update functions: Dynamic state management and visual updates
+%==============================================================================
 
 classdef UiComponents
 

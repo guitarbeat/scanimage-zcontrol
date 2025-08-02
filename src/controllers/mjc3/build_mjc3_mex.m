@@ -1,3 +1,41 @@
+%==============================================================================
+% BUILD_MJC3_MEX.M
+%==============================================================================
+% Build script for the MJC3 MEX function.
+%
+% This script compiles the mjc3_joystick_mex.cpp file with the hidapi library
+% to create a high-performance MEX function for MJC3 joystick communication.
+% The resulting MEX function provides direct hardware access to the MJC3 device
+% for real-time joystick polling.
+%
+% Prerequisites:
+%   1. MATLAB C++ compiler configured (run: mex -setup)
+%   2. hidapi library installed and accessible
+%   3. Visual Studio or compatible compiler (Windows)
+%   4. GCC or Clang (Linux/Mac)
+%
+% Key Features:
+%   - Automatic hidapi library detection
+%   - Cross-platform build support (Windows/Linux/Mac)
+%   - Multiple library name attempts for compatibility
+%   - Build verification and testing
+%   - Comprehensive error reporting and troubleshooting
+%
+% Dependencies:
+%   - mjc3_joystick_mex.cpp: Source file to compile
+%   - hidapi library: USB HID communication library
+%   - MATLAB MEX compiler: C++ compilation tools
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   build_mjc3_mex();  % Build the MEX function
+%
+%==============================================================================
+
 function build_mjc3_mex()
     % build_mjc3_mex - Build the MJC3 MEX function
     % 

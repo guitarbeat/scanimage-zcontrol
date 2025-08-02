@@ -1,3 +1,35 @@
+%==============================================================================
+% FILEPATHUTILS.M
+%==============================================================================
+% File and path manipulation utility class for Foilview.
+%
+% This class provides static methods for ensuring absolute paths, checking
+% and creating directories, generating safe filenames, and handling file
+% extensions and uniqueness. It is used throughout the application for
+% robust file and path operations.
+%
+% Key Features:
+%   - Absolute/relative path handling
+%   - Directory existence checks and creation
+%   - Filesystem-safe filename generation
+%   - Unique file path generation with timestamps
+%   - Relative path calculation
+%
+% Dependencies:
+%   - MATLAB: File I/O and path utilities
+%   - FoilviewUtils: Error handling
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   FilePathUtils.ensureFullPath('data/file.txt');
+%   FilePathUtils.makeSafeFilename('my:file?.txt');
+%
+%==============================================================================
+
 classdef FilePathUtils < handle
     % FilePathUtils - File and path manipulation utilities
     

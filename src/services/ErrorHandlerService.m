@@ -1,3 +1,52 @@
+%==============================================================================
+% ERRORHANDLERSERVICE.M
+%==============================================================================
+% Centralized error handling and logging service for the Foilview application.
+%
+% This service provides robust error handling, user-friendly error messages,
+% and comprehensive logging for the entire Foilview application. It implements
+% a hierarchical error handling system with different severity levels and
+% context-specific error recovery strategies.
+%
+% Key Features:
+%   - Multi-level error severity classification
+%   - Context-specific error handling strategies
+%   - User-friendly error message generation
+%   - Comprehensive logging with file and console output
+%   - Error callback notification system
+%   - Stack trace formatting and debugging support
+%   - Recovery strategy determination
+%
+% Error Severity Levels:
+%   - CRITICAL: Application cannot continue
+%   - ERROR: Operation failed but application can continue
+%   - WARNING: Potential issue that should be addressed
+%   - INFO: Informational messages
+%   - DEBUG: Detailed debugging information
+%
+% Error Contexts:
+%   - Initialization: Application startup errors
+%   - Connection: ScanImage connection issues
+%   - Runtime: Normal operation errors
+%   - UI: User interface errors
+%
+% Dependencies:
+%   - MATLAB: Core functionality and error handling
+%   - FoilviewUtils: Utility functions for logging
+%   - Application components: Error callback registration
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   errorHandler = ErrorHandlerService();
+%   errorHandler.handleRuntimeError(ME, 'stage_movement');
+%   userMsg = errorHandler.getUserFriendlyMessage(ME, 'connection');
+%
+%==============================================================================
+
 classdef ErrorHandlerService < handle
     % ErrorHandlerService - Centralized error handling and logging
     % 

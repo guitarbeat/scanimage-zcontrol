@@ -1,3 +1,36 @@
+%==============================================================================
+% METRICCALCULATIONSERVICE.M
+%==============================================================================
+% Metric calculation service for the Foilview application.
+%
+% This service handles all metric computations, caching, and optimization for
+% the application. It is pure business logic with no UI dependencies, focused
+% on providing fast and reliable metric calculations for focus, mean, and max
+% values from image data or simulated data.
+%
+% Key Features:
+%   - Multiple metric types (Std Dev, Mean, Max)
+%   - Caching for performance optimization
+%   - Simulation mode for testing without hardware
+%   - Event-driven notifications for metric changes
+%   - Robust error handling and logging
+%
+% Dependencies:
+%   - ScanImageManager: Provides image data and simulation mode
+%   - FoilviewUtils: Utility functions for error handling and logging
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   metricService = MetricCalculationService(scanImageManager);
+%   metrics = metricService.calculateAllMetrics([x, y, z]);
+%   value = metricService.getCurrentMetric();
+%
+%==============================================================================
+
 classdef MetricCalculationService < handle
     % MetricCalculationService - Pure business logic for metric calculations
     % Handles all metric computations, caching, and optimization

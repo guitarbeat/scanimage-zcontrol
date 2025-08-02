@@ -1,3 +1,35 @@
+%==============================================================================
+% MJC3VIEW.M
+%==============================================================================
+% UI view class for MJC3 joystick control in Foilview.
+%
+% This class implements the user interface for MJC3 joystick control, including
+% manual and auto-stepping controls, metric display, and status reporting. It
+% integrates with the controller and service layers to provide a responsive and
+% interactive user experience for Z-control and focus optimization.
+%
+% Key Features:
+%   - Manual and auto-stepping controls
+%   - Real-time metric and position display
+%   - Status and error reporting
+%   - Integration with MJC3 controller and services
+%   - UI layout and style management
+%
+% Dependencies:
+%   - FoilviewController: Main controller
+%   - UIController: UI state management
+%   - MATLAB App Designer: UI components
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   view = MJC3View(app, controller);
+%
+%==============================================================================
+
 classdef MJC3View < handle
     % MJC3View - Dedicated window for MJC3 Joystick Control
     % Provides a separate interface for joystick configuration, monitoring, and control

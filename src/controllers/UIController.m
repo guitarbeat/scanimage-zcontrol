@@ -1,3 +1,43 @@
+%==============================================================================
+% UICONTROLLER.M
+%==============================================================================
+% UI state management and update controller for the Foilview application.
+%
+% This controller handles all UI-related operations, including display updates,
+% control state management, and user interface synchronization. It separates
+% UI logic from business logic to maintain clean architecture and provides
+% throttled updates to prevent UI performance issues.
+%
+% Key Features:
+%   - Throttled UI updates to prevent performance issues
+%   - Position display management (X, Y, Z coordinates)
+%   - Metric display updates and formatting
+%   - Control state management (enable/disable during operations)
+%   - Status display updates and error handling
+%   - Component validation and error recovery
+%
+% Update Throttling:
+%   - Default throttle: 50ms between updates
+%   - Prevents excessive UI updates during rapid changes
+%   - Maintains responsive interface while reducing CPU usage
+%
+% Dependencies:
+%   - FoilviewUtils: Utility functions for formatting and error handling
+%   - Main application: Access to controller and UI components
+%   - MATLAB UI components: Display and control elements
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   uiController = UIController(app);
+%   uiController.updateAllUI();  % Update all UI components
+%   uiController.updatePositionDisplay();  % Update position display only
+%
+%==============================================================================
+
 classdef UIController < handle
     % UIController - Handles UI state management and updates
     % Separates UI logic from business logic

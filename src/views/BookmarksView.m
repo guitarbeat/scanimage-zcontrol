@@ -1,3 +1,34 @@
+%==============================================================================
+% BOOKMARKSVIEW.M
+%==============================================================================
+% Bookmarks view UI class for Foilview application.
+%
+% This class implements the bookmarks view, providing visualization and
+% management of position bookmarks within the Foilview application. It
+% supports adding, removing, and navigating to bookmarks, as well as
+% integration with controller and service layers.
+%
+% Key Features:
+%   - Visualization and management of position bookmarks
+%   - Add, remove, and navigate to bookmarks
+%   - Integration with controller and service layers
+%   - UI layout and style management
+%
+% Dependencies:
+%   - BookmarkManager: Bookmark storage and retrieval
+%   - FoilviewController: Main controller
+%   - MATLAB App Designer: UI components
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   view = BookmarksView(app, controller);
+%
+%==============================================================================
+
 classdef BookmarksView < handle
     % Manages the Position Bookmarks window (XYZ)
 

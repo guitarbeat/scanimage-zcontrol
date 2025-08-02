@@ -1,3 +1,43 @@
+%==============================================================================
+% SCANIMAGECONTROLLER.M
+%==============================================================================
+% Interface to ScanImage's motor control system.
+%
+% This controller provides a unified interface to ScanImage's motor control
+% system, supporting X, Y, and Z-axis movements. It abstracts the complexity
+% of ScanImage's motor API and provides a simple relative movement interface
+% that can be used by other controllers (like MJC3 controllers).
+%
+% Key Features:
+%   - Multi-axis support (X, Y, Z) with individual control
+%   - Relative movement interface for easy integration
+%   - Simulation mode for testing without ScanImage
+%   - Position validation and error handling
+%   - Backward compatibility with single-axis interfaces
+%   - Comprehensive logging and status reporting
+%
+% Axis Configuration:
+%   - X-axis: Index 1 (typically horizontal movement)
+%   - Y-axis: Index 2 (typically vertical movement)
+%   - Z-axis: Index 3 (typically focus movement)
+%
+% Dependencies:
+%   - ScanImage: Primary motor control system
+%   - hSI.hMotors: ScanImage motors handle
+%   - MATLAB: Core functionality and error handling
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   controller = ScanImageController(hSI.hMotors);
+%   success = controller.relativeMoveZ(10.0);  % Move Z up by 10 μm
+%   success = controller.relativeMoveX(5.0);   % Move X by 5 μm
+%
+%==============================================================================
+
 classdef ScanImageController < handle
     % ScanImageController - Interface to ScanImage's motor control
     % Provides a simple relativeMove interface for MJC3 controllers (X, Y, Z axes)

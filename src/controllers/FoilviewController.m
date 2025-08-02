@@ -1,4 +1,42 @@
-﻿classdef FoilviewController < handle
+﻿%==============================================================================
+% FOILVIEWCONTROLLER.M
+%==============================================================================
+% Main controller class for the Foilview application that manages Z-axis stage
+% control, auto-stepping, metrics calculation, and bookmark management.
+%
+% This controller serves as the central coordinator between the UI components
+% and the underlying services (ScanImageManager, StageControlService, etc.).
+% It handles all user interactions, stage movements, auto-stepping sequences,
+% and metric calculations.
+%
+% Key Features:
+%   - Z-axis stage control with X/Y position tracking
+%   - Auto-stepping with configurable parameters
+%   - Real-time metric calculation and display
+%   - Bookmark management for position marking
+%   - Simulation mode for testing without hardware
+%   - Event-driven architecture with status notifications
+%
+% Dependencies:
+%   - ScanImageManager: Connection to ScanImage software
+%   - StageControlService: Stage movement operations
+%   - MetricCalculationService: Focus metric calculations
+%   - BookmarkManager: Position bookmark storage
+%   - FoilviewUtils: Utility functions for error handling
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   controller = FoilviewController();
+%   controller.moveStage(10);  % Move Z stage by 10 microns
+%   controller.startAutoStepping(1, 10, 0.5, 1, true);  % Auto-step
+%
+%==============================================================================
+
+classdef FoilviewController < handle
 
     properties (Constant, Access = public)
         STEP_SIZES = [0.1, 0.5, 1, 5, 10, 50]

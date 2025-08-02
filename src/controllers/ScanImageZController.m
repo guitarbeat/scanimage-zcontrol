@@ -1,4 +1,45 @@
-classdef ScanImageController < handle
+%==============================================================================
+% SCANIMAGEZCONTROLLER.M
+%==============================================================================
+% Z-axis specific interface to ScanImage's motor control system.
+%
+% This controller provides a specialized interface for Z-axis control within
+% ScanImage's motor system. It focuses exclusively on Z-axis movements and
+% provides a simplified interface compared to the full multi-axis controller.
+% This is useful for applications that only need Z-axis control (like focus
+% adjustment).
+%
+% Key Features:
+%   - Z-axis specific control and positioning
+%   - Relative movement interface for easy integration
+%   - Simulation mode for testing without ScanImage
+%   - Position validation and error handling
+%   - Simplified interface compared to multi-axis controller
+%   - Comprehensive logging and status reporting
+%
+% Z-axis Configuration:
+%   - Z-axis: Index 3 (typically focus movement in ScanImage)
+%   - Movement Range: Dependent on stage hardware
+%   - Units: Micrometers (μm)
+%
+% Dependencies:
+%   - ScanImage: Primary motor control system
+%   - hSI.hMotors: ScanImage motors handle
+%   - MATLAB: Core functionality and error handling
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   controller = ScanImageZController(hSI.hMotors);
+%   success = controller.relativeMove(10.0);  % Move Z up by 10 μm
+%   success = controller.moveToAbsolute(100.0);  % Move Z to 100 μm
+%
+%==============================================================================
+
+classdef ScanImageZController < handle
     % ScanImageController - Interface to ScanImage's motor control
     % Provides a simple relativeMove interface for MJC3 controllers (X, Y, Z axes)
     

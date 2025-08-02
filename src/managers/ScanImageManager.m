@@ -1,3 +1,47 @@
+%==============================================================================
+% SCANIMAGEMANAGER.M
+%==============================================================================
+% Manager class for ScanImage integration and metadata logging.
+%
+% This manager handles the integration with ScanImage software, providing
+% connection management, metadata logging, and error handling for the
+% Foilview application. It serves as the bridge between Foilview and
+% ScanImage's motor control and acquisition systems.
+%
+% Key Features:
+%   - ScanImage connection management and validation
+%   - Metadata logging for acquired frames
+%   - Simulation mode when ScanImage is unavailable
+%   - Robust error handling and retry logic
+%   - Connection state tracking and reporting
+%   - Automatic metadata file path detection
+%   - Bidirectional Z-step size synchronization
+%
+% Connection States:
+%   - DISCONNECTED: No connection to ScanImage
+%   - CONNECTING: Attempting to establish connection
+%   - CONNECTED: Successfully connected to ScanImage
+%   - SIMULATION: Running in simulation mode
+%   - ERROR: Connection error state
+%
+% Dependencies:
+%   - ScanImage: Primary microscopy control software
+%   - FoilviewUtils: Utility functions for error handling
+%   - MetadataService: Metadata logging and file management
+%   - MATLAB base workspace: Access to hSI and metadata variables
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   manager = ScanImageManager();
+%   [success, message] = manager.connect();
+%   manager.initialize(foilviewApp);
+%
+%==============================================================================
+
 classdef ScanImageManager < handle
     % ScanImageManager - Manages ScanImage integration and metadata logging
     % This class handles the integration with ScanImage and manages metadata

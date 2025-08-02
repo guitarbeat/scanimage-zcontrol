@@ -1,4 +1,49 @@
 /**
+ *==============================================================================
+ * MJC3_JOYSTICK_MEX.CPP
+ *==============================================================================
+ * High-performance MEX interface for Thorlabs MJC3 joystick.
+ *
+ * This MEX function provides direct HID access to the MJC3 joystick without
+ * requiring PsychHID or other external dependencies. It implements a low-level
+ * USB HID communication protocol for real-time joystick polling and control.
+ *
+ * Key Features:
+ *   - Direct HID communication with MJC3 device (VID:1313, PID:9000)
+ *   - Non-blocking I/O with configurable timeouts
+ *   - Automatic device detection and connection management
+ *   - Error handling and device state validation
+ *   - Cross-platform compatibility (Windows/Linux/Mac)
+ *
+ * Device Specifications:
+ *   - Vendor ID: 0x1313 (Thorlabs)
+ *   - Product ID: 0x9000 (MJC3)
+ *   - Report Size: 5 bytes
+ *   - Interface: USB HID
+ *
+ * Dependencies:
+ *   - hidapi library: Cross-platform HID communication
+ *   - MATLAB MEX API: MATLAB interface
+ *   - C++ Standard Library: String handling and utilities
+ *
+ * Author: Aaron W. (alw4834)
+ * Created: 2024
+ * Last Modified: 2024
+ * Version: 1.0
+ *
+ * Usage:
+ *   data = mjc3_joystick_mex('read', timeout_ms)  % Read joystick state
+ *   info = mjc3_joystick_mex('info')              % Get device info
+ *   result = mjc3_joystick_mex('test')            % Test function
+ *   mjc3_joystick_mex('close')                    % Close connection
+ *
+ * Compilation:
+ *   mex -I"path/to/hidapi/include" -L"path/to/hidapi/lib" -lhidapi mjc3_joystick_mex.cpp
+ *
+ *==============================================================================
+ */
+
+/**
  * mjc3_joystick_mex.cpp - High-performance MEX interface for Thorlabs MJC3 joystick
  * 
  * This MEX function provides direct HID access to the MJC3 joystick without

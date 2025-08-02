@@ -1,3 +1,41 @@
+%==============================================================================
+% MJC3CONTROLLERFACTORY.M
+%==============================================================================
+% Factory class for creating MJC3 joystick controllers.
+%
+% This factory class provides a unified interface for creating different types
+% of MJC3 controllers (MEX-based, simulation, etc.) while automatically
+% selecting the best available implementation. It implements the Factory pattern
+% to abstract controller creation and provide fallback options.
+%
+% Key Features:
+%   - Automatic controller type selection based on availability
+%   - Preference-based controller creation (MEX preferred over simulation)
+%   - Availability checking for different controller types
+%   - Fallback to simulation controller when MEX is unavailable
+%   - Comprehensive controller type listing and description
+%
+% Controller Types:
+%   - MEX: High-performance controller with direct HID access (primary)
+%   - Simulation: Simulated joystick for testing and development (fallback)
+%
+% Dependencies:
+%   - MJC3_MEX_Controller: High-performance MEX implementation
+%   - MJC3_Simulation_Controller: Simulation implementation
+%   - mjc3_joystick_mex: MEX function for hardware communication
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   controller = MJC3ControllerFactory.createController(zController, 5.0);
+%   types = MJC3ControllerFactory.getAvailableTypes();
+%   MJC3ControllerFactory.listAvailableTypes();
+%
+%==============================================================================
+
 classdef MJC3ControllerFactory < handle
     % MJC3ControllerFactory - Factory for creating MJC3 joystick controllers
     % Primary implementation uses high-performance MEX controller

@@ -1,3 +1,44 @@
+%==============================================================================
+% MJC3_SIMULATION_CONTROLLER.M
+%==============================================================================
+% Simulated joystick controller for MJC3 testing and development.
+%
+% This controller provides a keyboard-based simulation of the MJC3 joystick
+% when hardware is not available. It implements the same interface as the
+% MEX controller but uses keyboard input to simulate joystick movements,
+% making it useful for testing and development without physical hardware.
+%
+% Key Features:
+%   - Keyboard-based joystick simulation
+%   - Arrow key controls for Z-axis movement
+%   - Space bar for stopping simulation
+%   - Visual feedback window with instructions
+%   - Compatible interface with real MJC3 controller
+%   - Safe fallback when hardware is unavailable
+%
+% Simulation Controls:
+%   - Up Arrow: Move Z-axis up (positive direction)
+%   - Down Arrow: Move Z-axis down (negative direction)
+%   - Space: Stop simulation
+%   - Escape: Stop simulation
+%
+% Dependencies:
+%   - BaseMJC3Controller: Abstract base class interface
+%   - MATLAB Figure: Visual feedback and key capture
+%   - Z-controller: Stage movement interface
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   controller = MJC3_Simulation_Controller(zController, 5.0);
+%   controller.start();  % Begin keyboard simulation
+%   controller.stop();   % Stop simulation
+%
+%==============================================================================
+
 classdef MJC3_Simulation_Controller < BaseMJC3Controller
     % MJC3_Simulation_Controller - Simulated joystick controller for testing
     % Provides keyboard-based simulation of joystick input when hardware isn't available

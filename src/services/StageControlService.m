@@ -1,3 +1,42 @@
+%==============================================================================
+% STAGECONTROLSERVICE.M
+%==============================================================================
+% Stage control service for the Foilview application.
+%
+% This service handles all stage positioning, movement validation, and
+% coordinate management for the Foilview application. It provides a pure
+% business logic layer with no UI dependencies, focused on core stage
+% control functionality.
+%
+% Key Features:
+%   - Multi-axis stage movement (X, Y, Z)
+%   - Movement validation and constraint checking
+%   - Position tracking and synchronization
+%   - Event-driven position change notifications
+%   - Simulation mode support
+%
+% Movement Constraints:
+%   - Minimum step size: 0.01 μm
+%   - Maximum step size: 1000 μm
+%   - Position tolerance: 0.01 μm
+%   - Movement wait time: 0.2 seconds
+%
+% Dependencies:
+%   - ScanImageManager: Stage movement interface
+%   - FoilviewUtils: Error handling and logging
+%   - MATLAB: Core functionality and events
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   stageService = StageControlService(scanImageManager);
+%   success = stageService.moveStage('Z', 10.0);
+%
+%==============================================================================
+
 classdef StageControlService < handle
     % StageControlService - Pure business logic for stage movement operations
     % Handles all stage positioning, movement validation, and coordinate management

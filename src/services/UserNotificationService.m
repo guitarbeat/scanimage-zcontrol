@@ -1,3 +1,42 @@
+%==============================================================================
+% USERNOTIFICATIONSERVICE.M
+%==============================================================================
+% User-friendly error reporting and notification service for Foilview.
+%
+% This service provides user-friendly error dialogs, status messages, and
+% troubleshooting guidance for the Foilview application. It translates
+% technical errors into user-understandable messages and provides helpful
+% guidance for resolving common issues.
+%
+% Key Features:
+%   - User-friendly error dialogs with troubleshooting steps
+%   - Connection-specific error handling (ScanImage, hardware, etc.)
+%   - Initialization error reporting with phase identification
+%   - Notification history tracking and management
+%   - Context-aware error messages and guidance
+%
+% Notification Types:
+%   - INFO: Informational messages
+%   - WARNING: Warning messages
+%   - ERROR: Error messages
+%   - SUCCESS: Success confirmations
+%
+% Dependencies:
+%   - ErrorHandlerService: Error handling and logging
+%   - MATLAB UI: Dialog and notification components
+%   - FoilviewUtils: Utility functions for formatting
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   notificationService = UserNotificationService(errorHandler, parentFigure);
+%   notificationService.showCriticalError('Error Title', 'Error message');
+%
+%==============================================================================
+
 classdef UserNotificationService < handle
     % UserNotificationService - User-friendly error reporting and notifications
     % 

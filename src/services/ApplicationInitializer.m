@@ -1,3 +1,48 @@
+%==============================================================================
+% APPLICATIONINITIALIZER.M
+%==============================================================================
+% Robust application startup service with comprehensive error handling.
+%
+% This service manages the complete application initialization sequence,
+% providing dependency validation, service initialization, UI setup, and
+% connection establishment. It implements a phased initialization approach
+% with comprehensive error handling and graceful fallback mechanisms.
+%
+% Key Features:
+%   - Phased initialization with clear progress tracking
+%   - Dependency validation and error reporting
+%   - Service initialization with error recovery
+%   - UI component creation and validation
+%   - Connection establishment and testing
+%   - Comprehensive error handling and logging
+%   - Graceful fallback for missing components
+%
+% Initialization Phases:
+%   - STARTING: Initial setup and validation
+%   - DEPENDENCIES: Check required dependencies
+%   - SERVICES: Initialize core services
+%   - UI: Create and configure UI components
+%   - CONNECTIONS: Establish external connections
+%   - COMPLETE: Initialization successful
+%   - FAILED: Initialization failed
+%
+% Dependencies:
+%   - ErrorHandlerService: Error handling and logging
+%   - Various Services: Stage control, metrics, metadata, etc.
+%   - UiBuilder: UI component construction
+%   - FoilviewUtils: Utility functions and validation
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   initializer = ApplicationInitializer(errorHandler);
+%   [success, app] = initializer.initializeApplication();
+%
+%==============================================================================
+
 classdef ApplicationInitializer < handle
     % ApplicationInitializer - Robust application startup with error handling
     % 

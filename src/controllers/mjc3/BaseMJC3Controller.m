@@ -1,3 +1,40 @@
+%==============================================================================
+% BASEMJC3CONTROLLER.M
+%==============================================================================
+% Abstract base class for MJC3 joystick controllers.
+%
+% This abstract class defines the common interface that all MJC3 controllers
+% must implement. It provides the foundation for different controller types
+% (MEX-based, simulation, etc.) while ensuring consistent behavior and
+% interface across all implementations.
+%
+% Key Features:
+%   - Abstract interface for MJC3 controller implementations
+%   - Common step factor management
+%   - Manual movement methods (moveUp, moveDown)
+%   - Z-controller integration interface
+%   - Automatic cleanup on destruction
+%
+% Abstract Methods:
+%   - start(): Start the controller polling
+%   - stop(): Stop the controller polling
+%   - connectToMJC3(): Connect to MJC3 device
+%
+% Dependencies:
+%   - Z-controller: Stage movement interface (must implement relativeMove)
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   % This is an abstract class - use concrete implementations:
+%   % controller = MJC3_MEX_Controller(zController, stepFactor);
+%   % controller = MJC3_Simulation_Controller(zController, stepFactor);
+%
+%==============================================================================
+
 classdef BaseMJC3Controller < handle
     % BaseMJC3Controller - Abstract base class for MJC3 joystick controllers
     % Defines the common interface that all MJC3 controllers must implement

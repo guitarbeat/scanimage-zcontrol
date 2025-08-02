@@ -1,3 +1,43 @@
+%==============================================================================
+% INSTALL_MJC3.M
+%==============================================================================
+% Complete installation script for MJC3 MEX controller system.
+%
+% This script provides a comprehensive installation process for the high-performance
+% MJC3 joystick controller, including compiler setup, library installation,
+% MEX function building, and system testing. It automates the entire setup
+% process to ensure the MJC3 controller is ready for use.
+%
+% Installation Steps:
+%   1. Check MATLAB C++ compiler configuration
+%   2. Verify hidapi library availability
+%   3. Build MEX function with hidapi
+%   4. Test installation and functionality
+%   5. Clean up deprecated files
+%   6. Display usage instructions
+%
+% Key Features:
+%   - Automated dependency checking
+%   - Cross-platform support (Windows/Linux/Mac)
+%   - Comprehensive error reporting
+%   - Installation verification
+%   - User-friendly progress reporting
+%
+% Prerequisites:
+%   - MATLAB with C++ compiler support
+%   - hidapi library (installed via vcpkg or system package manager)
+%   - Visual Studio (Windows) or GCC/Clang (Linux/Mac)
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   install_mjc3();  % Run complete installation
+%
+%==============================================================================
+
 function install_mjc3()
     % install_mjc3 - Complete installation script for MJC3 MEX controller
     % 

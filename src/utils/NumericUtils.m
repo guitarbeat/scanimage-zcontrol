@@ -1,3 +1,34 @@
+%==============================================================================
+% NUMERICUTILS.M
+%==============================================================================
+% Numeric computation and validation utility class for Foilview.
+%
+% This class provides static methods for safe division, normalization,
+% range limiting, rounding, interpolation, and smoothing of numeric data.
+% It is used throughout the application for robust numeric operations.
+%
+% Key Features:
+%   - Safe division with default fallback
+%   - Data normalization and range limiting
+%   - Precision rounding
+%   - Data range calculation with padding
+%   - NaN gap interpolation
+%   - Data smoothing (moving average)
+%
+% Dependencies:
+%   - MATLAB: Core numeric functions
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   NumericUtils.safeDiv(10, 0, NaN);
+%   NumericUtils.normalizeToFirst([1,2,3]);
+%
+%==============================================================================
+
 classdef NumericUtils < handle
     % NumericUtils - Numeric computation and validation utilities
     

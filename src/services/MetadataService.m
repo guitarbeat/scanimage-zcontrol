@@ -1,3 +1,47 @@
+%==============================================================================
+% METADATASERVICE.M
+%==============================================================================
+% Metadata logging and management service for the Foilview application.
+%
+% This service handles all metadata logging operations, including bookmark
+% metadata creation, scanner information extraction, and file writing.
+% It provides a pure business logic layer with no UI dependencies, making
+% it suitable for use across different parts of the application.
+%
+% Key Features:
+%   - Bookmark metadata creation with comprehensive information
+%   - Scanner information extraction from ScanImage
+%   - Metadata file writing with CSV format compatibility
+%   - Timestamp and filename generation
+%   - Metric data association with bookmarks
+%   - Simulation mode support with default values
+%   - Error handling and logging
+%
+% Metadata Structure:
+%   - Timestamp: ISO format timestamp
+%   - Filename: Generated TIFF filename
+%   - Scanner Info: Zoom, frame rate, resolution, etc.
+%   - Position Data: X, Y, Z coordinates
+%   - Bookmark Info: Label and associated metrics
+%   - Imaging Parameters: Power, feedback, FOV, etc.
+%
+% Dependencies:
+%   - MetadataWriter: File writing utility
+%   - FoilviewUtils: Error handling and logging
+%   - ScanImage: Scanner information extraction
+%   - MATLAB: Core functionality and file I/O
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   metadata = MetadataService.createBookmarkMetadata(label, x, y, z, metricStruct, scannerInfo);
+%   success = MetadataService.saveBookmarkMetadata(label, x, y, z, metricStruct, filePath, controller);
+%
+%==============================================================================
+
 classdef MetadataService < handle
     % MetadataService - Handles all metadata logging operations
     % Pure business logic, no UI dependencies

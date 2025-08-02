@@ -1,3 +1,45 @@
+%==============================================================================
+% CALIBRATIONSERVICE.M
+%==============================================================================
+% Calibration service for MJC3 joystick axes and stage control.
+%
+% This service handles the calibration logic for MJC3 joystick axes, providing
+% persistent storage and retrieval of calibration data for X, Y, and Z axes.
+% It implements dead zone detection, sensitivity adjustment, and range mapping
+% to ensure accurate and responsive joystick control.
+%
+% Key Features:
+%   - Multi-axis calibration (X, Y, Z) with individual parameters
+%   - Dead zone detection and compensation
+%   - Sensitivity adjustment and range mapping
+%   - Persistent calibration storage and retrieval
+%   - Default calibration fallback
+%   - Real-time calibration application
+%   - Calibration validation and error handling
+%
+% Calibration Parameters:
+%   - Center: Expected center value for each axis (typically 128)
+%   - Dead Zone: Inactive region around center (±5 units default)
+%   - Min/Max: Calibrated range limits for each axis
+%   - Sensitivity: Multiplier for movement sensitivity
+%
+% Dependencies:
+%   - FoilviewUtils: Utility functions for error handling
+%   - MATLAB file I/O: Calibration data persistence
+%   - MJC3 controllers: Raw joystick value input
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   service = CalibrationService();
+%   service.calibrateAxis('Z', rawValues);
+%   calibratedValue = service.applyCalibration('Z', rawValue);
+%
+%==============================================================================
+
 classdef CalibrationService < handle
     % CalibrationService - Handles calibration logic for MJC3 joystick axes
     % Provides persistent storage and retrieval of calibration data for X, Y, Z axes

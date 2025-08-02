@@ -1,3 +1,38 @@
+%==============================================================================
+% HIDCONTROLLER.M
+%==============================================================================
+% HID (Human Interface Device) controller for MJC3 joystick integration.
+%
+% This controller manages the MJC3 joystick device and provides a bridge between
+% the physical joystick hardware and the main Foilview application. It handles
+% device connection, joystick polling, and Z-axis movement control through
+% the MJC3_MEX_Controller.
+%
+% Key Features:
+%   - MJC3 joystick device detection and connection
+%   - Real-time joystick polling (20Hz)
+%   - Configurable step factor for movement sensitivity
+%   - UI integration with enable/disable controls
+%   - Settings dialog for joystick configuration
+%   - Error handling for device connection issues
+%
+% Dependencies:
+%   - MJC3_MEX_Controller: Low-level joystick interface
+%   - MJC3ControllerFactory: Controller creation and management
+%   - Z-controller: Stage movement interface (must implement relativeMove)
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   hidController = HIDController(uiComponents, zController);
+%   hidController.enable();  % Enable joystick control
+%   hidController.setStepFactor(5.0);  % Set sensitivity
+%
+%==============================================================================
+
 classdef HIDController < handle
     % HIDController - Manages MJC3 joystick integration with ScanImage
     %

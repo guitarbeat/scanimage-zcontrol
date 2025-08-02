@@ -1,3 +1,33 @@
+%==============================================================================
+% PLOTMANAGER.M
+%==============================================================================
+% Plot manager UI class for Foilview application.
+%
+% This class implements the plotting functionality for real-time metric and
+% position data within the Foilview application. It supports dynamic plot
+% updates, axis scaling, and integration with controller and service layers.
+%
+% Key Features:
+%   - Real-time plotting of metrics and positions
+%   - Dynamic axis scaling and updates
+%   - Integration with controller and service layers
+%   - UI layout and style management
+%
+% Dependencies:
+%   - FoilviewController: Main controller
+%   - UIController: UI state management
+%   - MATLAB App Designer: UI components
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   plotMgr = PlotManager(app, controller);
+%
+%==============================================================================
+
 classdef PlotManager < handle
     % Manages the metrics plot in the FoilView application.
     % This class now delegates all plotting logic to MetricsPlotService.

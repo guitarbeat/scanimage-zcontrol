@@ -1,3 +1,35 @@
+%==============================================================================
+% FOILVIEWUTILS.M
+%==============================================================================
+% Utility class for logging, formatting, and UI style management in Foilview.
+%
+% This class provides centralized logging, error handling, formatting utilities,
+% and UI style constants for the Foilview application. It is used throughout
+% the codebase for consistent logging, error reporting, and UI configuration.
+%
+% Key Features:
+%   - Centralized logging system with multiple log levels
+%   - Error handling and exception logging
+%   - UI style constants for consistent appearance
+%   - Formatting utilities for positions, metrics, and filenames
+%   - File and directory utilities
+%   - Progress bar and status message helpers
+%
+% Dependencies:
+%   - MATLAB: Core functionality
+%   - Application components: For context-specific logging
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   FoilviewUtils.log(FoilviewUtils.LOG_LEVEL_INFO, 'Component', 'Message');
+%   FoilviewUtils.formatPosition(123.456);
+%
+%==============================================================================
+
 classdef FoilviewUtils < handle
     
     properties (Constant, Access = public)

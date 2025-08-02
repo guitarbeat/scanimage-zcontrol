@@ -1,3 +1,33 @@
+%==============================================================================
+% TOOLSWINDOW.M
+%==============================================================================
+% Tools window UI class for Foilview application.
+%
+% This class implements the tools window, providing access to advanced
+% features, diagnostics, and developer utilities within the Foilview
+% application. It is designed for extensibility and integration with the
+% main application UI.
+%
+% Key Features:
+%   - Access to advanced and developer tools
+%   - Diagnostic and logging utilities
+%   - Integration with main application UI
+%   - Extensible layout for future tools
+%
+% Dependencies:
+%   - MATLAB App Designer: UI components
+%   - FoilviewUtils: UI style constants
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   toolsWin = ToolsWindow(app);
+%
+%==============================================================================
+
 classdef ToolsWindow < handle
     % TOOLS WINDOW - Separate window for FoilView tools and utilities
     %

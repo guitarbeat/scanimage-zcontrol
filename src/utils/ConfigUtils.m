@@ -1,3 +1,34 @@
+%==============================================================================
+% CONFIGUTILS.M
+%==============================================================================
+% Configuration loading and saving utility class for Foilview.
+%
+% This class provides static methods for loading, saving, and merging
+% configuration structures, as well as providing default application
+% configuration values. It is used throughout the application for
+% robust configuration management.
+%
+% Key Features:
+%   - Configuration file loading with fallback to defaults
+%   - Configuration saving with error handling
+%   - Merging of user and default configurations
+%   - Default application configuration structure
+%
+% Dependencies:
+%   - MATLAB: File I/O
+%   - FoilviewUtils: Error handling
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   config = ConfigUtils.loadConfig('config.mat');
+%   ConfigUtils.saveConfig(config, 'config.mat');
+%
+%==============================================================================
+
 classdef ConfigUtils < handle
     % ConfigUtils - Configuration loading and saving utilities
     

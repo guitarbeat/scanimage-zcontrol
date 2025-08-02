@@ -1,3 +1,41 @@
+%==============================================================================
+% METRICSPLOTSERVICE.M
+%==============================================================================
+% Metrics plotting service for the Foilview application.
+%
+% This service encapsulates all logic for creating, updating, and clearing
+% plots for metric data visualization. It provides a singleton pattern for
+% consistent plot management and supports real-time metric plotting with
+% multiple metric types and customizable styling.
+%
+% Key Features:
+%   - Singleton pattern for consistent plot management
+%   - Real-time metric plotting with multiple types
+%   - Customizable colors and markers for different metrics
+%   - Performance-optimized plot updates
+%   - Integration with controller and service layers
+%
+% Metric Types:
+%   - Std Dev: Standard deviation metric
+%   - Mean: Mean value metric
+%   - Max: Maximum value metric
+%
+% Dependencies:
+%   - MATLAB: Plotting and graphics functionality
+%   - FoilviewUtils: UI style constants
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   plotSvc = MetricsPlotService.getInstance();
+%   plotSvc.initialize(parentAxes);
+%   plotSvc.updateMetrics(dataStruct);
+%
+%==============================================================================
+
 classdef MetricsPlotService < handle
     % MetricsPlotService
     %

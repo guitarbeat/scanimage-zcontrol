@@ -1,3 +1,46 @@
+%==============================================================================
+% BOOKMARKMANAGER.M
+%==============================================================================
+% Manager class for position bookmark storage and retrieval.
+%
+% This manager handles the storage, retrieval, and management of position
+% bookmarks within the Foilview application. It provides a unified interface
+% for adding, removing, and accessing bookmarked positions with associated
+% metadata including metrics and labels.
+%
+% Key Features:
+%   - Position bookmark storage with X, Y, Z coordinates
+%   - Metric association with each bookmark
+%   - Label-based bookmark identification
+%   - Automatic metadata logging to files
+%   - Duplicate label handling (replace existing)
+%   - Index-based bookmark access and removal
+%   - Maximum metric tracking and bookmarking
+%
+% Bookmark Structure:
+%   - Labels: Human-readable identifiers for positions
+%   - XPositions: X-axis coordinates in micrometers
+%   - YPositions: Y-axis coordinates in micrometers
+%   - ZPositions: Z-axis coordinates in micrometers
+%   - Metrics: Associated metric data (type, value, etc.)
+%
+% Dependencies:
+%   - MetadataService: Metadata logging and file management
+%   - FoilviewUtils: Utility functions for error handling
+%   - Main application: Access to controller and metadata configuration
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   manager = BookmarkManager();
+%   manager.add('Focus Point', 100, 200, 50, metricStruct);
+%   bookmark = manager.get(1);  % Get first bookmark
+%
+%==============================================================================
+
 classdef BookmarkManager < handle
     properties (Access = public)
         MarkedPositions = struct('Labels', {{}}, 'XPositions', [], 'YPositions', [], 'ZPositions', [], 'Metrics', {{}})

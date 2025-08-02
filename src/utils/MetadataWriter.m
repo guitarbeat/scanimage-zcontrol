@@ -1,3 +1,32 @@
+%==============================================================================
+% METADATAWRITER.M
+%==============================================================================
+% Shared utility class for metadata writing operations in Foilview.
+%
+% This class extracts common metadata writing logic to eliminate duplication
+% between ScanImageManager and MetadataService. It provides methods for
+% formatting, extracting, and writing metadata to files in a consistent way.
+%
+% Key Features:
+%   - Metadata formatting for CSV output
+%   - Bookmark field extraction and defaulting
+%   - File writing with error handling
+%   - Compatibility with ScanImageManager and MetadataService
+%
+% Dependencies:
+%   - FoilviewUtils: Error handling and logging
+%   - MATLAB: File I/O
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   MetadataWriter.writeMetadataToFile(metadata, filePath, true);
+%
+%==============================================================================
+
 classdef MetadataWriter
     % MetadataWriter - Shared utility class for metadata writing operations
     % This class extracts common metadata writing logic to eliminate duplication

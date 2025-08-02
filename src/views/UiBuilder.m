@@ -1,3 +1,34 @@
+%==============================================================================
+% UIBUILDER.M
+%==============================================================================
+% UI component builder utility for Foilview application.
+%
+% This class provides static methods to construct and configure UI components
+% for the Foilview application, supporting modular and reusable UI layouts.
+% It abstracts the complexity of MATLAB App Designer UI creation and enables
+% rapid prototyping and consistent UI design.
+%
+% Key Features:
+%   - Modular UI component construction
+%   - Layout management for panels, grids, and tabs
+%   - Style and property configuration helpers
+%   - Support for custom and standard UI elements
+%   - Integration with controller and service layers
+%
+% Dependencies:
+%   - MATLAB App Designer: UI components
+%   - FoilviewUtils: UI style constants
+%
+% Author: Aaron W. (alw4834)
+% Created: 2024
+% Last Modified: 2024
+% Version: 1.0
+%
+% Usage:
+%   components = UiBuilder.build();
+%
+%==============================================================================
+
 classdef UiBuilder
     % UI CONSTRUCTION & LAYOUT - Static UI creation for FoilView application
     %

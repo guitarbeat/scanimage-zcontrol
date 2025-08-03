@@ -77,6 +77,9 @@ classdef foilview < matlab.apps.AppBase
         MetricTimer
         ResizeMonitorTimer
         
+        % * UI Update throttling - replaces persistent variable in updater
+        LastUpdateTime (1,1) double = 0  % Timestamp of last UI update for throttling
+        
         % Window sizing tracking
         LastWindowSize = [0 0 0 0]  % Track previous window size for resize detection
         IgnoreNextResize = false    % Flag to ignore programmatic resizes

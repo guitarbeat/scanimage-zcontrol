@@ -65,13 +65,16 @@ classdef foilview_controller < handle
             'Simulation', 'Simulation Mode', ...
             'Initializing', 'Initializing...', ...
             'Connected', 'Connected', ...
-            'NotRunning', 'ScanImage not running', ...
-            'WindowNotFound', 'Motor Controls window not found', ...
-            'MissingElements', 'Missing UI elements in Motor Controls', ...
+            'NotRunning', 'ScanImage not running - Start ScanImage first', ...
+            'WindowNotFound', 'Motor Controls window not found - Open Motor Controls in ScanImage', ...
+            'MissingElements', 'Missing UI elements in Motor Controls - Check ScanImage version compatibility', ...
             'LostConnection', 'Lost connection', ...
             'MovementError', 'Movement error', ...
             'InvalidPosition', 'Invalid position', ...
-            'AutoStepError', 'Auto-step error')
+            'AutoStepError', 'Auto-step error', ...
+            'WorkspaceError', 'Cannot access base workspace - Ensure ScanImage is initialized', ...
+            'ScanImageInvalid', 'hSI variable exists but is not a valid ScanImage object', ...
+            'VersionIncompatible', 'ScanImage version may be incompatible - Some features may not work')
     end
     
     %% Public Properties
@@ -152,16 +155,17 @@ classdef foilview_controller < handle
     %% Public Interface Methods
     methods (Access = public)
         function connectToScanImage(obj)
-            % Check if ScanImage is running
+            % Check if ScanImage is running with enhanced workspace validation
             try
-                % Check if hSI exists
-                if ~evalin('base', 'exist(''hSI'', ''var'') && isobject(hSI)')
-                    obj.setSimulationMode(true, obj.TEXT.NotRunning);
+                % * Use safe method to get ScanImage handle
+                [success, hSI_handle] = obj.safeGetScanImageHandle();
+                if ~success
+                    % Error message already set by safeGetScanImageHandle
                     return;
                 end
                 
-                % Get ScanImage handle
-                obj.hSI = evalin('base', 'hSI');
+                % Store validated handle
+                obj.hSI = hSI_handle;
                 
                 % Find motor controls window
                 obj.motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
@@ -193,9 +197,12 @@ classdef foilview_controller < handle
                 % Successfully connected
                 obj.setSimulationMode(false, obj.TEXT.Connected);
                 
-                % Initialize positions
+                % ! Initialize positions with better error handling
                 obj.CurrentPosition = str2double(obj.etZPos.String);
                 if isnan(obj.CurrentPosition)
+                    % ! Warn about position reading failure instead of silent default
+                    warning('foilview:PositionRead', ...
+                        'Could not read Z position from Motor Controls, defaulting to 0');
                     obj.CurrentPosition = 0;
                 end
                 
@@ -203,6 +210,8 @@ classdef foilview_controller < handle
                 if ~isempty(obj.etXPos)
                     obj.CurrentXPosition = str2double(obj.etXPos.String);
                     if isnan(obj.CurrentXPosition)
+                        warning('foilview:PositionRead', ...
+                            'Could not read X position from Motor Controls, defaulting to 0');
                         obj.CurrentXPosition = 0;
                     end
                 end
@@ -211,6 +220,8 @@ classdef foilview_controller < handle
                 if ~isempty(obj.etYPos)
                     obj.CurrentYPosition = str2double(obj.etYPos.String);
                     if isnan(obj.CurrentYPosition)
+                        warning('foilview:PositionRead', ...
+                            'Could not read Y position from Motor Controls, defaulting to 0');
                         obj.CurrentYPosition = 0;
                     end
                 end
@@ -218,7 +229,10 @@ classdef foilview_controller < handle
                 obj.notifyPositionChanged();
                 
             catch ex
-                obj.setSimulationMode(true, ['Error: ' ex.message]);
+                % ! Provide specific troubleshooting guidance based on error type
+                errorMsg = obj.generateTroubleshootingMessage(ex);
+                obj.setSimulationMode(true, errorMsg);
+                foilview_utils.logError('connectToScanImage', ex);
             end
         end
         
@@ -639,6 +653,138 @@ classdef foilview_controller < handle
             obj.notifyStatusChanged();
         end
         
+        function [success, hSI_handle] = safeGetScanImageHandle(obj)
+            % * Safely retrieve ScanImage handle with comprehensive validation
+            % This method addresses the critical base workspace dependency issue
+            success = false;
+            hSI_handle = [];
+            
+            try
+                % ! Check if we can access base workspace at all
+                try
+                    testVar = evalin('base', '1');
+                catch ME
+                    % Cannot access base workspace - might be called from function scope
+                    obj.setSimulationMode(true, obj.TEXT.WorkspaceError);
+                    foilview_utils.logError('safeGetScanImageHandle', ...
+                        ['Base workspace inaccessible: ' ME.message]);
+                    return;
+                end
+                
+                % Check if hSI variable exists in base workspace
+                if ~evalin('base', 'exist(''hSI'', ''var'')')
+                    obj.setSimulationMode(true, obj.TEXT.NotRunning);
+                    return;
+                end
+                
+                % Get the hSI handle
+                hSI_handle = evalin('base', 'hSI');
+                
+                % ! Validate that hSI is actually a ScanImage object
+                if isempty(hSI_handle)
+                    obj.setSimulationMode(true, obj.TEXT.NotRunning);
+                    return;
+                end
+                
+                if ~isobject(hSI_handle)
+                    obj.setSimulationMode(true, obj.TEXT.ScanImageInvalid);
+                    return;
+                end
+                
+                % * Validate ScanImage compatibility
+                [isCompatible, versionInfo] = obj.validateScanImageVersion(hSI_handle);
+                if ~isCompatible
+                    % ! Still allow connection but warn user
+                    warning('foilview:VersionCheck', ...
+                        'ScanImage version compatibility issue: %s', versionInfo);
+                    % Set simulation mode with warning but continue
+                    obj.setSimulationMode(false, obj.TEXT.VersionIncompatible);
+                else
+                    success = true;
+                end
+                
+                success = true;
+                
+            catch ME
+                obj.setSimulationMode(true, ['Workspace Error: ' ME.message]);
+                foilview_utils.logError('safeGetScanImageHandle', ME);
+            end
+        end
+        
+        function [isCompatible, versionInfo] = validateScanImageVersion(obj, hSI_handle)
+            % * Validate ScanImage version compatibility
+            % Returns true if compatible, false with warning message if not
+            isCompatible = true;
+            versionInfo = 'Unknown version';
+            
+            try
+                % Check if version property exists
+                if isprop(hSI_handle, 'version')
+                    versionInfo = hSI_handle.version;
+                    % ! Basic version check - could be enhanced with specific version logic
+                    if ischar(versionInfo) && ~isempty(versionInfo)
+                        % Log version for debugging
+                        fprintf('ScanImage version detected: %s\n', versionInfo);
+                        % For now, consider all versions compatible but log
+                        isCompatible = true;
+                    else
+                        versionInfo = 'Version property exists but is empty';
+                        isCompatible = false;
+                    end
+                elseif isprop(hSI_handle, 'VERSION_STR')
+                    % Alternative version property name
+                    versionInfo = hSI_handle.VERSION_STR;
+                    fprintf('ScanImage version detected (VERSION_STR): %s\n', versionInfo);
+                    isCompatible = true;
+                else
+                    % No version property found - older ScanImage
+                    versionInfo = 'No version property found - may be older ScanImage version';
+                    isCompatible = false;
+                end
+                
+                % ! Additional compatibility checks could be added here
+                % For example: checking for required properties/methods
+                requiredProperties = {'hMotors'};
+                for i = 1:length(requiredProperties)
+                    if ~isprop(hSI_handle, requiredProperties{i})
+                        versionInfo = sprintf('Missing required property: %s', requiredProperties{i});
+                        isCompatible = false;
+                        break;
+                    end
+                end
+                
+            catch ME
+                versionInfo = sprintf('Error checking version: %s', ME.message);
+                isCompatible = false;
+            end
+        end
+        
+        function errorMsg = generateTroubleshootingMessage(obj, exception)
+            % * Generate specific troubleshooting messages based on error type
+            % Provides users with actionable guidance instead of generic errors
+            
+            errorMsg = ['Connection Error: ' exception.message];
+            
+            % ! Provide specific guidance based on error patterns
+            if contains(exception.message, 'Undefined variable')
+                errorMsg = sprintf('%s\n\nTroubleshooting:\n1. Start ScanImage first\n2. Ensure ScanImage completed initialization\n3. Check that hSI variable exists in workspace', ...
+                    errorMsg);
+            elseif contains(exception.message, 'Reference to non-existent field')
+                errorMsg = sprintf('%s\n\nTroubleshooting:\n1. Check ScanImage version compatibility\n2. Try restarting ScanImage\n3. Verify Motor Controls are enabled', ...
+                    errorMsg);
+            elseif contains(exception.message, 'Invalid figure handle')
+                errorMsg = sprintf('%s\n\nTroubleshooting:\n1. Open Motor Controls window in ScanImage\n2. Ensure Motor Controls are not minimized\n3. Try closing and reopening Motor Controls', ...
+                    errorMsg);
+            elseif contains(exception.message, 'Tag')
+                errorMsg = sprintf('%s\n\nTroubleshooting:\n1. Check ScanImage version - UI tags may have changed\n2. Try restarting ScanImage\n3. Verify Motor Controls window is fully loaded', ...
+                    errorMsg);
+            else
+                % Generic troubleshooting for unknown errors
+                errorMsg = sprintf('%s\n\nGeneral Troubleshooting:\n1. Restart ScanImage\n2. Ensure Motor Controls window is open\n3. Check MATLAB command window for additional error details', ...
+                    errorMsg);
+            end
+        end
+        
         function should = shouldRefreshPosition(obj)
             should = ~obj.SimulationMode && ...
                      ~obj.IsAutoRunning && ...
@@ -834,9 +980,18 @@ classdef foilview_controller < handle
         end
         
         function handleMovementError(obj, e, microns)
+            % ! Enhanced movement error handling with troubleshooting guidance
             obj.SimulationMode = true;
-            obj.setSimulationMode(true, ['Error: ' e.message]);
-            fprintf('Movement error: %.1f μm\n', microns);
+            
+            % Generate specific error message with troubleshooting steps
+            errorMsg = sprintf('Movement Error (%.1f μm): %s\n\nTroubleshooting:\n1. Check motor connections\n2. Verify ScanImage is not busy\n3. Ensure stage limits are not exceeded\n4. Try smaller step sizes', ...
+                microns, e.message);
+            
+            obj.setSimulationMode(true, errorMsg);
+            foilview_utils.logError('handleMovementError', e);
+            
+            % ! Also log to console for debugging
+            warning('foilview:MovementError', 'Movement error: %.1f μm - %s', microns, e.message);
         end
     end
 end 

@@ -11,18 +11,15 @@ classdef foilview_updater < handle
             success = foilview_utils.safeExecuteWithReturn(@() doUpdateAll(), 'updateAllUI', false);
             
             function success = doUpdateAll()
-                % Use persistent variable for throttling
-                persistent lastUpdateTime;
-                if isempty(lastUpdateTime)
-                    lastUpdateTime = 0;
-                end
+                % * Use app's LastUpdateTime property instead of persistent variable
+                % This fixes the persistent variable state issue
                 
                 % Use throttling to prevent excessive updates
-                if ~foilview_utils.shouldThrottleUpdate(lastUpdateTime)
+                if ~foilview_utils.shouldThrottleUpdate(app.LastUpdateTime)
                     success = true;  % Not an error, just throttled
                     return;
                 end
-                lastUpdateTime = now * 24 * 3600;  % Update timestamp
+                app.LastUpdateTime = now * 24 * 3600;  % Update timestamp
                 
                 % Use batch update for better performance
                 updateFunctions = {

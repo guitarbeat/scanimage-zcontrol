@@ -251,7 +251,7 @@ classdef ErrorHandlerService < handle
             end
         end
         
-        function stackStr = formatStackTrace(obj, stack)
+        function stackStr = formatStackTrace(~, stack)
             % Format stack trace for logging
             % 
             % Args:

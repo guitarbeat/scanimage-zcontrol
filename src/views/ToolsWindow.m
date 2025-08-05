@@ -202,7 +202,7 @@ classdef ToolsWindow < handle
             end
         end
         
-        function onRefreshButtonPressed(obj, ~, ~)
+        function onRefreshButtonPressed(~, ~, ~)
             % Callback for Refresh button
             try
                 % Refresh position and status
@@ -213,7 +213,7 @@ classdef ToolsWindow < handle
             end
         end
         
-        function onMetadataButtonPressed(obj, ~, ~)
+        function onMetadataButtonPressed(~, ~, ~)
             % Callback for Metadata button
             try
                 % Toggle metadata logging

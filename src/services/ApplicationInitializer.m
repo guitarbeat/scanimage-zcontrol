@@ -565,7 +565,7 @@ classdef ApplicationInitializer < handle
             obj.showErrorDialog('Initialization Error', userMsg);
         end
         
-        function showErrorDialog(obj, title, message)
+        function showErrorDialog(~, title, message)
             % Show error dialog to user
             
             try

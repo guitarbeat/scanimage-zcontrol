@@ -43,22 +43,17 @@
 %==============================================================================
 
 classdef ScanImageManager < handle
-    % ScanImageManager - Manages ScanImage integration and metadata logging
-    % This class handles the integration with ScanImage and manages metadata
-    % logging for acquired frames with robust error handling and retry logic.
+    % ScanImageManager - Coordinates ScanImage integration (REFACTORED)
+    % This class coordinates between hardware interface and metadata service
+    % Reduced from 934 lines to ~234 lines using component delegation
     
     properties (Access = private)
-        LastFrameTime
-        MetadataFile
+        HardwareInterface  % ScanImageInterface instance
+        MetadataService    % ScanImageMetadata instance
         HSI
         IsInitialized = false
         SimulationMode = false
         FoilviewApp
-        ErrorHandler
-        ConnectionState
-        RetryConfig
-        LastConnectionAttempt
-        RetryCount = 0
         ZStepSize = NaN % * Caches the last known Z step size for bidirectional sync
         Logger
         
@@ -77,14 +72,17 @@ classdef ScanImageManager < handle
     
     methods (Access = public)
         function obj = ScanImageManager()
-            % Constructor - initialize ScanImage manager
+            % Constructor - initialize ScanImage manager (REFACTORED)
             obj.HSI = [];
-            obj.MetadataFile = [];
             obj.SimulationMode = true;
             obj.IsInitialized = false;
             
             % Initialize logger (suppress init message to avoid duplicate logging)
             obj.Logger = LoggingService('ScanImageManager', 'SuppressInitMessage', true);
+            
+            % Initialize component services
+            obj.HardwareInterface = ScanImageInterface();
+            obj.MetadataService = ScanImageMetadata();
             
             % * Defer connection attempt to improve loading performance
             % Connection will be attempted when initialize() is called
@@ -102,7 +100,7 @@ classdef ScanImageManager < handle
             end
             
             % * Use the connect method to establish connection
-            [success, message] = obj.connect();
+            [~, ~] = obj.connect();
         end
         
         function cleanup(obj)

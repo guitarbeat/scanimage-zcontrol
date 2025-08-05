@@ -309,7 +309,7 @@ classdef StageControlService < handle
             valid = FoilviewUtils.validateNumericRange(microns, -obj.MAX_STEP_SIZE, obj.MAX_STEP_SIZE, 'Movement distance');
         end
         
-        function valid = validatePosition(obj, position)
+        function valid = validatePosition(~, ~)
             % Validate absolute position
             valid = true;
         end

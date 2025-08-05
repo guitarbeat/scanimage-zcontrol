@@ -260,7 +260,7 @@ classdef LoggingService < handle
             logger = LoggingService(componentName, varargin{:});
         end
         
-        function setGlobalLogLevel(level)
+        function setGlobalLogLevel(~)
             % Set global log level for all loggers
             % This is a simple implementation - in a more complex system,
             % you might want a global logger registry

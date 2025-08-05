@@ -455,7 +455,7 @@ classdef UiComponents
                     return;
                 end
 
-                [style, text] = UiComponents.getButtonStateStyle(isRunning);
+                [style, ~] = UiComponents.getButtonStateStyle(isRunning);
                 UiComponents.applyButtonStyle(autoControls.StartStopButton, style);
 
                 success = true;

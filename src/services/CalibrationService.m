@@ -330,7 +330,7 @@ classdef CalibrationService < handle
             end
         end
         
-        function calibration = calculateCalibration(obj, rawValues)
+        function calibration = calculateCalibration(~, rawValues)
             % Calculate calibration parameters from raw values
             % rawValues: Array of raw joystick values
             % Returns: Calibration structure
@@ -369,7 +369,7 @@ classdef CalibrationService < handle
             calibratedValue = max(-1.0, min(1.0, calibratedValue));
         end
         
-        function fieldName = axisNameToField(obj, axisName)
+        function fieldName = axisNameToField(~, axisName)
             % Convert axis name to field name
             % axisName: 'X', 'Y', or 'Z'
             % Returns: Field name for calibration data

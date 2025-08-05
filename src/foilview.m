@@ -150,7 +150,7 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         
-        function writeMetadataToFile(app, metadata, filePath, verbose)
+        function writeMetadataToFile(~, metadata, filePath, verbose)
             if nargin < 4
                 verbose = false;
             end

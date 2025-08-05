@@ -791,7 +791,7 @@ end
 fclose(fid);
 end
 
-function writeReportContent(fid, unusedFunctions, suspiciousFunctions, protectedFunctions, allFunctions, allCalls, classInfo, fileStats)
+function writeReportContent(fid, unusedFunctions, suspiciousFunctions, protectedFunctions, allFunctions, allCalls, classInfo, ~)
 % Write the complete report content to file handle
     fprintf(fid, 'ENHANCED DEAD CODE ANALYSIS REPORT\n');
     fprintf(fid, '==================================\n');

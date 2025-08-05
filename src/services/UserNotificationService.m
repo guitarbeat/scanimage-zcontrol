@@ -387,7 +387,7 @@ classdef UserNotificationService < handle
             };
         end
         
-        function fullMessage = formatErrorMessage(obj, message, troubleshootingSteps)
+        function fullMessage = formatErrorMessage(~, message, troubleshootingSteps)
             % Format error message with troubleshooting steps
             
             fullMessage = sprintf('%s\n\nTroubleshooting Steps:\n', message);

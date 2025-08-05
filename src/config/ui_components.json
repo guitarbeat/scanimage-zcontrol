@@ -1,0 +1,80 @@
+{
+  "components": {
+    "position_display": {
+      "type": "grid_panel",
+      "title": "Position Display",
+      "rows": 3,
+      "columns": 2,
+      "elements": [
+        {"type": "label", "text": "X:", "row": 1, "col": 1},
+        {"type": "numeric_field", "id": "x_position", "row": 1, "col": 2, "editable": false},
+        {"type": "label", "text": "Y:", "row": 2, "col": 1},
+        {"type": "numeric_field", "id": "y_position", "row": 2, "col": 2, "editable": false},
+        {"type": "label", "text": "Z:", "row": 3, "col": 1},
+        {"type": "numeric_field", "id": "z_position", "row": 3, "col": 2, "editable": false}
+      ]
+    },
+    "manual_controls": {
+      "type": "grid_panel",
+      "title": "Manual Control",
+      "rows": 2,
+      "columns": 1,
+      "elements": [
+        {"type": "button", "text": "▲ UP", "id": "up_button", "row": 1, "col": 1, "style": "success", "tooltip": "Move stage up by current step size"},
+        {"type": "button", "text": "▼ DOWN", "id": "down_button", "row": 2, "col": 1, "style": "warning", "tooltip": "Move stage down by current step size"}
+      ]
+    },
+    "step_size_control": {
+      "type": "horizontal_panel",
+      "title": "Step Size",
+      "elements": [
+        {"type": "dropdown", "id": "step_size_dropdown", "items": ["0.1", "0.5", "1", "5", "10", "50"]},
+        {"type": "label", "text": "μm"}
+      ]
+    },
+    "auto_controls": {
+      "type": "vertical_panel",
+      "title": "Auto Controls",
+      "elements": [
+        {"type": "numeric_field", "id": "steps_field", "value": 10, "tooltip": "Number of steps"},
+        {"type": "numeric_field", "id": "delay_field", "value": 0.5, "tooltip": "Delay between steps"},
+        {"type": "dropdown", "id": "direction_switch", "items": ["Up", "Down"], "value": "Up", "tooltip": "Direction"},
+        {"type": "button", "id": "start_stop_button", "text": "Start", "tooltip": "Start/Stop auto stepping"},
+        {"type": "label", "id": "total_move_label", "text": "Total: 0.0 μm"}
+      ]
+    },
+    "status_display": {
+      "type": "vertical_panel",
+      "title": "Status",
+      "elements": [
+        {"type": "label", "id": "connection_status", "text": "Disconnected"},
+        {"type": "label", "id": "metric_display", "text": "Metric: --"}
+      ]
+    },
+    "metric_display": {
+      "type": "horizontal_panel",
+      "title": "📊 Image Metrics",
+      "elements": [
+        {"type": "dropdown", "id": "type_dropdown", "items": ["Std Dev", "Mean", "Max"], "value": "Std Dev"},
+        {"type": "label", "id": "value_label", "text": "N/A"},
+        {"type": "button", "id": "refresh_button", "text": "↻", "tooltip": "Refresh metric calculation"},
+        {"type": "button", "id": "plot_button", "text": "Plot", "tooltip": "Show/Hide metrics plot"},
+        {"type": "button", "id": "tools_button", "text": "🔧", "tooltip": "Show/Hide Tools Window"}
+      ]
+    }
+  },
+  "layouts": {
+    "main_window": {
+      "type": "grid",
+      "rows": 2,
+      "columns": 3,
+      "components": [
+        {"component": "position_display", "row": 1, "col": 1},
+        {"component": "manual_controls", "row": 1, "col": 2},
+        {"component": "step_size_control", "row": 1, "col": 3},
+        {"component": "auto_controls", "row": 2, "col": 1},
+        {"component": "status_display", "row": 2, "col": 2}
+      ]
+    }
+  }
+}

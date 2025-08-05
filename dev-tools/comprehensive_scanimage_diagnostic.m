@@ -529,7 +529,7 @@ end
 out('\n');
 end
 
-function generateIntegrationCode(out, colorOut, dataRes, stat)
+function generateIntegrationCode(out, colorOut, dataRes, ~)
 out('┌─────────────────────────────────────────────────────────────┐\n');
 out('│ INTEGRATION CODE                                            │\n');
 out('└─────────────────────────────────────────────────────────────┘\n\n');
@@ -680,7 +680,7 @@ catch
 end
 end
 
-function closeFile(fid, fname)
+function closeFile(fid, ~)
 fclose(fid);
 end
 
@@ -760,7 +760,7 @@ end
 end
 
 %% Display Component Analysis
-function info = diagnoseDisplayComponent(hSI, verbose)
+function info = diagnoseDisplayComponent(hSI, ~)
 info = struct('available', false, ...
     'class', '', ...
     'totalProps', 0, ...

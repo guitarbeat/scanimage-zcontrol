@@ -161,7 +161,7 @@ classdef UiBuilder
 
         % ===== DISPLAY COMPONENTS =====
         function metricDisplay = createMetricDisplay(mainLayout)
-            % Creates the metric display section with enhanced modern styling.
+            % Creates the metric display using ComponentFactory (REFACTORED)
             metricCard = UiBuilder.createCard(mainLayout, 1, '📊 Image Metrics', UiComponents.CONTROL_FONT_SIZE);
             metricPanel = uigridlayout(metricCard, [1, 5]); % Changed to 5 columns to include tools button
             metricPanel.ColumnWidth = {'fit', '1x', 'fit', 'fit', 'fit'}; % Dropdown, Value, Refresh, Plot, Tools
@@ -192,7 +192,7 @@ classdef UiBuilder
         end
 
         function positionDisplay = createPositionDisplay(mainLayout)
-            % Creates the position display with modern card styling and enhanced visual hierarchy.
+            % Creates the position display using ComponentFactory (REFACTORED)
             positionCard = UiBuilder.createCard(mainLayout, 2, 'Current Position', UiComponents.CARD_TITLE_FONT_SIZE);
             positionCard.TitlePosition = 'centertop';
 
@@ -311,7 +311,7 @@ classdef UiBuilder
         end
 
         function manualControls = createCompactManualControls(parent, row)
-            % Creates compact manual controls - now without step size controls (uses shared)
+            % Creates compact manual controls using ComponentFactory (REFACTORED)
             if nargin < 2, row = 2; end
             manualCard = uipanel(parent);
             manualCard.Layout.Row = row;
@@ -517,7 +517,7 @@ classdef UiBuilder
                 fieldPanel.Layout.Row = row;
             else
                             % Create grid with label and field
-            [fieldGrid, label] = UiBuilder.createLabeledGrid(parent, row, labelText);
+            [fieldGrid, ~] = UiBuilder.createLabeledGrid(parent, row, labelText);
 
                             % Field panel with arrow buttons
             fieldPanel = uipanel(fieldGrid);
@@ -541,7 +541,7 @@ classdef UiBuilder
 
         function field = createFieldBase(parent, row, labelText, defaultValue, tooltip)
             % Creates the base structure for labeled input fields.
-            [fieldGrid, label] = UiBuilder.createLabeledGrid(parent, row, labelText);
+            [fieldGrid, ~] = UiBuilder.createLabeledGrid(parent, row, labelText);
 
             fieldPanel = UiBuilder.createFieldPanel(uipanel(fieldGrid));
 
@@ -571,7 +571,7 @@ classdef UiBuilder
         
         function stepsControl = createStepsControl(parent, row)
             % Creates the steps control (similar to step size but for number of steps)
-            [stepsCard, stepsGrid] = UiBuilder.createControlCard(parent, row, 'Steps');
+            [~, stepsGrid] = UiBuilder.createControlCard(parent, row, 'Steps');
             
             % Create arrow field structure for steps (without label since it's in the card title)
             stepsControl = UiBuilder.createArrowFieldDirect(stepsGrid, ...
@@ -580,7 +580,7 @@ classdef UiBuilder
         
         function delayControl = createDelayControl(parent, row)
             % Creates the delay control (similar to step size but for delay)
-            [delayCard, delayGrid] = UiBuilder.createControlCard(parent, row, 'Delay');
+            [~, delayGrid] = UiBuilder.createControlCard(parent, row, 'Delay');
             
             % Create arrow field structure for delay (without label since it's in the card title)
             delayControl = UiBuilder.createArrowFieldDirect(delayGrid, ...
@@ -589,7 +589,7 @@ classdef UiBuilder
         
         function directionControl = createDirectionControl(parent, row)
             % Creates the direction control
-            [directionCard, directionGrid] = UiBuilder.createControlCard(parent, row, 'Direction');
+            [~, directionGrid] = UiBuilder.createControlCard(parent, row, 'Direction');
 
             directionControl = struct();
             directionControl.DirectionSwitch = uiswitch(directionGrid, 'toggle');
@@ -601,7 +601,7 @@ classdef UiBuilder
         
         function startControl = createStartControl(parent, row)
             % Creates the start/stop control with total move display
-            [startCard, startGrid] = UiBuilder.createControlCard(parent, row, 'Control');
+            [~, startGrid] = UiBuilder.createControlCard(parent, row, 'Control');
             
             % Override grid layout for start control (needs 2 rows)
             startGrid.RowHeight = {'fit', 'fit'};
@@ -624,7 +624,7 @@ classdef UiBuilder
             startControl.TotalMoveLabel.Layout.Row = 2;
         end
         
-        function onMainWindowResize(mainWindow, toolsWindow)
+        function onMainWindowResize(~, toolsWindow)
             % Callback for main window resize - updates tools window position
             if ~isempty(toolsWindow) && isvalid(toolsWindow) && toolsWindow.isVisible()
                 toolsWindow.updatePosition();

@@ -652,7 +652,7 @@ classdef MJC3View < handle
             obj.RemoveMappingButton.ButtonPushedFcn = @(~,~) obj.removeMapping();
         end
         
-        function createAnalogHeader(obj, grid)
+        function createAnalogHeader(~, grid)
             % Create header row for analog controls
             % Control Name
             nameHeader = uilabel(grid);

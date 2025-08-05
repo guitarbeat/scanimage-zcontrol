@@ -26,6 +26,7 @@
 %   - BaseMJC3Controller: Abstract base class interface
 %   - MATLAB Figure: Visual feedback and key capture
 %   - Z-controller: Stage movement interface
+%   - LoggingService: Unified logging system
 %
 % Author: Aaron W. (alw4834)
 % Created: 2024
@@ -44,6 +45,8 @@ classdef MJC3_Simulation_Controller < BaseMJC3Controller
     % Provides keyboard-based simulation of joystick input when hardware isn't available
     
     properties
+        stepFactor     % Micrometres moved per unit of joystick deflection - from abstract base
+        running        % Logical flag indicating whether polling is active - from abstract base
         timerObj       % Timer for keyboard polling
         simulatedZ     % Current simulated Z position
         keyListener    % Figure for capturing key events
@@ -64,8 +67,8 @@ classdef MJC3_Simulation_Controller < BaseMJC3Controller
             obj.keyListener = figure('Visible', 'off', 'Name', 'MJC3 Simulation Key Listener');
             set(obj.keyListener, 'KeyPressFcn', @(src,evt)obj.handleKeyPress(evt));
             
-            fprintf('MJC3 Simulation Controller initialized (Step factor: %.1f μm/unit)\n', obj.stepFactor);
-            fprintf('Keyboard controls: Up Arrow = Z up, Down Arrow = Z down, Space = Stop\n');
+            obj.Logger.info('MJC3 Simulation Controller initialized (Step factor: %.1f μm/unit)', obj.stepFactor);
+            obj.Logger.info('Keyboard controls: Up Arrow = Z up, Down Arrow = Z down, Space = Stop');
         end
         
         function start(obj)
@@ -83,9 +86,9 @@ classdef MJC3_Simulation_Controller < BaseMJC3Controller
                     'Units', 'normalized', 'Position', [0.1 0.2 0.8 0.6], ...
                     'FontSize', 10, 'HorizontalAlignment', 'center');
                 
-                fprintf('MJC3 Simulation Controller started\n');
-                fprintf('Use Up/Down arrow keys to simulate joystick movement\n');
-                fprintf('Press Space to stop, or close the simulation window\n');
+                obj.Logger.info('MJC3 Simulation Controller started');
+                obj.Logger.info('Use Up/Down arrow keys to simulate joystick movement');
+                obj.Logger.info('Press Space to stop, or close the simulation window');
             end
         end
         
@@ -96,26 +99,31 @@ classdef MJC3_Simulation_Controller < BaseMJC3Controller
                 if isvalid(obj.keyListener)
                     set(obj.keyListener, 'Visible', 'off');
                 end
-                fprintf('MJC3 Simulation Controller stopped\n');
+                obj.Logger.info('MJC3 Simulation Controller stopped');
             end
         end
         
         function success = connectToMJC3(obj)
             % Simulate connection - always succeeds
             success = true;
-            fprintf('[Sim] MJC3 device connection simulated successfully\n');
+            obj.Logger.info('MJC3 device connection simulated successfully');
+            obj.Logger.debug('Simulation mode - no actual hardware connection required');
         end
         
         function pos = getCurrentPosition(obj)
             % Get current simulated position
             pos = obj.simulatedZ;
+            obj.Logger.debug('Current simulated Z position: %.1f μm', pos);
         end
         
         function delete(obj)
+            obj.Logger.info('Cleaning up MJC3 Simulation Controller...');
             obj.stop();
             if isvalid(obj.keyListener)
                 delete(obj.keyListener);
+                obj.Logger.debug('Key listener figure deleted');
             end
+            obj.Logger.info('MJC3 Simulation Controller cleanup complete');
         end
     end
     
@@ -131,8 +139,10 @@ classdef MJC3_Simulation_Controller < BaseMJC3Controller
                 case 'downarrow'
                     obj.simulateMovement(-1);
                 case 'space'
+                    obj.Logger.info('Simulation stopped by user (Space key)');
                     obj.stop();
                 case 'escape'
+                    obj.Logger.info('Simulation stopped by user (Escape key)');
                     obj.stop();
             end
         end
@@ -143,7 +153,7 @@ classdef MJC3_Simulation_Controller < BaseMJC3Controller
             obj.simulatedZ = obj.simulatedZ + dz;
             
             directionStr = ternary(direction > 0, 'up', 'down');
-            fprintf('[Sim] Joystick %s: %.1f μm (Total: %.1f μm)\n', directionStr, abs(dz), obj.simulatedZ);
+            obj.Logger.debug('Simulated joystick %s: %.1f μm (Total: %.1f μm)', directionStr, abs(dz), obj.simulatedZ);
             
             % In a real implementation, this would call the stage control service
             % For simulation, we just log the movement

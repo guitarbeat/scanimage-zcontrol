@@ -46,7 +46,10 @@ function build_mjc3_mex()
     %   2. hidapi library installed and accessible
     %   3. Visual Studio or compatible compiler
     
-    fprintf('Building MJC3 MEX function...\n');
+    % Initialize logger
+    logger = LoggingService('MJC3Builder');
+    
+    logger.info('Building MJC3 MEX function...');
     
     % Check if MEX compiler is configured
     try
@@ -54,10 +57,11 @@ function build_mjc3_mex()
         if isempty(cc)
             error('No C++ compiler configured');
         end
-        fprintf('Using C++ compiler: %s\n', cc.Name);
+        logger.info('Using C++ compiler: %s', cc.Name);
+        logger.debug('Compiler details: %s', jsonencode(cc));
     catch ME
-        fprintf('Error: C++ compiler not configured.\n');
-        fprintf('Please run: mex -setup\n');
+        logger.error('C++ compiler not configured: %s', ME.message);
+        logger.info('Please run: mex -setup');
         error('MEX compiler not available');
     end
     
@@ -77,6 +81,8 @@ function build_mjc3_mex()
     };
     
     hidapi_found = false;
+    logger.debug('Searching for hidapi library in common locations...');
+    
     for i = 1:length(possible_paths)
         include_path = fullfile(possible_paths{i}, 'include');
         lib_path = fullfile(possible_paths{i}, 'lib');
@@ -85,34 +91,39 @@ function build_mjc3_mex()
             hidapi_include = include_path;
             hidapi_lib = lib_path;
             hidapi_found = true;
-            fprintf('Found hidapi at: %s\n', possible_paths{i});
+            logger.info('Found hidapi at: %s', possible_paths{i});
+            logger.debug('hidapi include path: %s', include_path);
+            logger.debug('hidapi lib path: %s', lib_path);
             break;
         end
     end
     
     if ~hidapi_found
-        fprintf('Warning: hidapi not found in common locations.\n');
-        fprintf('Installing hidapi via vcpkg (recommended):\n');
-        fprintf('  1. Install vcpkg: https://github.com/Microsoft/vcpkg\n');
-        fprintf('  2. Run: vcpkg install hidapi:x64-windows\n');
-        fprintf('  3. Re-run this build script\n\n');
-        fprintf('Alternative: Download from https://github.com/libusb/hidapi\n');
+        logger.warning('hidapi not found in common locations');
+        logger.info('Installing hidapi via vcpkg (recommended):');
+        logger.info('  1. Install vcpkg: https://github.com/Microsoft/vcpkg');
+        logger.info('  2. Run: vcpkg install hidapi:x64-windows');
+        logger.info('  3. Re-run this build script');
+        logger.info('Alternative: Download from https://github.com/libusb/hidapi');
         
         % Try to continue with default paths
-        fprintf('Attempting build with default paths...\n');
+        logger.info('Attempting build with default paths...');
     end
     
     % Source file
     source_file = 'mjc3_joystick_mex.cpp';
     if ~exist(source_file, 'file')
+        logger.error('Source file %s not found in current directory', source_file);
         error('Source file %s not found in current directory', source_file);
     end
+    
+    logger.debug('Source file found: %s', source_file);
     
     % Build command
     try
         if ispc
             % Windows build
-            fprintf('Building for Windows...\n');
+            logger.info('Building for Windows...');
             
             % Try different library names
             lib_names = {'hidapi', 'hidapi_ms', 'hid'};
@@ -120,72 +131,78 @@ function build_mjc3_mex()
             
             for i = 1:length(lib_names)
                 try
-                    fprintf('Trying library: %s\n', lib_names{i});
+                    logger.debug('Trying library: %s', lib_names{i});
                     
                     mex_cmd = sprintf('mex -I"%s" -L"%s" -l%s "%s"', ...
                         hidapi_include, hidapi_lib, lib_names{i}, source_file);
                     
-                    fprintf('MEX command: %s\n', mex_cmd);
+                    logger.debug('MEX command: %s', mex_cmd);
                     eval(mex_cmd);
                     
                     build_success = true;
-                    fprintf('✓ Build successful with library: %s\n', lib_names{i});
+                    logger.info('✓ Build successful with library: %s', lib_names{i});
                     break;
                     
                 catch ME
-                    fprintf('✗ Build failed with %s: %s\n', lib_names{i}, ME.message);
+                    logger.debug('✗ Build failed with %s: %s', lib_names{i}, ME.message);
                 end
             end
             
             if ~build_success
+                logger.error('All build attempts failed');
                 error('All build attempts failed');
             end
             
         else
             % Linux/Mac build
-            fprintf('Building for Unix/Linux/Mac...\n');
+            logger.info('Building for Unix/Linux/Mac...');
             mex_cmd = sprintf('mex -I"%s" -L"%s" -lhidapi "%s"', ...
                 hidapi_include, hidapi_lib, source_file);
             
-            fprintf('MEX command: %s\n', mex_cmd);
+            logger.debug('MEX command: %s', mex_cmd);
             eval(mex_cmd);
         end
         
-        fprintf('✓ MEX build completed successfully!\n');
+        logger.info('✓ MEX build completed successfully!');
         
         % Test the MEX function
-        fprintf('Testing MEX function...\n');
+        logger.info('Testing MEX function...');
         try
             result = mjc3_joystick_mex('test');
             if result
-                fprintf('✓ MEX function test passed\n');
+                logger.info('✓ MEX function test passed');
             else
-                fprintf('✗ MEX function test failed\n');
+                logger.error('✗ MEX function test failed');
             end
             
             % Try to get device info
             info = mjc3_joystick_mex('info');
+            logger.debug('Device info: %s', jsonencode(info));
+            
             if info.connected
-                fprintf('✓ MJC3 device detected and connected\n');
+                logger.info('✓ MJC3 device detected and connected');
             else
-                fprintf('ℹ MEX function works, but MJC3 device not connected\n');
+                logger.info('ℹ MEX function works, but MJC3 device not connected');
+                logger.debug('This is normal if MJC3 hardware is not plugged in');
             end
             
         catch ME
-            fprintf('✗ MEX function test error: %s\n', ME.message);
+            logger.error('✗ MEX function test error: %s', ME.message);
+            logger.debug('Test error details: %s', ME.getReport());
         end
         
     catch ME
-        fprintf('✗ Build failed: %s\n', ME.message);
-        fprintf('\nTroubleshooting:\n');
-        fprintf('1. Ensure hidapi is installed\n');
-        fprintf('2. Update paths in this script\n');
-        fprintf('3. Check C++ compiler configuration: mex -setup\n');
-        fprintf('4. On Windows, ensure Visual Studio is installed\n');
+        logger.error('✗ Build failed: %s', ME.message);
+        logger.debug('Build error details: %s', ME.getReport());
+        logger.info('Troubleshooting:');
+        logger.info('1. Ensure hidapi is installed');
+        logger.info('2. Update paths in this script');
+        logger.info('3. Check C++ compiler configuration: mex -setup');
+        logger.info('4. On Windows, ensure Visual Studio is installed');
         rethrow(ME);
     end
     
-    fprintf('\nBuild complete! You can now use MJC3_MEX_Controller.\n');
+    logger.info('Build complete! You can now use MJC3_MEX_Controller.');
 end
 
 % Helper function to detect hidapi installation

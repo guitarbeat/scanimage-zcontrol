@@ -108,6 +108,7 @@ classdef FoilviewController < handle
         StageControlService
         MetricCalculationService
         AutoTimer
+        Logger
 
         StatusUpdateCallback
         PositionUpdateCallback
@@ -125,23 +126,37 @@ classdef FoilviewController < handle
     methods (Access = public)
         function obj = FoilviewController()
             % Initialize the controller
-            obj.ScanImageManager = ScanImageManager();
-            obj.StageControlService = StageControlService(obj.ScanImageManager);
-            obj.MetricCalculationService = MetricCalculationService(obj.ScanImageManager);
+            % * Note: ScanImageManager will be set externally to avoid duplication
+            obj.ScanImageManager = [];
+            obj.StageControlService = [];
+            obj.MetricCalculationService = [];
             obj.BookmarkManager = BookmarkManager();
             obj.CurrentMetricType = obj.DEFAULT_METRIC;
-
-            % Set up event listeners
-            addlistener(obj.StageControlService, 'PositionChanged', @obj.onStagePositionChanged);
-            addlistener(obj.MetricCalculationService, 'MetricCalculated', @obj.onMetricCalculated);
-
-            obj.connectToScanImage();
+            obj.Logger = LoggingService('FoilviewController', 'SuppressInitMessage', true);
         end
 
         function setFoilviewApp(obj, foilviewApp)
             % Set reference to the main foilview app for metadata logging
             if ~isempty(obj.BookmarkManager)
                 obj.BookmarkManager.setFoilviewApp(foilviewApp);
+            end
+        end
+        
+        function setScanImageManager(obj, scanImageManager)
+            % Set the ScanImageManager instance and initialize dependent services
+            obj.ScanImageManager = scanImageManager;
+            
+            % Initialize services that depend on ScanImageManager
+            if ~isempty(obj.ScanImageManager)
+                obj.StageControlService = StageControlService(obj.ScanImageManager);
+                obj.MetricCalculationService = MetricCalculationService(obj.ScanImageManager);
+                
+                % Set up event listeners
+                addlistener(obj.StageControlService, 'PositionChanged', @obj.onStagePositionChanged);
+                addlistener(obj.MetricCalculationService, 'MetricCalculated', @obj.onMetricCalculated);
+                
+                % Connect to ScanImage
+                obj.connectToScanImage();
             end
         end
 
@@ -291,9 +306,13 @@ classdef FoilviewController < handle
                 start(obj.AutoTimer);
                 obj.notifyStatusChanged();
 
-                fprintf('Auto-stepping started: %d steps of %.1f μm\n', params.numSteps, params.stepSize);
+                % Use logger for consistent output
+                obj.Logger.info('Auto-stepping started: %d steps of %.1f μm (direction: %s)', ...
+                    params.numSteps, params.stepSize, ternary(params.direction > 0, 'up', 'down'));
             catch ME
-                fprintf('ERROR: Failed to start auto-stepping: %s\n', ME.message);
+                % Use logger for error reporting
+                obj.Logger.error('Failed to start auto-stepping: %s', ME.message);
+                
                 % Clean up on failure
                 obj.IsAutoRunning = false;
                 if ~isempty(obj.AutoTimer) && isvalid(obj.AutoTimer)
@@ -320,14 +339,16 @@ classdef FoilviewController < handle
 
                 obj.notifyStatusChanged();
 
+                % Use logger for consistent output
+                
                 % Generate completion summary using ScanControlService
                 if obj.RecordMetrics && ~isempty(obj.AutoStepMetrics.Positions)
                     params = struct('stepSize', 0, 'numSteps', obj.TotalSteps, 'direction', obj.AutoDirection);
                     summary = ScanControlService.summarizeAutoStepSession(obj.AutoStepMetrics, params);
-                    fprintf('Auto-stepping completed: %d steps, %.1f μm total distance, %.1f sec duration\n', ...
+                    obj.Logger.info('Auto-stepping completed: %d steps, %.1f μm total distance, %.1f sec duration', ...
                         summary.TotalSteps, summary.TotalDistance, summary.Duration);
                 else
-                    fprintf('Auto-stepping completed at position %.1f μm\n', obj.CurrentPosition);
+                    obj.Logger.info('Auto-stepping completed at position %.1f μm', obj.CurrentPosition);
                 end
 
                 % Notify completion
@@ -343,7 +364,8 @@ classdef FoilviewController < handle
             metricStruct = struct('Type', obj.CurrentMetricType, 'Value', obj.CurrentMetric);
             obj.BookmarkManager.add(label, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition, metricStruct);
 
-            fprintf('Position marked: "%s" at X:%.1f, Y:%.1f, Z:%.1f μm (Metric: %.2f)\n', ...
+            % Use logger for consistent output
+            obj.Logger.info('Position marked: "%s" at X:%.1f, Y:%.1f, Z:%.1f μm (Metric: %.2f)', ...
                 label, obj.CurrentXPosition, obj.CurrentYPosition, obj.CurrentPosition, obj.CurrentMetric);
         end
 
@@ -351,7 +373,10 @@ classdef FoilviewController < handle
             bookmark = obj.BookmarkManager.get(index);
             if ~isempty(bookmark) && ~obj.IsAutoRunning
                 obj.setXYZPosition(bookmark.X, bookmark.Y, bookmark.Z);
-                fprintf('Moved to bookmark "%s": X:%.1f, Y:%.1f, Z:%.1f μm\n', bookmark.Label, bookmark.X, bookmark.Y, bookmark.Z);
+                
+                % Use logger for consistent output
+                obj.Logger.info('Moved to bookmark "%s": X:%.1f, Y:%.1f, Z:%.1f μm', ...
+                    bookmark.Label, bookmark.X, bookmark.Y, bookmark.Z);
             end
         end
 
@@ -359,7 +384,9 @@ classdef FoilviewController < handle
             bookmark = obj.BookmarkManager.get(index);
             if ~isempty(bookmark)
                 obj.BookmarkManager.remove(index);
-                fprintf('Deleted bookmark: "%s"\n', bookmark.Label);
+                
+                % Use logger for consistent output
+                obj.Logger.info('Deleted bookmark: "%s"', bookmark.Label);
             end
         end
 
@@ -453,12 +480,12 @@ classdef FoilviewController < handle
                 success = false;
 
                 if ~obj.BookmarkManager.isValidIndex(index)
-                    fprintf('Invalid bookmark index: %d\n', index);
+                    obj.Logger.warning('Invalid bookmark index: %d', index);
                     return;
                 end
 
                 if obj.IsAutoRunning
-                    fprintf('Cannot navigate to bookmark while auto-stepping is running\n');
+                    obj.Logger.warning('Cannot navigate to bookmark while auto-stepping is running');
                     return;
                 end
 
@@ -476,7 +503,7 @@ classdef FoilviewController < handle
                 success = false;
 
                 if ~obj.BookmarkManager.isValidIndex(index)
-                    fprintf('Invalid bookmark index: %d\n', index);
+                    obj.Logger.warning('Invalid bookmark index: %d', index);
                     return;
                 end
 
@@ -495,16 +522,16 @@ classdef FoilviewController < handle
                 success = false;
 
                 if ~isnumeric(direction) || ~ismember(direction, [-1, 1])
-                    fprintf('Invalid direction: must be 1 (up) or -1 (down)\n');
+                    obj.Logger.warning('Invalid direction: must be 1 (up) or -1 (down)');
                     return;
                 end
 
                 if ~isnumeric(stepSize) || stepSize <= 0
-                    fprintf('Invalid step size: must be a positive number\n');
+                    obj.Logger.warning('Invalid step size: must be a positive number');
                     return;
                 end
 
-                fprintf('FoilviewController: Attempting to move stage %.1f μm in direction %d\n', stepSize, direction);
+                obj.Logger.debug('Attempting to move stage %.1f μm in direction %d', stepSize, direction);
                 obj.moveStage(direction * stepSize);
                 success = true;
             end
@@ -531,24 +558,24 @@ classdef FoilviewController < handle
 
                     % Check for error state on Z axis
                     if obj.ScanImageManager.checkMotorErrorState(motorFig, 'Z')
-                        fprintf('FoilviewController: Motor error detected, attempting recovery...\n');
+                        obj.Logger.warning('Motor error detected, attempting recovery...');
                         obj.ScanImageManager.clearMotorError(motorFig, 'Z');
                         pause(1.0); % Give more time for recovery
 
                         % Check if recovery was successful
                         if ~obj.ScanImageManager.checkMotorErrorState(motorFig, 'Z')
-                            fprintf('FoilviewController: Motor error recovery successful\n');
+                            obj.Logger.info('Motor error recovery successful');
                             success = true;
                         else
-                            fprintf('FoilviewController: Motor error recovery failed\n');
+                            obj.Logger.warning('Motor error recovery failed');
                         end
                     else
-                        fprintf('FoilviewController: No motor error detected\n');
+                        obj.Logger.info('No motor error detected');
                         success = true;
                     end
 
                 catch ME
-                    fprintf('FoilviewController: Error during motor recovery: %s\n', ME.message);
+                    obj.Logger.error('Error during motor recovery: %s', ME.message);
                 end
             end
         end
@@ -573,12 +600,12 @@ classdef FoilviewController < handle
                 success = false;
 
                 if ~ischar(metricType) && ~isstring(metricType)
-                    fprintf('Metric type must be a string\n');
+                    obj.Logger.warning('Metric type must be a string');
                     return;
                 end
 
                 if ~ismember(metricType, obj.METRIC_TYPES)
-                    fprintf('Invalid metric type: %s\n', metricType);
+                    obj.Logger.warning('Invalid metric type: %s', metricType);
                     return;
                 end
 
@@ -622,7 +649,7 @@ classdef FoilviewController < handle
 
             function doSetDirection()
                 if ~isnumeric(direction) || ~ismember(direction, [-1, 1])
-                    fprintf('Invalid direction: must be 1 (up) or -1 (down)\n');
+                    obj.Logger.warning('Invalid direction: must be 1 (up) or -1 (down)');
                     return;
                 end
 
@@ -684,47 +711,41 @@ classdef FoilviewController < handle
                 stepFactor = 5; % Default step factor
             end
             
+            % Initialize logger for this operation
+            obj.Logger.info('Creating MJC3 controller with step factor: %.1f μm/unit', stepFactor);
+            
             % Determine the appropriate Z-controller based on mode
             if obj.ScanImageManager.isSimulationMode()
                 % Create simulation controller
                 zController = ScanImageController([]); % Empty for simulation
-                fprintf('Created simulation controller for testing mode\n');
+                obj.Logger.info('Using simulation mode - created simulation Z-controller');
             else
                 try
                     % Create real ScanImage controller
                     hSI = evalin('base', 'hSI');
                     zController = ScanImageController(hSI.hMotors);
-                    fprintf('Created ScanImage controller\n');
+                    obj.Logger.info('Using ScanImage mode - created real Z-controller');
                 catch ME
-                    fprintf('Failed to create ScanImage controller: %s\n', ME.message);
+                    obj.Logger.warning('Failed to create ScanImage controller: %s', ME.message);
                     % Fallback to simulation
                     zController = ScanImageController([]); % Empty for simulation
-                    fprintf('Falling back to simulation controller\n');
+                    obj.Logger.info('Falling back to simulation Z-controller');
                 end
             end
             
             % Use the factory to create the best available controller
             try
-                % Check if MEX controller is available
-                availableTypes = MJC3ControllerFactory.getAvailableTypes();
-                if ismember('MEX', availableTypes)
-                    fprintf('Using high-performance MEX controller (50Hz polling)\n');
-                else
-                    fprintf('MEX controller not available, using: %s\n', availableTypes{1});
-                end
-                
                 controller = MJC3ControllerFactory.createController(zController, stepFactor);
-                fprintf('✅ MJC3 Controller created successfully using factory\n');
                 
             catch ME
-                fprintf('❌ Failed to create MJC3 controller using factory: %s\n', ME.message);
+                obj.Logger.error('Failed to create MJC3 controller: %s', ME.message);
                 
                 % Show helpful error message
                 if contains(ME.message, 'MEX') || contains(ME.message, 'mjc3_joystick_mex')
-                    fprintf('💡 To enable high-performance MEX controller, run: install_mjc3()\n');
+                    obj.Logger.warning('MEX controller not available - run build_mjc3_mex() to enable');
                 end
                 
-                fprintf('MJC3 functionality will be limited to manual testing\n');
+                obj.Logger.warning('MJC3 functionality will be limited to manual testing');
                 controller = [];
             end
         end
@@ -749,9 +770,13 @@ classdef FoilviewController < handle
 
                 try
                     obj.moveStage(actualStep);
-                    fprintf('Auto-step %d/%d: moved %.2f μm (direction %d)\n', obj.CurrentStep, obj.TotalSteps, actualStep, obj.AutoDirection);
+                    
+                    % Use logger for consistent output
+                    obj.Logger.debug('Auto-step %d/%d: moved %.2f μm (direction %d)', ...
+                        obj.CurrentStep, obj.TotalSteps, actualStep, obj.AutoDirection);
+                        
                 catch ME
-                    fprintf('ERROR: Failed to execute step %d/%d: %s\n', obj.CurrentStep, obj.TotalSteps, ME.message);
+                    obj.Logger.error('Failed to execute step %d/%d: %s', obj.CurrentStep, obj.TotalSteps, ME.message);
                     % Stop auto-stepping on movement error
                     obj.stopAutoStepping();
                     return;

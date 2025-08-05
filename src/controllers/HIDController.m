@@ -19,6 +19,7 @@
 % Dependencies:
 %   - MJC3_MEX_Controller: Low-level joystick interface
 %   - MJC3ControllerFactory: Controller creation and management
+%   - LoggingService: Unified logging system
 %   - Z-controller: Stage movement interface (must implement relativeMove)
 %
 % Author: Aaron W. (alw4834)
@@ -45,6 +46,7 @@ classdef HIDController < handle
         uiComponents    % UI components for HID controls
         isEnabled       % Current enable/disable state
         stepFactor      % Current step factor setting
+        Logger          % Logging service for structured output
     end
     
     properties (Constant)
@@ -62,11 +64,16 @@ classdef HIDController < handle
                 error('HIDController requires UI components and Z-controller');
             end
             
+            % Initialize logger
+            obj.Logger = LoggingService('HIDController', 'SuppressInitMessage', true);
+            
             obj.uiComponents = uiComponents;
             obj.zController = zController;
             obj.isEnabled = false;
             obj.stepFactor = obj.DEFAULT_STEP_FACTOR;
             obj.hidController = [];
+            
+            obj.Logger.info('HID controller initialized with step factor: %.1f μm/unit', obj.stepFactor);
             
             obj.setupUICallbacks();
             obj.updateUI();
@@ -74,6 +81,7 @@ classdef HIDController < handle
         
         function delete(obj)
             % Destructor - ensure HID controller is properly cleaned up
+            obj.Logger.info('Cleaning up HID controller');
             obj.disable();
         end
         
@@ -81,8 +89,11 @@ classdef HIDController < handle
             % Enable MJC3 joystick control
             try
                 if obj.isEnabled
+                    obj.Logger.debug('Already enabled, skipping');
                     return; % Already enabled
                 end
+                
+                obj.Logger.info('Enabling MJC3 joystick control...');
                 
                 % Create and start MEX controller using factory
                 obj.hidController = MJC3ControllerFactory.createController(obj.zController, obj.stepFactor);
@@ -91,22 +102,25 @@ classdef HIDController < handle
                 obj.isEnabled = true;
                 obj.updateUI();
                 
-                fprintf('MJC3 Controller enabled (Step factor: %.1f μm/unit)\n', obj.stepFactor);
+                obj.Logger.info('Joystick control enabled (Step factor: %.1f μm/unit)', obj.stepFactor);
                 
             catch ME
                 obj.isEnabled = false;
                 obj.updateUI();
                 
+                obj.Logger.error('Failed to enable joystick control: %s', ME.message);
+                
                 % Show user-friendly error message
                 if contains(ME.message, 'MEX function') || contains(ME.message, 'mjc3_joystick_mex')
                     errordlg('MEX controller not available. Please run build_mjc3_mex() to compile the MEX function.', 'MEX Not Found');
+                    obj.Logger.warning('MEX controller not available - run build_mjc3_mex() to enable');
                 elseif contains(ME.message, 'MJC3 device not connected')
                     errordlg('MJC3 joystick not detected. Please check USB connection.', 'Joystick Not Found');
+                    obj.Logger.warning('MJC3 device not detected - check USB connection');
                 else
                     errordlg(sprintf('Failed to enable joystick control: %s', ME.message), 'Controller Error');
+                    obj.Logger.error('Unknown error during enable: %s', ME.message);
                 end
-                
-                warning('MJC3Controller:EnableFailed', 'Failed to enable MJC3 Controller: %s', ME.message);
             end
         end
         
@@ -114,6 +128,7 @@ classdef HIDController < handle
             % Disable MJC3 joystick control
             try
                 if ~isempty(obj.hidController)
+                    obj.Logger.info('Stopping joystick controller...');
                     obj.hidController.stop();
                     delete(obj.hidController);
                     obj.hidController = [];
@@ -122,25 +137,26 @@ classdef HIDController < handle
                 obj.isEnabled = false;
                 obj.updateUI();
                 
-                fprintf('MJC3 Controller disabled\n');
+                obj.Logger.info('Joystick control disabled');
                 
             catch ME
-                warning('MJC3Controller:DisableFailed', 'Error disabling MJC3 Controller: %s', ME.message);
+                obj.Logger.error('Error disabling joystick control: %s', ME.message);
             end
         end
         
         function setStepFactor(obj, newStepFactor)
             % Update the step factor for joystick sensitivity
             if newStepFactor <= 0
-                warning('Step factor must be positive. Using default value.');
+                obj.Logger.warning('Step factor must be positive. Using default value.');
                 newStepFactor = obj.DEFAULT_STEP_FACTOR;
             end
             
             obj.stepFactor = newStepFactor;
+            obj.Logger.info('Step factor updated to %.1f μm/unit', newStepFactor);
             
             % Update the HID controller if it's running
             if ~isempty(obj.hidController)
-                obj.hidController.stepFactor = newStepFactor;
+                obj.hidController.setStepFactor(newStepFactor);
             end
             
             % Update UI
@@ -149,6 +165,8 @@ classdef HIDController < handle
         
         function showSettings(obj)
             % Show settings dialog for MJC3 configuration
+            
+            obj.Logger.info('Opening settings dialog');
             
             % Create settings dialog
             dlg = uifigure('Name', 'MJC3 Joystick Settings', 'Position', [100 100 400 300]);
@@ -264,8 +282,10 @@ classdef HIDController < handle
         function toggleEnable(obj)
             % Toggle enable/disable state
             if obj.isEnabled
+                obj.Logger.info('User requested disable');
                 obj.disable();
             else
+                obj.Logger.info('User requested enable');
                 obj.enable();
             end
         end
@@ -278,11 +298,13 @@ classdef HIDController < handle
                 obj.uiComponents.EnableButton.BackgroundColor = [0.8 0.4 0.4]; % Red-ish for disable
                 obj.uiComponents.StatusLabel.Text = '🟢 Connected';
                 obj.uiComponents.StatusLabel.FontColor = [0 0.7 0]; % Green
+                obj.Logger.debug('UI updated: Enabled state');
             else
                 obj.uiComponents.EnableButton.Text = '▶ Enable';
                 obj.uiComponents.EnableButton.BackgroundColor = [0.4 0.7 0.4]; % Green-ish for enable
                 obj.uiComponents.StatusLabel.Text = '⚪ Disconnected';
                 obj.uiComponents.StatusLabel.FontColor = [0.5 0.5 0.5]; % Gray
+                obj.Logger.debug('UI updated: Disabled state');
             end
             
             % Update step factor display
@@ -291,6 +313,7 @@ classdef HIDController < handle
         
         function applySettings(obj, newStepFactor, dialog)
             % Apply settings from the settings dialog
+            obj.Logger.info('Applying settings from dialog');
             obj.setStepFactor(newStepFactor);
             close(dialog);
             

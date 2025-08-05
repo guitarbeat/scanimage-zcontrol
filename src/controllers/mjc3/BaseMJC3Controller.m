@@ -14,6 +14,7 @@
 %   - Manual movement methods (moveUp, moveDown)
 %   - Z-controller integration interface
 %   - Automatic cleanup on destruction
+%   - Unified logging system
 %
 % Abstract Methods:
 %   - start(): Start the controller polling
@@ -22,6 +23,7 @@
 %
 % Dependencies:
 %   - Z-controller: Stage movement interface (must implement relativeMove)
+%   - LoggingService: Unified logging system
 %
 % Author: Aaron W. (alw4834)
 % Created: 2024
@@ -46,6 +48,7 @@ classdef BaseMJC3Controller < handle
     
     properties (Access = protected)
         zController    % Z-axis controller (must implement relativeMove method)
+        Logger         % Logging service for structured output
     end
     
     methods (Abstract)
@@ -70,15 +73,19 @@ classdef BaseMJC3Controller < handle
             obj.zController = zController;
             obj.stepFactor = stepFactor;
             obj.running = false;
+            
+            % Initialize logger
+            obj.Logger = LoggingService('BaseMJC3Controller', 'SuppressInitMessage', true);
+            obj.Logger.info('Base controller initialized with step factor: %.1f μm/unit', stepFactor);
         end
         
         function setStepFactor(obj, newStepFactor)
             % Update the step factor for joystick sensitivity
             if newStepFactor > 0
                 obj.stepFactor = newStepFactor;
-                fprintf('MJC3 step factor updated to %.1f μm/unit\n', newStepFactor);
+                obj.Logger.info('Step factor updated to %.1f μm/unit', newStepFactor);
             else
-                warning('Step factor must be positive');
+                obj.Logger.warning('Step factor must be positive');
             end
         end
         
@@ -88,9 +95,9 @@ classdef BaseMJC3Controller < handle
             dz = steps * obj.stepFactor;
             success = obj.zController.relativeMove(dz);
             if success
-                fprintf('Manual Z up: %.1f μm\n', dz);
+                obj.Logger.info('Manual Z up: %.1f μm', dz);
             else
-                fprintf('Failed to move Z up by %.1f μm\n', dz);
+                obj.Logger.warning('Failed to move Z up by %.1f μm', dz);
             end
         end
         
@@ -100,14 +107,15 @@ classdef BaseMJC3Controller < handle
             dz = -steps * obj.stepFactor;
             success = obj.zController.relativeMove(dz);
             if success
-                fprintf('Manual Z down: %.1f μm\n', abs(dz));
+                obj.Logger.info('Manual Z down: %.1f μm', abs(dz));
             else
-                fprintf('Failed to move Z down by %.1f μm\n', abs(dz));
+                obj.Logger.warning('Failed to move Z down by %.1f μm', abs(dz));
             end
         end
         
         function delete(obj)
             % Destructor - ensure controller stops
+            obj.Logger.info('Cleaning up base controller');
             obj.stop();
         end
     end

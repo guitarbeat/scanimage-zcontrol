@@ -1,18 +1,18 @@
 %==============================================================================
-% UICOMPONENTS.M
+% UiComponents - Centralized UI Component Definitions
 %==============================================================================
-% UI component definitions for Foilview application.
 %
-% This class defines and manages the UI components used throughout the
-% Foilview application, providing a centralized location for component
-% configuration and access. It supports modular UI design and consistent
-% component usage across different views.
+% Purpose:
+%   Provides centralized definitions for all UI components, constants, and styling
+%   used throughout the FoilView application. This class serves as the single
+%   source of truth for UI configuration and ensures consistency across the app.
 %
 % Key Features:
 %   - Centralized UI component definitions
 %   - Modular and reusable component structures
 %   - Property and event configuration
 %   - Integration with controller and service layers
+%   - Consistent color scheme and styling
 %
 % Dependencies:
 %   - MATLAB App Designer: UI components
@@ -41,48 +41,48 @@ classdef UiComponents
 
         % ===== LAYOUT CONSTANTS =====
         % Common dimensions
-        BUTTON_HEIGHT = 30;
+        BUTTON_HEIGHT = 30
 
         % Standard padding and spacing
-        STANDARD_PADDING = [2 2 2 2];
-        STANDARD_SPACING = 2;
-        TIGHT_PADDING = [1 1 1 1];
-        TIGHT_SPACING = 1;
-        LOOSE_PADDING = [4 4 4 4];
-        LOOSE_SPACING = 4;
+        STANDARD_PADDING = [2 2 2 2]
+        STANDARD_SPACING = 2
+        TIGHT_PADDING = [1 1 1 1]
+        TIGHT_SPACING = 1
+        LOOSE_PADDING = [4 4 4 4]
+        LOOSE_SPACING = 4
 
         % Main layout
-        MAIN_PADDING = [1 1 1 1];
-        MAIN_ROW_SPACING = 1;
-        MAIN_ROW_HEIGHTS = {'fit', 'fit', 'fit', 'fit', 'fit', 'fit'};
+        MAIN_PADDING = [1 1 1 1]
+        MAIN_ROW_SPACING = 1
+        MAIN_ROW_HEIGHTS = {'fit', 'fit', 'fit', 'fit', 'fit', 'fit'}
 
         % Status bar
-        STATUS_BAR_COLUMN_WIDTHS = {'1x', 40, 40, 40, 40, 40};
-        STATUS_BAR_PADDING = [8 8 8 8];
-        STATUS_BAR_SPACING = 4;
+        STATUS_BAR_COLUMN_WIDTHS = {'1x', 40, 40, 40, 40, 40}
+        STATUS_BAR_PADDING = [8 8 8 8]
+        STATUS_BAR_SPACING = 4
 
         % Control panels
-        CONTROL_GRID_PADDING = [2 2 2 2];
-        CONTROL_GRID_SPACING = 4;
-        CONTROL_COLUMN_SPACING = 8;
+        CONTROL_GRID_PADDING = [2 2 2 2]
+        CONTROL_GRID_SPACING = 4
+        CONTROL_COLUMN_SPACING = 8
 
         % Standard column and row configurations
-        STANDARD_COLUMN_WIDTHS = {'1x', 'fit'};
-        FIT_EXPAND_COLUMNS = {'fit', '1x'};
-        FIT_EXPAND_ROWS = {'fit', '1x'};
-        ALL_FIT_ROWS = {'fit', 'fit'};
-        THREE_FIT_ROWS = {'fit', 'fit', 'fit'};
+        STANDARD_COLUMN_WIDTHS = {'1x', 'fit'}
+        FIT_EXPAND_COLUMNS = {'fit', '1x'}
+        FIT_EXPAND_ROWS = {'fit', '1x'}
+        ALL_FIT_ROWS = {'fit', 'fit'}
+        THREE_FIT_ROWS = {'fit', 'fit', 'fit'}
 
         % Plot area
-        PLOT_PANEL_OFFSET = 10;
-        PLOT_PANEL_MARGIN = 20;
-        PLOT_GRID_PADDING = [10 10 10 10];
-        PLOT_GRID_SPACING = 10;
+        PLOT_PANEL_OFFSET = 10
+        PLOT_PANEL_MARGIN = 20
+        PLOT_GRID_PADDING = [10 10 10 10]
+        PLOT_GRID_SPACING = 10
 
         % Font sizes - Unified for consistency
-        POSITION_DISPLAY_FONT_SIZE = 28;  % Large position display
-        CARD_TITLE_FONT_SIZE = 11;        % Card headers
-        CONTROL_FONT_SIZE = 10;           % All controls (buttons, fields, dropdowns, labels)
+        POSITION_DISPLAY_FONT_SIZE = 28  % Large position display
+        CARD_TITLE_FONT_SIZE = 11        % Card headers
+        CONTROL_FONT_SIZE = 10           % All controls (buttons, fields, dropdowns, labels)
 
         % ===== MODERN COLOR SCHEME =====
         COLORS = struct(...
@@ -107,16 +107,109 @@ classdef UiComponents
             'DarkText', [0.15 0.15 0.15], ...           % Softer dark text
             'LightBackground', [0.98 0.98 0.98], ...
             'MetricBackground', [0.95 0.9 0.95], ...
+            'PlotBackground', [0.98 0.98 0.98], ...
+            'PlotGrid', [0.9 0.9 0.9], ...
+            'PlotLine', [0.13 0.45 0.82], ...
+            'PlotMarker', [0.86 0.24 0.24], ...
             'StatusGood', [0.16 0.68 0.38], ...         % Green for good status
             'StatusWarning', [0.95 0.61 0.07], ...      % Orange for warnings
             'StatusError', [0.86 0.24 0.24], ...        % Red for errors
             'ButtonShadow', [0.85 0.87 0.90] ...        % Button shadow color
-            )
+        )
+
+        % ===== BUTTON STYLES =====
+        BUTTON_STYLES = struct(...
+            'Primary', struct(...
+                'BackgroundColor', [0.13 0.45 0.82], ...
+                'FontColor', [1 1 1], ...
+                'FontWeight', 'bold' ...
+            ), ...
+            'Secondary', struct(...
+                'BackgroundColor', [0.96 0.97 0.98], ...
+                'FontColor', [0.15 0.15 0.15], ...
+                'FontWeight', 'normal' ...
+            ), ...
+            'Success', struct(...
+                'BackgroundColor', [0.16 0.68 0.38], ...
+                'FontColor', [1 1 1], ...
+                'FontWeight', 'bold' ...
+            ), ...
+            'Warning', struct(...
+                'BackgroundColor', [0.95 0.61 0.07], ...
+                'FontColor', [1 1 1], ...
+                'FontWeight', 'bold' ...
+            ), ...
+            'Danger', struct(...
+                'BackgroundColor', [0.86 0.24 0.24], ...
+                'FontColor', [1 1 1], ...
+                'FontWeight', 'bold' ...
+            ), ...
+            'Info', struct(...
+                'BackgroundColor', [0.11 0.63 0.95], ...
+                'FontColor', [1 1 1], ...
+                'FontWeight', 'bold' ...
+            ), ...
+            'Muted', struct(...
+                'BackgroundColor', [0.96 0.97 0.98], ...
+                'FontColor', [0.45 0.55 0.65], ...
+                'FontWeight', 'normal' ...
+            ) ...
+        )
+
+        % ===== TEXT STYLES =====
+        TEXT_STYLES = struct(...
+            'Title', struct(...
+                'FontSize', 14, ...
+                'FontWeight', 'bold', ...
+                'FontColor', [0.15 0.15 0.15] ...
+            ), ...
+            'Subtitle', struct(...
+                'FontSize', 12, ...
+                'FontWeight', 'normal', ...
+                'FontColor', [0.45 0.55 0.65] ...
+            ), ...
+            'Body', struct(...
+                'FontSize', 10, ...
+                'FontWeight', 'normal', ...
+                'FontColor', [0.15 0.15 0.15] ...
+            ), ...
+            'Caption', struct(...
+                'FontSize', 9, ...
+                'FontWeight', 'normal', ...
+                'FontColor', [0.45 0.55 0.65] ...
+            ) ...
+        )
+
+        % ===== COMPONENT DIMENSIONS =====
+        DIMENSIONS = struct(...
+            'ButtonHeight', 30, ...
+            'ButtonWidth', 80, ...
+            'InputHeight', 25, ...
+            'LabelHeight', 20, ...
+            'CardPadding', [10 10 10 10], ...
+            'CardSpacing', 5, ...
+            'PanelPadding', [5 5 5 5], ...
+            'PanelSpacing', 3 ...
+        )
+
+        % ===== ANIMATION SETTINGS =====
+        ANIMATION = struct(...
+            'Duration', 0.2, ...
+            'Easing', 'ease-in-out', ...
+            'HoverDelay', 0.1, ...
+            'TransitionDelay', 0.05 ...
+        )
 
         % ===== TEXT CONSTANTS =====
         TEXT = struct(...
             'WindowTitle', 'FoilView', ...
-            'Ready', '✓ Ready')
+            'Ready', '✓ Ready', ...
+            'Loading', 'Loading...', ...
+            'Error', 'Error', ...
+            'Success', 'Success', ...
+            'Warning', 'Warning', ...
+            'Info', 'Info' ...
+        )
     end
 
     methods (Static)
@@ -363,7 +456,7 @@ classdef UiComponents
                 end
 
                 [style, text] = UiComponents.getButtonStateStyle(isRunning);
-                UiComponents.applyButtonStyle(autoControls.StartStopButton, style, text);
+                UiComponents.applyButtonStyle(autoControls.StartStopButton, style);
 
                 success = true;
             end
@@ -388,22 +481,57 @@ classdef UiComponents
             end
         end
 
-        function applyButtonStyle(button, style, text)
-            % Applies style-based background color and optional text to a button.
-            if ~isvalid(button)
-                return;
-            end
-
-            styleName = [upper(style(1)) lower(style(2:end))];
-            if isfield(UiComponents.COLORS, styleName)
-                button.BackgroundColor = UiComponents.COLORS.(styleName);
+        function applyButtonStyle(button, styleName)
+            % Apply a predefined button style to a UI button
+            % 
+            % Inputs:
+            %   button: UIButton object to style
+            %   styleName: String name of style ('Primary', 'Secondary', etc.)
+            
+            % Convert to title case for case-insensitive matching
+            styleNameTitle = UiComponents.toTitleCase(styleName);
+            
+            if isfield(UiComponents.BUTTON_STYLES, styleNameTitle)
+                style = UiComponents.BUTTON_STYLES.(styleNameTitle);
+                button.BackgroundColor = style.BackgroundColor;
+                button.FontColor = style.FontColor;
+                button.FontWeight = style.FontWeight;
             else
-                button.BackgroundColor = UiComponents.COLORS.Primary;  % Fallback
+                warning('UiComponents:InvalidStyle', 'Unknown button style: %s (tried: %s)', styleName, styleNameTitle);
             end
+        end
 
-            button.FontColor = UiComponents.COLORS.White;
-            if nargin > 2 && ~isempty(text)
-                button.Text = text;
+        function applyTextStyle(label, styleName)
+            % Apply a predefined text style to a UI label
+            % 
+            % Inputs:
+            %   label: UILabel object to style
+            %   styleName: String name of style ('Title', 'Subtitle', etc.)
+            
+            if isfield(UiComponents.TEXT_STYLES, styleName)
+                style = UiComponents.TEXT_STYLES.(styleName);
+                label.FontSize = style.FontSize;
+                label.FontWeight = style.FontWeight;
+                label.FontColor = style.FontColor;
+            else
+                warning('UiComponents:InvalidStyle', 'Unknown text style: %s', styleName);
+            end
+        end
+
+        function color = getColor(colorName)
+            % Get a color from the color scheme
+            % 
+            % Inputs:
+            %   colorName: String name of color
+            % 
+            % Returns:
+            %   color: RGB color array [r g b]
+            
+            if isfield(UiComponents.COLORS, colorName)
+                color = UiComponents.COLORS.(colorName);
+            else
+                warning('UiComponents:InvalidColor', 'Unknown color: %s', colorName);
+                color = [0 0 0]; % Default to black
             end
         end
 
@@ -525,6 +653,29 @@ classdef UiComponents
                 else
                     bgColor = UiComponents.COLORS.LightBackground;
                 end
+            end
+        end
+        
+        function titleCase = toTitleCase(str)
+            % Convert a string to title case for case-insensitive matching
+            % 
+            % Inputs:
+            %   str: Input string (e.g., 'primary', 'SUCCESS')
+            % 
+            % Returns:
+            %   titleCase: Title case string (e.g., 'Primary', 'Success')
+            
+            if isempty(str)
+                titleCase = '';
+                return;
+            end
+            
+            % Convert to lowercase first, then capitalize first letter
+            strLower = lower(str);
+            if length(strLower) > 1
+                titleCase = [upper(strLower(1)) strLower(2:end)];
+            else
+                titleCase = upper(strLower);
             end
         end
     end

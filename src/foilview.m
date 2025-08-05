@@ -88,18 +88,26 @@ classdef foilview < matlab.apps.AppBase
         DataDir
         LastSetupTime
         MetadataConfig
+        Logger
     end
     
     methods (Access = public)
         function app = foilview()
-            % Add MJC3 MEX controller paths
+            % Initialize logger
+            app.Logger = LoggingService('FoilviewApp');
+            
+            % Add MJC3 MEX controller paths (lightweight operation)
             app.addMJC3Paths();
             
+            % Build UI components (this is relatively fast)
             components = UiBuilder.build();
             app.copyComponentsFromStruct(components);
             app.setupCallbacks();
+            
+            % * Defer heavy initialization until after UI is ready
             app.initializeApplication();
             registerApp(app, app.UIFigure);
+            
             % * Initialize metadata button pressed flag
             app.MetadataButtonPressed = false;
             % * Set initial Metadata button color
@@ -109,6 +117,10 @@ classdef foilview < matlab.apps.AppBase
             if isfield(app.StatusControls, 'MJC3Button') && ~isempty(app.StatusControls.MJC3Button)
                 app.StatusControls.MJC3Button.ButtonPushedFcn = @(~,~) app.onMJC3ButtonPushed();
             end
+            
+            % Hide main window initially and show tools window as main interface
+            app.UIFigure.Visible = 'off';  % Hide main window initially
+            app.ToolsWindow.show();        % Show Tools Window instead
             
             if nargout == 0
                 clear app
@@ -278,12 +290,12 @@ classdef foilview < matlab.apps.AppBase
                         app.ManualControls.SharedStepSize.StepSizeDropdown.Value = formattedValue;
                     end
                     
-                    fprintf('Custom step size set to: %.3f μm\n', customStepSize);
+                    app.Logger.info('Custom step size set to: %.3f μm', customStepSize);
                     app.updateTotalMoveLabel();
                 else
                     % Invalid value - revert to previous value
                     app.ManualControls.SharedStepSize.StepSizeDisplay.Value = app.ManualControls.SharedStepSize.CurrentValue;
-                    fprintf('Invalid step size. Must be between 0.001 and 1000 μm\n');
+                    app.Logger.warning('Invalid step size. Must be between 0.001 and 1000 μm');
                 end
             end
         end
@@ -583,36 +595,67 @@ classdef foilview < matlab.apps.AppBase
     methods (Access = private)
         %% Start the refresh timer for position updates
         function startRefreshTimer(app)
-            app.RefreshTimer = FoilviewUtils.createTimer('fixedRate', ...
-                app.Controller.POSITION_REFRESH_PERIOD, ...
-                @(~,~) app.safeRefreshPosition());
-            start(app.RefreshTimer);
+            try
+                app.RefreshTimer = FoilviewUtils.createTimer('fixedRate', ...
+                    app.Controller.POSITION_REFRESH_PERIOD, ...
+                    @(~,~) app.safeRefreshPosition());
+                start(app.RefreshTimer);
+                app.Logger.debug('Position refresh timer started (%.1f s period)', app.Controller.POSITION_REFRESH_PERIOD);
+            catch ME
+                app.Logger.warning('Failed to start position refresh timer: %s', ME.message);
+            end
         end
         %% Start the metric timer for metric updates
         function startMetricTimer(app)
-            app.MetricTimer = FoilviewUtils.createTimer('fixedRate', ...
-                app.Controller.METRIC_REFRESH_PERIOD, ...
-                @(~,~) app.safeUpdateMetric());
-            start(app.MetricTimer);
+            try
+                app.MetricTimer = FoilviewUtils.createTimer('fixedRate', ...
+                    app.Controller.METRIC_REFRESH_PERIOD, ...
+                    @(~,~) app.safeUpdateMetric());
+                start(app.MetricTimer);
+                app.Logger.debug('Metric timer started (%.1f s period)', app.Controller.METRIC_REFRESH_PERIOD);
+            catch ME
+                app.Logger.warning('Failed to start metric timer: %s', ME.message);
+            end
         end
         %% Start the resize monitor timer
         function startResizeMonitorTimer(app)
-            app.ResizeMonitorTimer = FoilviewUtils.createTimer('fixedRate', ...
-                0.5, ...
-                @(~,~) app.monitorWindowResize());
-            if isvalid(app.UIFigure)
-                app.LastWindowSize = app.UIFigure.Position;
+            try
+                app.ResizeMonitorTimer = FoilviewUtils.createTimer('fixedRate', ...
+                    1.0, ... % * Increased from 0.5s to 1.0s to reduce overhead
+                    @(~,~) app.monitorWindowResize());
+                if isvalid(app.UIFigure)
+                    app.LastWindowSize = app.UIFigure.Position;
+                end
+                start(app.ResizeMonitorTimer);
+                app.Logger.debug('Resize monitor timer started (1.0 s period)');
+            catch ME
+                app.Logger.warning('Failed to start resize monitor timer: %s', ME.message);
             end
-            start(app.ResizeMonitorTimer);
         end
         %% Stop and delete all timers
         function stopTimers(app)
-            FoilviewUtils.safeStopTimer(app.RefreshTimer);
-            app.RefreshTimer = [];
-            FoilviewUtils.safeStopTimer(app.MetricTimer);
-            app.MetricTimer = [];
-            FoilviewUtils.safeStopTimer(app.ResizeMonitorTimer);
-            app.ResizeMonitorTimer = [];
+            try
+                if ~isempty(app.RefreshTimer) && isvalid(app.RefreshTimer)
+                    FoilviewUtils.safeStopTimer(app.RefreshTimer);
+                    app.Logger.debug('Position refresh timer stopped');
+                end
+                app.RefreshTimer = [];
+                
+                if ~isempty(app.MetricTimer) && isvalid(app.MetricTimer)
+                    FoilviewUtils.safeStopTimer(app.MetricTimer);
+                    app.Logger.debug('Metric timer stopped');
+                end
+                app.MetricTimer = [];
+                
+                if ~isempty(app.ResizeMonitorTimer) && isvalid(app.ResizeMonitorTimer)
+                    FoilviewUtils.safeStopTimer(app.ResizeMonitorTimer);
+                    app.Logger.debug('Resize monitor timer stopped');
+                end
+                app.ResizeMonitorTimer = [];
+                
+            catch ME
+                app.Logger.warning('Error stopping timers: %s', ME.message);
+            end
         end
     end
 
@@ -620,27 +663,76 @@ classdef foilview < matlab.apps.AppBase
     methods (Access = private)
         %% Clean up all application resources
         function cleanup(app)
-            app.stopTimers();
-            app.cleanupMetadataLogging();
-            if ~isempty(app.ScanImageManager) && isvalid(app.ScanImageManager)
-                app.ScanImageManager.cleanup();
+            % Enhanced cleanup with robust error handling for all components
+            app.Logger.info('Starting application cleanup...');
+            
+            % Stop resize monitoring timer
+            if ~isempty(app.ResizeMonitorTimer) && isvalid(app.ResizeMonitorTimer)
+                try
+                    stop(app.ResizeMonitorTimer);
+                    delete(app.ResizeMonitorTimer);
+                    app.ResizeMonitorTimer = [];
+                    app.Logger.info('Resize monitor timer stopped');
+                catch ME
+                    app.Logger.error('Error stopping resize monitor timer: %s', ME.message);
+                end
             end
-            if ~isempty(app.Controller) && isvalid(app.Controller)
-                app.Controller.cleanup();
-            end
-            if ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp)
-                delete(app.BookmarksViewApp);
-                app.BookmarksViewApp = [];
-            end
-            if ~isempty(app.StageViewApp) && isvalid(app.StageViewApp)
-                delete(app.StageViewApp);
-                app.StageViewApp = [];
-            end
+            
+            % Safely close MJC3View
             if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp)
-                fprintf('FoilviewApp: Cleaning up MJC3View...\n');
-                delete(app.MJC3ViewApp);
-                app.MJC3ViewApp = [];
+                try
+                    app.Logger.info('Closing MJC3View...');
+                    delete(app.MJC3ViewApp);
+                    app.MJC3ViewApp = [];
+                    app.Logger.info('MJC3View closed successfully');
+                catch ME
+                    app.Logger.error('Error closing MJC3View: %s', ME.message);
+                    app.MJC3ViewApp = [];
+                end
             end
+            
+            % Safely close BookmarksView
+            if ~isempty(app.BookmarksViewApp) && isvalid(app.BookmarksViewApp)
+                try
+                    app.Logger.info('Closing BookmarksView...');
+                    delete(app.BookmarksViewApp);
+                    app.BookmarksViewApp = [];
+                    app.Logger.info('BookmarksView closed successfully');
+                catch ME
+                    app.Logger.error('Error closing BookmarksView: %s', ME.message);
+                    app.BookmarksViewApp = [];
+                end
+            end
+            
+            % Clean up controller
+            if ~isempty(app.Controller) && isvalid(app.Controller)
+                try
+                    app.Logger.info('Cleaning up controller...');
+                    app.Controller.cleanup();
+                    % Don't set to [] since Controller is typed as FoilviewController
+                    app.Logger.info('Controller cleaned up successfully');
+                catch ME
+                    app.Logger.error('Error cleaning up controller: %s', ME.message);
+                end
+            end
+            
+            % Clean up ScanImageManager
+            if ~isempty(app.ScanImageManager) && isvalid(app.ScanImageManager)
+                try
+                    app.Logger.info('Cleaning up ScanImageManager...');
+                    app.ScanImageManager.cleanup();
+                    % Don't set to [] since ScanImageManager is typed
+                    app.Logger.info('ScanImageManager cleaned up successfully');
+                catch ME
+                    app.Logger.error('Error cleaning up ScanImageManager: %s', ME.message);
+                end
+            end
+            
+            % Clean up metadata writer
+            % The MetadataWriter is now a static utility class, so we don't delete it here.
+            % The cleanupMetadataLogging method handles its own cleanup.
+            
+            app.Logger.info('Application cleanup completed');
         end
         %% Clean up metadata logging and generate session stats
         function cleanupMetadataLogging(app)
@@ -658,37 +750,38 @@ classdef foilview < matlab.apps.AppBase
 
     % === Utility/Helper Methods ===
     methods (Access = private)
-        %% Add MJC3 MEX controller paths
+        %% Add all required application paths
         function addMJC3Paths(app)
-            % Add paths for the high-performance MEX-based MJC3 controller
+            % Add all required paths for the Foilview application
             try
                 currentDir = fileparts(mfilename('fullpath'));
                 srcDir = currentDir; % We're already in the src/ directory
                 
-                % Add required paths
+                % Add all required paths
                 addpath(fullfile(srcDir, 'controllers', 'mjc3'));
                 addpath(fullfile(srcDir, 'controllers'));
                 addpath(fullfile(srcDir, 'views'));
+                addpath(fullfile(srcDir, 'services'));
+                addpath(fullfile(srcDir, 'utils'));
+                addpath(fullfile(srcDir, 'managers'));
                 
                 % Verify MEX controller is available
                 if exist('mjc3_joystick_mex', 'file') == 3
-                    fprintf('✅ MJC3 MEX controller paths added successfully\n');
-                    
                     % Test MEX function
                     try
                         result = mjc3_joystick_mex('test');
                         if result
-                            fprintf('✅ MJC3 MEX controller is functional\n');
+                            app.Logger.info('✅ MJC3 MEX controller is functional');
                         end
                     catch
-                        fprintf('⚠️  MJC3 MEX controller paths added but function not responding\n');
+                        app.Logger.warning('⚠️  MJC3 MEX controller paths added but function not responding');
                     end
                 else
-                    fprintf('⚠️  MJC3 MEX controller not found. Run install_mjc3() to build.\n');
+                    app.Logger.warning('⚠️  MJC3 MEX controller not found. Run install_mjc3() to build.');
                 end
                 
             catch ME
-                fprintf('⚠️  Error adding MJC3 paths: %s\n', ME.message);
+                app.Logger.error('⚠️  Error adding application paths: %s', ME.message);
             end
         end
         %% Copy UI components from struct
@@ -700,23 +793,41 @@ classdef foilview < matlab.apps.AppBase
         end
         %% Initialize the application (controllers, listeners, UI, timers)
         function initializeApplication(app)
-            app.Controller = FoilviewController();
-            app.UIController = UIController(app);
-            app.PlotManager = PlotManager(app);
-            app.ScanImageManager = ScanImageManager();
-            app.Controller.setFoilviewApp(app);
-            addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
-            addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
-            addlistener(app.Controller, 'MetricChanged', @(src,evt) app.onControllerMetricChanged());
-            addlistener(app.Controller, 'AutoStepComplete', @(src,evt) app.onControllerAutoStepComplete());
-            app.PlotManager.initializeMetricsPlot(app.MetricsPlotControls.Axes);
-            app.UIController.updateAllUI();
-            app.updateAutoStepStatus();
-            app.updateWindowStatusButtons();
-            app.startRefreshTimer();
-            app.startMetricTimer();
-            app.startResizeMonitorTimer();
-            app.ScanImageManager.initialize(app);
+            try
+                % Initialize controllers and services
+                app.Controller = FoilviewController();
+                app.UIController = UIController(app);
+                app.PlotManager = PlotManager(app);
+                app.ScanImageManager = ScanImageManager();
+                
+                % Set up cross-references
+                app.Controller.setFoilviewApp(app);
+                app.Controller.setScanImageManager(app.ScanImageManager);
+                
+                % Set up event listeners
+                addlistener(app.Controller, 'StatusChanged', @(src,evt) app.onControllerStatusChanged());
+                addlistener(app.Controller, 'PositionChanged', @(src,evt) app.onControllerPositionChanged());
+                addlistener(app.Controller, 'MetricChanged', @(src,evt) app.onControllerMetricChanged());
+                addlistener(app.Controller, 'AutoStepComplete', @(src,evt) app.onControllerAutoStepComplete());
+                
+                % Initialize UI components
+                app.PlotManager.initializeMetricsPlot(app.MetricsPlotControls.Axes);
+                app.UIController.updateAllUI();
+                app.updateAutoStepStatus();
+                app.updateWindowStatusButtons();
+                
+                % Start timers with error handling
+                app.startRefreshTimer();
+                app.startMetricTimer();
+                app.startResizeMonitorTimer();
+                
+                % Initialize ScanImage manager (this may take time)
+                app.ScanImageManager.initialize(app);
+                
+            catch ME
+                app.Logger.error('Error during application initialization: %s', ME.message);
+                % Continue with limited functionality rather than failing completely
+            end
         end
         %% Launch the stage view window
         function launchStageView(app)
@@ -747,31 +858,63 @@ classdef foilview < matlab.apps.AppBase
         
         %% Launch the MJC3 joystick control window
         function launchMJC3View(app)
-            if isempty(app.MJC3ViewApp) || ~isvalid(app.MJC3ViewApp) || ~isvalid(app.MJC3ViewApp.UIFigure)
-                try
-                    app.MJC3ViewApp = MJC3View();
-                    
-                    % Create and set up the HID controller using the controller's method
-                    if ~isempty(app.Controller)
-                        hidController = app.Controller.createMJC3Controller(5);
-                        app.MJC3ViewApp.setController(hidController);
-                        
-                        if ~isempty(hidController)
-                            fprintf('MJC3 Controller integrated successfully\n');
-                        else
-                            fprintf('MJC3 View opened without controller (manual testing mode)\n');
-                        end
-                    else
-                        fprintf('Main controller not available, MJC3 View opened in manual mode\n');
-                        app.MJC3ViewApp.setController([]);
-                    end
-                    
-                catch ME
-                    FoilviewUtils.warn('FoilviewApp', 'Failed to launch MJC3 View: %s', ME.message);
+            try
+                % Check if MJC3View already exists and is valid
+                if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp.UIFigure)
+                    app.MJC3ViewApp.bringToFront();
+                    return;
+                end
+                
+                % Clear any invalid reference
+                if ~isempty(app.MJC3ViewApp) && ~isvalid(app.MJC3ViewApp)
+                    app.Logger.warning('Clearing invalid MJC3ViewApp reference');
                     app.MJC3ViewApp = [];
                 end
-            else
-                app.MJC3ViewApp.bringToFront();
+                
+                % Create new MJC3View with robust error handling
+                try
+                    app.MJC3ViewApp = MJC3View();
+                    app.Logger.info('MJC3View created successfully');
+                catch ME
+                    app.Logger.error('Failed to create MJC3View: %s', ME.message);
+                    app.MJC3ViewApp = [];
+                    uialert(app.UIFigure, sprintf('Failed to open joystick window: %s', ME.message), 'Error', 'Icon', 'error');
+                    return;
+                end
+                
+                % Create and set up the HID controller using the controller's method
+                if ~isempty(app.Controller) && isvalid(app.Controller)
+                    try
+                        hidController = app.Controller.createMJC3Controller(5);
+                        
+                        if ~isempty(hidController) && isvalid(hidController)
+                            app.MJC3ViewApp.setController(hidController);
+                            app.Logger.info('MJC3 Controller integrated successfully');
+                        else
+                            app.Logger.warning('Invalid HID controller created - using manual mode');
+                            app.MJC3ViewApp.setController([]);
+                        end
+                    catch ME
+                        app.Logger.error('Failed to create HID controller: %s', ME.message);
+                        app.MJC3ViewApp.setController([]);
+                    end
+                else
+                    app.Logger.warning('Main controller not available, MJC3 View opened in manual mode');
+                    app.MJC3ViewApp.setController([]);
+                end
+                
+            catch ME
+                app.Logger.error('Failed to launch MJC3 View: %s', ME.message);
+                % Clean up any partially created objects
+                if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp)
+                    try
+                        delete(app.MJC3ViewApp);
+                    catch
+                        % Ignore cleanup errors
+                    end
+                    app.MJC3ViewApp = [];
+                end
+                uialert(app.UIFigure, sprintf('Failed to open joystick window: %s', ME.message), 'Error', 'Icon', 'error');
             end
         end
         %% Set up all UI callback functions
@@ -991,21 +1134,21 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         %% Display session summary in command window
-        function displaySessionSummary(~, frameCount, duration, avgFrameRate, fileSize, metadataFile)
-            fprintf('\n=== Session Summary ===\n');
-            fprintf('Frames recorded: %d\n', frameCount);
+        function displaySessionSummary(app, frameCount, duration, avgFrameRate, fileSize, metadataFile)
+            app.Logger.info('=== Session Summary ===');
+            app.Logger.info('Frames recorded: %d', frameCount);
             if duration >= 60
                 mins = floor(duration / 60);
                 secs = duration - (mins * 60);
-                fprintf('Session duration: %d min %d sec\n', mins, round(secs));
+                app.Logger.info('Session duration: %d min %d sec', mins, round(secs));
             else
-                fprintf('Session duration: %.1f sec\n', duration);
+                app.Logger.info('Session duration: %.1f sec', duration);
             end
             if avgFrameRate > 0
-                fprintf('Average frame rate: %.2f frames/sec\n', avgFrameRate);
+                app.Logger.info('Average frame rate: %.2f frames/sec', avgFrameRate);
             end
-            fprintf('Metadata file: %s\n', metadataFile);
-            fprintf('File size: %.1f KB\n', fileSize);
+            app.Logger.info('Metadata file: %s', metadataFile);
+            app.Logger.info('File size: %.1f KB', fileSize);
         end
         %% Controller event: Status changed
         function onControllerStatusChanged(app)
@@ -1054,7 +1197,7 @@ classdef foilview < matlab.apps.AppBase
             % In simulation mode, also collect a sample metadata entry for testing
             if app.Controller.SimulationMode
                 app.collectSimulatedMetadata();
-                fprintf('Sample metadata collected in simulation mode\n');
+                app.Logger.info('Sample metadata collected in simulation mode');
             end
         end
 
@@ -1075,13 +1218,13 @@ classdef foilview < matlab.apps.AppBase
                     end
                     app.MetadataConfig.baseDir = selectedDir;
                     assignin('base', 'metadataConfig', app.MetadataConfig);
-                    fprintf('Metadata base directory set to: %s\n', selectedDir);
+                    app.Logger.info('Metadata base directory set to: %s', selectedDir);
                     uialert(app.UIFigure, ...
                         sprintf('Metadata base directory set to:\n%s\n\nFiles will be saved in date-based subdirectories.', selectedDir), ...
                         'Configuration Updated', ...
                         'Icon', 'success');
                 else
-                    fprintf('Metadata path configuration cancelled\n');
+                    app.Logger.info('Metadata path configuration cancelled');
                 end
             catch ME
                 FoilviewUtils.logException('FoilviewApp', ME);
@@ -1154,7 +1297,7 @@ classdef foilview < matlab.apps.AppBase
                 isSimulation = app.Controller.SimulationMode;
                 if isSimulation
                     app.createSimulationMetadataFile();
-                    fprintf('Metadata logging initialized in simulation mode\n');
+                    app.Logger.info('Metadata logging initialized in simulation mode');
                     return;
                 end
                 try
@@ -1162,7 +1305,7 @@ classdef foilview < matlab.apps.AppBase
                 catch ME
                     FoilviewUtils.logException('FoilviewApp', ME);
                     app.createSimulationMetadataFile();
-                    fprintf('Metadata logging initialized in simulation mode (ScanImage not available)\n');
+                    app.Logger.info('Metadata logging initialized in simulation mode (ScanImage not available)');
                     return;
                 end
                 app.checkBeamSystem(hSI, false);
@@ -1174,11 +1317,11 @@ classdef foilview < matlab.apps.AppBase
                 app.ensureMetadataFile(app.MetadataFile, config.headers);
                 assignin('base', 'metadataFilePath', app.MetadataFile);
                 assignin('base', 'metadataConfig', config);
-                fprintf('Metadata logging initialized successfully\n');
+                app.Logger.info('Metadata logging initialized successfully');
             catch ME
                 FoilviewUtils.logException('FoilviewApp', ME);
                 app.createSimulationMetadataFile();
-                fprintf('Metadata logging initialized in simulation mode due to error\n');
+                app.Logger.info('Metadata logging initialized in simulation mode due to error');
             end
         end
 
@@ -1269,53 +1412,53 @@ classdef foilview < matlab.apps.AppBase
         end
 
         %% Diagnostic: checks beam system configuration
-        function checkBeamSystem(~, hSI, verbose)
+        function checkBeamSystem(app, hSI, verbose)
             if nargin < 3
                 verbose = true;
             end
             try
                 if verbose
-                    fprintf('\n--- Beam System Diagnostics ---\n');
+                    app.Logger.info('--- Beam System Diagnostics ---');
                 end
                 if ~isprop(hSI, 'hBeams') || isempty(hSI.hBeams)
                     if verbose
-                        fprintf('❌ No beam control system found\n');
+                        app.Logger.warning('❌ No beam control system found');
                     end
                     return;
                 end
                 if verbose
-                    fprintf('✓ Beam control system detected\n');
+                    app.Logger.info('✓ Beam control system detected');
                 end
                 if isprop(hSI.hBeams, 'hBeams') && ~isempty(hSI.hBeams.hBeams)
                     beam = hSI.hBeams.hBeams{1};
                     if verbose
-                        fprintf('✓ Beam controller type: %s\n', class(beam));
+                        app.Logger.info('✓ Beam controller type: %s', class(beam));
                     end
                     if isprop(beam, 'beamBufferSize')
                         if verbose
-                            fprintf('✓ Beam buffer size: %d\n', beam.beamBufferSize);
+                            app.Logger.info('✓ Beam buffer size: %d', beam.beamBufferSize);
                         end
                     end
                     if isprop(beam, 'beamBufferTimeout')
                         if verbose
-                            fprintf('✓ Beam buffer timeout: %f seconds\n', beam.beamBufferTimeout);
-                            fprintf('  (If timeout errors occur, consider increasing this value)\n');
+                            app.Logger.info('✓ Beam buffer timeout: %f seconds', beam.beamBufferTimeout);
+                            app.Logger.info('  (If timeout errors occur, consider increasing this value)');
                         end
                     end
                 end
                 if verbose
                     if isprop(hSI.hBeams, 'hPockels') && ~isempty(hSI.hBeams.hPockels)
-                        fprintf('✓ Pockels cell controller found\n');
+                        app.Logger.info('✓ Pockels cell controller found');
                     else
-                        fprintf('❌ No Pockels cell controller found\n');
+                        app.Logger.warning('❌ No Pockels cell controller found');
                     end
                     if verbose
-                        fprintf('--- End Beam Diagnostics ---\n\n');
+                        app.Logger.info('--- End Beam Diagnostics ---');
                     end
                 end
             catch ME
                 if verbose
-                    fprintf('Error during beam diagnostics: %s\n', ME.message);
+                    app.Logger.error('Error during beam diagnostics: %s', ME.message);
                 end
             end
         end

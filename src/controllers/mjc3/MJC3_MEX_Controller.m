@@ -27,6 +27,7 @@
 %   - mjc3_joystick_mex: Custom MEX function for HID communication
 %   - BaseMJC3Controller: Abstract base class interface
 %   - CalibrationService: Axis calibration and scaling
+%   - LoggingService: Unified logging system
 %   - MATLAB Timer: Polling mechanism
 %
 % Author: Aaron W. (alw4834)
@@ -46,10 +47,10 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
     % Uses custom C++ MEX function for direct HID access without PsychHID
     
     properties
-        stepFactor     % Micrometres moved per unit of joystick deflection (Z-axis)
+        stepFactor     % Micrometres moved per unit of joystick deflection (Z-axis) - from abstract base
+        running        % Logical flag indicating whether polling is active - from abstract base
         xStepFactor    % Micrometres moved per unit of joystick deflection (X-axis)
         yStepFactor    % Micrometres moved per unit of joystick deflection (Y-axis)
-        running        % Logical flag indicating whether polling is active
         timerObj       % MATLAB timer object for polling
         lastZValue     % Last Z-axis value to detect changes
         lastXValue     % Last X-axis value to detect changes
@@ -89,14 +90,14 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             
             % Verify MEX function exists
             if ~obj.verifyMEXFunction()
+                obj.Logger.error('MEX function %s not found. Please compile the MEX file.', obj.mexFunction);
                 error('MJC3_MEX_Controller:MEXNotFound', ...
                     'MEX function %s not found. Please compile the MEX file.', obj.mexFunction);
             end
             
             % Test connection
             if ~obj.connectToMJC3()
-                warning('MJC3_MEX_Controller:NoDevice', ...
-                    'MJC3 device not detected. Controller created but not connected.');
+                obj.Logger.warning('MJC3 device not detected. Controller created but not connected.');
             end
             
             % Create timer with better error handling
@@ -112,12 +113,13 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             % Start polling the joystick
             if ~obj.running
                 if ~obj.isConnected && ~obj.connectToMJC3()
+                    obj.Logger.error('Cannot start: MJC3 device not connected');
                     error('MJC3_MEX_Controller:NotConnected', 'Cannot start: MJC3 device not connected');
                 end
                 
                 obj.running = true;
                 start(obj.timerObj);
-                fprintf('MJC3 MEX Controller started (Step factor: %.1f μm/unit, Poll rate: %.0f Hz)\n', ...
+                obj.Logger.info('Started polling (Step factor: %.1f μm/unit, Poll rate: %.0f Hz)', ...
                     obj.stepFactor, 1/obj.POLL_RATE);
             end
         end
@@ -127,27 +129,32 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             if obj.running
                 obj.running = false;
                 stop(obj.timerObj);
-                fprintf('MJC3 MEX Controller stopped\n');
+                obj.Logger.info('Stopped polling');
             end
         end
         
         function success = connectToMJC3(obj)
             % Test connection to MJC3 device
             try
+                obj.Logger.debug('Attempting to connect to MJC3 device...');
+                
                 % Check if device info shows connection
                 info = feval(obj.mexFunction, 'info');
                 obj.isConnected = info.connected;
                 success = obj.isConnected;
                 
                 if success
-                    fprintf('MJC3 MEX Controller: Device connected (VID:1313, PID:9000)\n');
+                    obj.Logger.info('MJC3 device connected successfully (VID:1313, PID:9000)');
+                    obj.Logger.debug('Device info: %s', jsonencode(info));
                 else
-                    fprintf('MJC3 MEX Controller: Device not detected\n');
+                    obj.Logger.warning('MJC3 device not detected - check USB connection');
+                    obj.Logger.debug('Connection test failed - device may be disconnected or not powered');
                 end
             catch ME
                 obj.isConnected = false;
                 success = false;
-                fprintf('MJC3 MEX Controller: Connection test failed: %s\n', ME.message);
+                obj.Logger.error('Connection test failed: %s', ME.message);
+                obj.Logger.debug('Connection error details: %s', ME.getReport());
             end
         end
         
@@ -158,9 +165,11 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 data = feval(obj.mexFunction, 'read', 50); % 50ms timeout
                 if isempty(data)
                     data = [0, 0, 0, 0, 0]; % Return neutral state on timeout
+                    obj.Logger.debug('Joystick read timeout - returning neutral state');
                 end
             catch ME
-                fprintf('MJC3 MEX Controller: Read error: %s\n', ME.message);
+                obj.Logger.error('Joystick read error: %s', ME.message);
+                obj.Logger.debug('Read error details: %s', ME.getReport());
                 data = [0, 0, 0, 0, 0];
             end
         end
@@ -169,21 +178,21 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             % Get device information
             try
                 info = feval(obj.mexFunction, 'info');
+                obj.Logger.debug('Device info retrieved: %s', jsonencode(info));
             catch ME
-                fprintf('MJC3 MEX Controller: Info error: %s\n', ME.message);
+                obj.Logger.error('Device info error: %s', ME.message);
+                obj.Logger.debug('Info error details: %s', ME.getReport());
                 info = struct('connected', false, 'error', ME.message);
             end
         end
-        
-
         
         function setXStepFactor(obj, stepFactor)
             % Set X-axis step factor
             if stepFactor > 0
                 obj.xStepFactor = stepFactor;
-                fprintf('MJC3 MEX: X-axis step factor updated to %.1f μm/unit\n', stepFactor);
+                obj.Logger.info('X-axis step factor updated to %.1f μm/unit', stepFactor);
             else
-                warning('X-axis step factor must be positive');
+                obj.Logger.warning('X-axis step factor must be positive (got: %.1f)', stepFactor);
             end
         end
         
@@ -191,15 +200,15 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             % Set Y-axis step factor
             if stepFactor > 0
                 obj.yStepFactor = stepFactor;
-                fprintf('MJC3 MEX: Y-axis step factor updated to %.1f μm/unit\n', stepFactor);
+                obj.Logger.info('Y-axis step factor updated to %.1f μm/unit', stepFactor);
             else
-                warning('Y-axis step factor must be positive');
+                obj.Logger.warning('Y-axis step factor must be positive (got: %.1f)', stepFactor);
             end
         end
         
         function delete(obj)
             % Destructor: ensure polling stops and resources are cleaned up
-            fprintf('MJC3 MEX Controller: Cleaning up...\n');
+            obj.Logger.info('Cleaning up MJC3 MEX controller resources...');
             
             % Stop polling first
             obj.stop();
@@ -209,21 +218,22 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 try
                     stop(obj.timerObj);
                     delete(obj.timerObj);
+                    obj.Logger.debug('Timer object cleaned up successfully');
                 catch ME
-                    fprintf('MJC3 MEX Controller: Warning - Error cleaning up timer: %s\n', ME.message);
+                    obj.Logger.warning('Error cleaning up timer: %s', ME.message);
                 end
             end
             
             % Close MEX connection
             try
-                fprintf('MJC3 MEX Controller: Closing MEX connection...\n');
+                obj.Logger.debug('Closing MEX connection...');
                 feval(obj.mexFunction, 'close');
-                fprintf('MJC3 MEX Controller: MEX connection closed\n');
+                obj.Logger.debug('MEX connection closed successfully');
             catch ME
-                fprintf('MJC3 MEX Controller: Warning - Error closing MEX: %s\n', ME.message);
+                obj.Logger.warning('Error closing MEX connection: %s', ME.message);
             end
             
-            fprintf('MJC3 MEX Controller: Cleanup complete\n');
+            obj.Logger.info('MJC3 MEX controller cleanup complete');
         end
     end
     
@@ -231,15 +241,27 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
         function success = verifyMEXFunction(obj)
             % Verify that the MEX function exists and is callable
             try
+                obj.Logger.debug('Verifying MEX function: %s', obj.mexFunction);
+                
                 % Test if function exists
                 success = exist(obj.mexFunction, 'file') == 3; % 3 = MEX file
                 
                 if success
+                    obj.Logger.debug('MEX function file found, testing functionality...');
                     % Test basic functionality
                     result = feval(obj.mexFunction, 'test');
                     success = ~isempty(result);
+                    
+                    if success
+                        obj.Logger.debug('MEX function test passed');
+                    else
+                        obj.Logger.warning('MEX function test failed - function exists but test failed');
+                    end
+                else
+                    obj.Logger.warning('MEX function file not found: %s', obj.mexFunction);
                 end
-            catch
+            catch ME
+                obj.Logger.error('MEX function verification failed: %s', ME.message);
                 success = false;
             end
         end
@@ -253,13 +275,14 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             try
                 obj.poll();
             catch ME
-                fprintf('MJC3 MEX Controller polling error: %s\n', ME.message);
+                obj.Logger.error('Polling error: %s', ME.message);
+                obj.Logger.debug('Polling error details: %s', ME.getReport());
                 
                 % Try to reconnect once
                 if obj.connectToMJC3()
-                    fprintf('MJC3 MEX Controller: Reconnected successfully\n');
+                    obj.Logger.info('Reconnected successfully after polling error');
                 else
-                    fprintf('MJC3 MEX Controller: Reconnection failed, stopping\n');
+                    obj.Logger.error('Reconnection failed after polling error, stopping controller');
                     obj.stop();
                 end
             end
@@ -270,6 +293,7 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             data = obj.readJoystick();
             
             if length(data) < 5
+                obj.Logger.debug('Invalid joystick data length: %d (expected 5)', length(data));
                 return;
             end
             
@@ -296,7 +320,9 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 if abs(dz) > 0.01  % Minimum movement threshold
                     success = obj.zController.relativeMove(dz);
                     if ~success
-                        fprintf('MJC3 MEX: Failed to move Z-axis by %.2f μm\n', dz);
+                        obj.Logger.warning('Failed to move Z-axis by %.2f μm', dz);
+                    else
+                        obj.Logger.debug('Z-axis moved by %.2f μm (calibrated: %.3f, speed: %.2f)', dz, calibratedZ, speedFactor);
                     end
                 end
                 
@@ -313,7 +339,9 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 if abs(dx) > 0.01  % Minimum movement threshold
                     success = obj.zController.relativeMoveX(dx);
                     if ~success
-                        fprintf('MJC3 MEX: Failed to move X-axis by %.2f μm\n', dx);
+                        obj.Logger.warning('Failed to move X-axis by %.2f μm', dx);
+                    else
+                        obj.Logger.debug('X-axis moved by %.2f μm (calibrated: %.3f, speed: %.2f)', dx, calibratedX, speedFactor);
                     end
                 end
                 
@@ -330,7 +358,9 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 if abs(dy) > 0.01  % Minimum movement threshold
                     success = obj.zController.relativeMoveY(dy);
                     if ~success
-                        fprintf('MJC3 MEX: Failed to move Y-axis by %.2f μm\n', dy);
+                        obj.Logger.warning('Failed to move Y-axis by %.2f μm', dy);
+                    else
+                        obj.Logger.debug('Y-axis moved by %.2f μm (calibrated: %.3f, speed: %.2f)', dy, calibratedY, speedFactor);
                     end
                 end
                 
@@ -342,7 +372,7 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
         
         function handleTimerError(obj)
             % Handle timer errors gracefully
-            fprintf('MJC3 MEX Controller: Timer error occurred, stopping controller\n');
+            obj.Logger.error('Timer error occurred, stopping controller');
             obj.running = false;
             obj.isConnected = false;
         end
@@ -358,10 +388,13 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             end
             
             try
-                fprintf('Calibrating %s axis... Please move the joystick through its full range.\n', axisName);
+                obj.Logger.info('Starting calibration for %s axis (%d samples)...', axisName, samples);
+                obj.Logger.info('Please move the joystick through its full range for %s axis', axisName);
                 
                 % Collect samples
                 rawValues = [];
+                obj.Logger.debug('Collecting %d calibration samples...', samples);
+                
                 for i = 1:samples
                     data = obj.readJoystick();
                     if length(data) >= 3
@@ -375,15 +408,25 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                         end
                     end
                     pause(0.01); % 10ms delay between samples
+                    
+                    % Log progress every 10 samples
+                    if mod(i, 10) == 0
+                        obj.Logger.debug('Calibration progress: %d/%d samples collected', i, samples);
+                    end
                 end
+                
+                obj.Logger.debug('Collected %d raw values for %s axis calibration', length(rawValues), axisName);
+                obj.Logger.debug('Raw value range: [%d, %d]', min(rawValues), max(rawValues));
                 
                 % Perform calibration
                 obj.CalibrationService.calibrateAxis(axisName, rawValues);
                 
-                fprintf('%s axis calibration completed successfully\n', axisName);
+                obj.Logger.info('%s axis calibration completed successfully (%d samples)', axisName, length(rawValues));
+                obj.Logger.debug('Calibration data saved for %s axis', axisName);
                 
             catch ME
-                fprintf('Calibration failed for %s axis: %s\n', axisName, ME.message);
+                obj.Logger.error('Calibration failed for %s axis: %s', axisName, ME.message);
+                obj.Logger.debug('Calibration error details: %s', ME.getReport());
                 error('Calibration failed: %s', ME.message);
             end
         end
@@ -393,10 +436,12 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             % axisName: 'X', 'Y', 'Z', or 'all'
             
             try
+                obj.Logger.info('Resetting calibration for %s...', axisName);
                 obj.CalibrationService.resetCalibration(axisName);
-                fprintf('Calibration reset for %s\n', axisName);
+                obj.Logger.info('Calibration reset successfully for %s', axisName);
             catch ME
-                fprintf('Failed to reset calibration: %s\n', ME.message);
+                obj.Logger.error('Failed to reset calibration for %s: %s', axisName, ME.message);
+                obj.Logger.debug('Reset error details: %s', ME.getReport());
                 error('Reset failed: %s', ME.message);
             end
         end
@@ -407,8 +452,10 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             
             try
                 status = obj.CalibrationService.getCalibrationStatus();
+                obj.Logger.debug('Calibration status retrieved: %s', jsonencode(status));
             catch ME
-                fprintf('Failed to get calibration status: %s\n', ME.message);
+                obj.Logger.error('Failed to get calibration status: %s', ME.message);
+                obj.Logger.debug('Status error details: %s', ME.getReport());
                 status = [];
             end
         end
@@ -420,8 +467,10 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             
             try
                 isCalibrated = obj.CalibrationService.isAxisCalibrated(axisName);
+                obj.Logger.debug('%s axis calibration status: %s', axisName, mat2str(isCalibrated));
             catch ME
-                fprintf('Failed to check calibration status: %s\n', ME.message);
+                obj.Logger.error('Failed to check calibration status for %s: %s', axisName, ME.message);
+                obj.Logger.debug('Calibration check error details: %s', ME.getReport());
                 isCalibrated = false;
             end
         end

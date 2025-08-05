@@ -60,6 +60,11 @@ classdef ToolsWindow < handle
         MJC3Button
         RefreshButton
         MetadataButton
+        
+        % View app references
+        BookmarksViewApp
+        StageViewApp
+        MJC3ViewApp
     end
     
     methods
@@ -124,6 +129,100 @@ classdef ToolsWindow < handle
                 delete(obj.UIFigure);
             end
         end
+        
+        % ===== CALLBACK METHODS =====
+        function onShowFoilViewButtonPressed(obj, ~, ~)
+            % Callback for Show FoilView button
+            try
+                % Show the main FoilView interface
+                if ~isempty(obj.MainWindowHandle) && isvalid(obj.MainWindowHandle)
+                    obj.MainWindowHandle.Visible = 'on';
+                    % Update button text to indicate it's now open
+                    obj.ShowFoilViewButton.Text = '🚀 FoilView Open';
+                end
+            catch ME
+                FoilviewUtils.logException('ToolsWindow.onShowFoilViewButtonPressed', ME);
+            end
+        end
+        
+        function onBookmarksButtonPressed(obj, ~, ~)
+            % Callback for Bookmarks button
+            try
+                % Toggle bookmarks view
+                if isempty(obj.BookmarksViewApp) || ~isvalid(obj.BookmarksViewApp)
+                    obj.BookmarksViewApp = BookmarksView();
+                    obj.BookmarksViewApp.show();
+                else
+                    if obj.BookmarksViewApp.isVisible()
+                        obj.BookmarksViewApp.hide();
+                    else
+                        obj.BookmarksViewApp.show();
+                    end
+                end
+            catch ME
+                FoilviewUtils.logException('ToolsWindow.onBookmarksButtonPressed', ME);
+            end
+        end
+        
+        function onStageViewButtonPressed(obj, ~, ~)
+            % Callback for Stage View button
+            try
+                % Toggle stage view
+                if isempty(obj.StageViewApp) || ~isvalid(obj.StageViewApp)
+                    obj.StageViewApp = StageView();
+                    obj.StageViewApp.show();
+                else
+                    if obj.StageViewApp.isVisible()
+                        obj.StageViewApp.hide();
+                    else
+                        obj.StageViewApp.show();
+                    end
+                end
+            catch ME
+                FoilviewUtils.logException('ToolsWindow.onStageViewButtonPressed', ME);
+            end
+        end
+        
+        function onMJC3ButtonPressed(obj, ~, ~)
+            % Callback for MJC3 Joystick button
+            try
+                % Toggle MJC3 joystick control
+                if isempty(obj.MJC3ViewApp) || ~isvalid(obj.MJC3ViewApp)
+                    obj.MJC3ViewApp = MJC3View();
+                    obj.MJC3ViewApp.show();
+                else
+                    if obj.MJC3ViewApp.isVisible()
+                        obj.MJC3ViewApp.hide();
+                    else
+                        obj.MJC3ViewApp.show();
+                    end
+                end
+            catch ME
+                FoilviewUtils.logException('ToolsWindow.onMJC3ButtonPressed', ME);
+            end
+        end
+        
+        function onRefreshButtonPressed(obj, ~, ~)
+            % Callback for Refresh button
+            try
+                % Refresh position and status
+                FoilviewUtils.logInfo('ToolsWindow: Refreshing position and status...');
+                % Add refresh logic here
+            catch ME
+                FoilviewUtils.logException('ToolsWindow.onRefreshButtonPressed', ME);
+            end
+        end
+        
+        function onMetadataButtonPressed(obj, ~, ~)
+            % Callback for Metadata button
+            try
+                % Toggle metadata logging
+                FoilviewUtils.logInfo('ToolsWindow: Toggling metadata logging...');
+                % Add metadata toggle logic here
+            catch ME
+                FoilviewUtils.logException('ToolsWindow.onMetadataButtonPressed', ME);
+            end
+        end
     end
     
     methods (Access = private)
@@ -140,7 +239,7 @@ classdef ToolsWindow < handle
             obj.UIFigure = uifigure('Visible', 'off');
             obj.UIFigure.Units = 'pixels';
             obj.UIFigure.Position = [100 100 UiComponents.TOOLS_WINDOW_WIDTH UiComponents.TOOLS_WINDOW_HEIGHT]; % Temporary position
-            obj.UIFigure.Name = 'FoilView';
+            obj.UIFigure.Name = 'FoilView - Main Interface';
             obj.UIFigure.Color = UiComponents.COLORS.Background;
             obj.UIFigure.Resize = 'off';  % Fixed size tools window
             obj.UIFigure.WindowStyle = 'normal';
@@ -172,21 +271,29 @@ classdef ToolsWindow < handle
         function createToolButtons(obj)
             % Create all tool buttons
             
-            % Row 1: Show FoilView (spans both columns, prominent)
-            obj.ShowFoilViewButton = obj.createToolButton('🚀 Show FoilView', 'Show/Hide Main FoilView Window', 1, [1 2]);
-            obj.ShowFoilViewButton.FontSize = UiComponents.CONTROL_FONT_SIZE + 2; % Make it more prominent
+            % Row 1: Main FoilView Interface (spans both columns, very prominent)
+            obj.ShowFoilViewButton = obj.createToolButton('🚀 Launch FoilView', 'Open Main FoilView Interface', 1, [1 2]);
+            obj.ShowFoilViewButton.FontSize = UiComponents.CONTROL_FONT_SIZE + 4; % Make it very prominent
             UiComponents.applyButtonStyle(obj.ShowFoilViewButton, 'success'); % Green color
+            obj.ShowFoilViewButton.ButtonPushedFcn = @(src, event) obj.onShowFoilViewButtonPressed(src, event);
             
             % Row 2: Bookmarks and Camera
             obj.BookmarksButton = obj.createToolButton('📍 Bookmarks', 'Toggle Bookmarks (Open/Close)', 2, 1);
+            obj.BookmarksButton.ButtonPushedFcn = @(src, event) obj.onBookmarksButtonPressed(src, event);
+            
             obj.StageViewButton = obj.createToolButton('📷 Camera', 'Toggle Camera (Open/Close)', 2, 2);
+            obj.StageViewButton.ButtonPushedFcn = @(src, event) obj.onStageViewButtonPressed(src, event);
             
             % Row 3: Joystick and Refresh
             obj.MJC3Button = obj.createToolButton('🕹️ Joystick', 'Toggle MJC3 Joystick Control (Open/Close)', 3, 1);
+            obj.MJC3Button.ButtonPushedFcn = @(src, event) obj.onMJC3ButtonPressed(src, event);
+            
             obj.RefreshButton = obj.createToolButton('↻ Refresh', 'Refresh position and status', 3, 2);
+            obj.RefreshButton.ButtonPushedFcn = @(src, event) obj.onRefreshButtonPressed(src, event);
             
             % Row 4: Metadata (centered, spans both columns)
             obj.MetadataButton = obj.createToolButton('⚙ Metadata', 'Metadata Logging', 4, [1 2]);
+            obj.MetadataButton.ButtonPushedFcn = @(src, event) obj.onMetadataButtonPressed(src, event);
         end
         
         function button = createToolButton(obj, text, tooltip, row, column)

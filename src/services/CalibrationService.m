@@ -1,32 +1,33 @@
 %==============================================================================
 % CALIBRATIONSERVICE.M
 %==============================================================================
-% Calibration service for MJC3 joystick axes and stage control.
+% Calibration service for MJC3 joystick axes.
 %
-% This service handles the calibration logic for MJC3 joystick axes, providing
-% persistent storage and retrieval of calibration data for X, Y, and Z axes.
-% It implements dead zone detection, sensitivity adjustment, and range mapping
-% to ensure accurate and responsive joystick control.
+% This service provides comprehensive calibration functionality for the MJC3
+% joystick controller, including automatic calibration, manual calibration,
+% and persistent storage of calibration data. It handles the conversion
+% between raw joystick values and calibrated, normalized values for precise
+% control.
 %
 % Key Features:
-%   - Multi-axis calibration (X, Y, Z) with individual parameters
-%   - Dead zone detection and compensation
-%   - Sensitivity adjustment and range mapping
-%   - Persistent calibration storage and retrieval
+%   - Multi-axis calibration (X, Y, Z)
+%   - Automatic calibration from sample data
+%   - Manual calibration with user input
+%   - Persistent calibration storage
+%   - Dead zone handling
+%   - Sensitivity adjustment
 %   - Default calibration fallback
-%   - Real-time calibration application
-%   - Calibration validation and error handling
 %
-% Calibration Parameters:
-%   - Center: Expected center value for each axis (typically 128)
-%   - Dead Zone: Inactive region around center (±5 units default)
-%   - Min/Max: Calibrated range limits for each axis
-%   - Sensitivity: Multiplier for movement sensitivity
+% Calibration Process:
+%   1. Collect raw joystick samples
+%   2. Calculate center, min, max values
+%   3. Determine dead zone and sensitivity
+%   4. Store calibration data
+%   5. Apply calibration to real-time values
 %
 % Dependencies:
-%   - FoilviewUtils: Utility functions for error handling
-%   - MATLAB file I/O: Calibration data persistence
-%   - MJC3 controllers: Raw joystick value input
+%   - FoilviewUtils: Utility functions and error handling
+%   - LoggingService: Unified logging system
 %
 % Author: Aaron W. (alw4834)
 % Created: 2024
@@ -41,52 +42,57 @@
 %==============================================================================
 
 classdef CalibrationService < handle
-    % CalibrationService - Handles calibration logic for MJC3 joystick axes
-    % Provides persistent storage and retrieval of calibration data for X, Y, Z axes
+    % CalibrationService - Comprehensive calibration for MJC3 joystick axes
+    % Provides automatic and manual calibration with persistent storage
     
     properties (Access = private)
-        CalibrationData     % Structure containing calibration data for all axes
-        CalibrationFile     % Path to calibration data file
-        DefaultCalibration  % Default calibration values
+        CalibrationData    % Structure containing calibration data for each axis
+        CalibrationFile    % File path for persistent calibration storage
+        DefaultCalibration % Default calibration values
+        Logger             % Logging service for structured output
     end
     
     properties (Constant)
-        DEFAULT_CALIBRATION_FILE = 'mjc3_calibration.mat';
-        DEFAULT_CENTER_VALUE = 128;  % Expected center value for joystick axes
-        DEFAULT_DEADZONE = 5;        % Dead zone around center (±5 units)
-        DEFAULT_SENSITIVITY = 1.0;   % Default sensitivity multiplier
+        % Default calibration parameters
+        DEFAULT_CENTER = 128
+        DEFAULT_MIN = 0
+        DEFAULT_MAX = 255
+        DEFAULT_DEADZONE = 10
+        DEFAULT_SENSITIVITY = 1.0
     end
     
     methods
-        function obj = CalibrationService(calibrationDir)
-            % Constructor
-            % calibrationDir: Directory to store calibration data (optional)
+        function obj = CalibrationService()
+            % Constructor: Initialize calibration service
             
-            if nargin < 1
-                calibrationDir = pwd;
-            end
+            % Initialize logger
+            obj.Logger = LoggingService('CalibrationService');
             
             % Set up calibration file path
-            obj.CalibrationFile = fullfile(calibrationDir, obj.DEFAULT_CALIBRATION_FILE);
+            obj.CalibrationFile = fullfile(pwd, 'calibration_data.mat');
             
-            % Initialize default calibration structure
+            % Create default calibration
             obj.DefaultCalibration = obj.createDefaultCalibration();
             
             % Load existing calibration or create new
             obj.loadCalibration();
+            
+            obj.Logger.info('Calibration service initialized');
         end
         
         function calibrateAxis(obj, axisName, rawValues)
-            % Calibrate a specific axis using raw joystick values
+            % Calibrate a specific axis using raw joystick samples
             % axisName: 'X', 'Y', or 'Z'
-            % rawValues: Array of raw joystick values for this axis
+            % rawValues: Array of raw joystick values for the axis
             
             try
                 if isempty(rawValues)
-                    error('No calibration data provided');
+                    error('No raw values provided for calibration');
                 end
                 
-                % Convert axis name to field name
+                obj.Logger.info('Calibrating %s axis with %d samples...', axisName, length(rawValues));
+                obj.Logger.debug('Raw values range: [%d, %d]', min(rawValues), max(rawValues));
+                
                 fieldName = obj.axisNameToField(axisName);
                 
                 % Calculate calibration parameters
@@ -98,11 +104,13 @@ classdef CalibrationService < handle
                 % Save to file
                 obj.saveCalibration();
                 
-                fprintf('CalibrationService: %s axis calibrated successfully\n', axisName);
-                fprintf('  Center: %d, Range: [%d, %d], Sensitivity: %.2f\n', ...
+                obj.Logger.info('%s axis calibrated successfully', axisName);
+                obj.Logger.debug('Calibration parameters - Center: %d, Range: [%d, %d], Sensitivity: %.2f', ...
                     calibration.center, calibration.min, calibration.max, calibration.sensitivity);
                 
             catch ME
+                obj.Logger.error('Failed to calibrate %s axis: %s', axisName, ME.message);
+                obj.Logger.debug('Calibration error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.calibrateAxis', ME);
                 error('Failed to calibrate %s axis: %s', axisName, ME.message);
             end
@@ -155,6 +163,8 @@ classdef CalibrationService < handle
                 calibratedValue = max(-1.0, min(1.0, calibratedValue));
                 
             catch ME
+                obj.Logger.error('Error applying calibration to %s axis: %s', axisName, ME.message);
+                obj.Logger.debug('Calibration application error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.applyCalibration', ME);
                 % Fallback to default calibration
                 calibratedValue = obj.applyDefaultCalibration(rawValue);
@@ -176,6 +186,8 @@ classdef CalibrationService < handle
                 end
                 
             catch ME
+                obj.Logger.error('Failed to get calibration for %s axis: %s', axisName, ME.message);
+                obj.Logger.debug('Get calibration error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.getCalibration', ME);
                 calibration = [];
             end
@@ -189,13 +201,15 @@ classdef CalibrationService < handle
                 if strcmpi(axisName, 'all')
                     % Reset all axes
                     obj.CalibrationData = obj.createDefaultCalibration();
-                    fprintf('CalibrationService: All axes reset to default\n');
+                    obj.Logger.info('All axes reset to default calibration');
                 else
                     % Reset specific axis
                     fieldName = obj.axisNameToField(axisName);
                     if isfield(obj.CalibrationData, fieldName)
                         obj.CalibrationData = rmfield(obj.CalibrationData, fieldName);
-                        fprintf('CalibrationService: %s axis reset to default\n', axisName);
+                        obj.Logger.info('%s axis reset to default calibration', axisName);
+                    else
+                        obj.Logger.debug('%s axis was already using default calibration', axisName);
                     end
                 end
                 
@@ -203,6 +217,8 @@ classdef CalibrationService < handle
                 obj.saveCalibration();
                 
             catch ME
+                obj.Logger.error('Failed to reset calibration for %s: %s', axisName, ME.message);
+                obj.Logger.debug('Reset calibration error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.resetCalibration', ME);
                 error('Failed to reset calibration for %s: %s', axisName, ME.message);
             end
@@ -216,7 +232,10 @@ classdef CalibrationService < handle
             try
                 fieldName = obj.axisNameToField(axisName);
                 isCalibrated = isfield(obj.CalibrationData, fieldName);
+                obj.Logger.debug('%s axis calibration status: %s', axisName, mat2str(isCalibrated));
             catch ME
+                obj.Logger.error('Failed to check calibration status for %s: %s', axisName, ME.message);
+                obj.Logger.debug('Calibration status check error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.isAxisCalibrated', ME);
                 isCalibrated = false;
             end
@@ -241,7 +260,11 @@ classdef CalibrationService < handle
                     end
                 end
                 
+                obj.Logger.debug('Calibration status retrieved: %s', jsonencode(status));
+                
             catch ME
+                obj.Logger.error('Failed to get calibration status: %s', ME.message);
+                obj.Logger.debug('Calibration status error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.getCalibrationStatus', ME);
                 status = obj.DefaultCalibration;
             end
@@ -256,15 +279,19 @@ classdef CalibrationService < handle
                     loadedData = load(obj.CalibrationFile);
                     if isfield(loadedData, 'calibrationData')
                         obj.CalibrationData = loadedData.calibrationData;
-                        fprintf('CalibrationService: Loaded calibration from %s\n', obj.CalibrationFile);
+                        obj.Logger.info('Loaded calibration from %s', obj.CalibrationFile);
+                        obj.Logger.debug('Loaded calibration data: %s', jsonencode(obj.CalibrationData));
                     else
                         obj.CalibrationData = obj.createDefaultCalibration();
+                        obj.Logger.warning('Calibration file exists but has invalid format, using defaults');
                     end
                 else
                     obj.CalibrationData = obj.createDefaultCalibration();
-                    fprintf('CalibrationService: Created new calibration data\n');
+                    obj.Logger.info('Created new calibration data (no existing file found)');
                 end
             catch ME
+                obj.Logger.error('Failed to load calibration: %s', ME.message);
+                obj.Logger.debug('Load calibration error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.loadCalibration', ME);
                 obj.CalibrationData = obj.createDefaultCalibration();
             end
@@ -275,8 +302,11 @@ classdef CalibrationService < handle
             try
                 calibrationData = obj.CalibrationData;
                 save(obj.CalibrationFile, 'calibrationData');
-                fprintf('CalibrationService: Saved calibration to %s\n', obj.CalibrationFile);
+                obj.Logger.info('Saved calibration to %s', obj.CalibrationFile);
+                obj.Logger.debug('Saved calibration data: %s', jsonencode(calibrationData));
             catch ME
+                obj.Logger.error('Failed to save calibration: %s', ME.message);
+                obj.Logger.debug('Save calibration error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.saveCalibration', ME);
                 error('Failed to save calibration data: %s', ME.message);
             end
@@ -285,77 +315,64 @@ classdef CalibrationService < handle
         function calibration = createDefaultCalibration(obj)
             % Create default calibration structure
             calibration = struct();
-            
             axes = {'X', 'Y', 'Z'};
+            
             for i = 1:length(axes)
-                fieldName = obj.axisNameToField(axes{i});
+                axisName = axes{i};
+                fieldName = obj.axisNameToField(axisName);
+                
                 calibration.(fieldName) = struct(...
-                    'center', obj.DEFAULT_CENTER_VALUE, ...
-                    'min', 0, ...
-                    'max', 255, ...
+                    'center', obj.DEFAULT_CENTER, ...
+                    'min', obj.DEFAULT_MIN, ...
+                    'max', obj.DEFAULT_MAX, ...
                     'deadzone', obj.DEFAULT_DEADZONE, ...
-                    'sensitivity', obj.DEFAULT_SENSITIVITY, ...
-                    'calibrated', false, ...
-                    'calibrationDate', []);
+                    'sensitivity', obj.DEFAULT_SENSITIVITY);
             end
         end
         
         function calibration = calculateCalibration(obj, rawValues)
             % Calculate calibration parameters from raw values
             % rawValues: Array of raw joystick values
+            % Returns: Calibration structure
             
-            % Calculate center (median of values)
+            % Calculate basic statistics
             center = median(rawValues);
-            
-            % Calculate range
             minVal = min(rawValues);
             maxVal = max(rawValues);
             
             % Calculate dead zone (5% of total range)
-            range = maxVal - minVal;
-            deadzone = max(obj.DEFAULT_DEADZONE, round(range * 0.05));
+            totalRange = maxVal - minVal;
+            deadzone = max(1, round(totalRange * 0.05));
             
             % Calculate sensitivity based on range
-            sensitivity = 255 / range;  % Normalize to full range
-            sensitivity = max(0.1, min(2.0, sensitivity));  % Clamp to reasonable range
+            if totalRange > 0
+                sensitivity = 255 / totalRange;
+            else
+                sensitivity = 1.0;
+            end
             
             calibration = struct(...
                 'center', center, ...
                 'min', minVal, ...
                 'max', maxVal, ...
                 'deadzone', deadzone, ...
-                'sensitivity', sensitivity, ...
-                'calibrated', true, ...
-                'calibrationDate', datetime('now'));
+                'sensitivity', sensitivity);
         end
         
         function calibratedValue = applyDefaultCalibration(obj, rawValue)
-            % Apply default calibration (no calibration applied)
-            % Returns normalized value between -1 and 1
+            % Apply default calibration to raw value
+            % rawValue: Raw joystick value
+            % Returns: Calibrated value (-1.0 to 1.0)
             
-            center = obj.DEFAULT_CENTER_VALUE;
-            deadzone = obj.DEFAULT_DEADZONE;
-            
-            % Apply dead zone
-            if abs(rawValue - center) <= deadzone
-                calibratedValue = 0;
-                return;
-            end
-            
-            % Simple linear mapping
-            if rawValue > center
-                normalized = (rawValue - center) / (255 - center);
-            else
-                normalized = -(center - rawValue) / center;
-            end
-            
-            calibratedValue = max(-1.0, min(1.0, normalized));
+            % Simple linear mapping from [0, 255] to [-1, 1]
+            calibratedValue = (rawValue - obj.DEFAULT_CENTER) / obj.DEFAULT_CENTER;
+            calibratedValue = max(-1.0, min(1.0, calibratedValue));
         end
         
         function fieldName = axisNameToField(obj, axisName)
             % Convert axis name to field name
             % axisName: 'X', 'Y', or 'Z'
-            % Returns: 'xAxis', 'yAxis', or 'zAxis'
+            % Returns: Field name for calibration data
             
             switch upper(axisName)
                 case 'X'
@@ -365,7 +382,7 @@ classdef CalibrationService < handle
                 case 'Z'
                     fieldName = 'zAxis';
                 otherwise
-                    error('Invalid axis name: %s. Must be X, Y, or Z.', axisName);
+                    error('Invalid axis name: %s', axisName);
             end
         end
     end

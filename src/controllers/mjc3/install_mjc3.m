@@ -44,83 +44,92 @@ function install_mjc3()
     % This script handles the complete setup process for the high-performance
     % MJC3 joystick controller system.
     
-    fprintf('=== MJC3 MEX Controller Installation ===\n\n');
+    % Initialize logger
+    logger = LoggingService('MJC3Installer');
+    
+    logger.info('=== MJC3 MEX Controller Installation ===');
     
     % Step 1: Check MATLAB compiler
-    fprintf('Step 1: Checking MATLAB C++ compiler...\n');
-    if ~check_compiler()
-        fprintf('❌ Installation failed: C++ compiler not configured\n');
+    logger.info('Step 1: Checking MATLAB C++ compiler...');
+    if ~check_compiler(logger)
+        logger.error('Installation failed: C++ compiler not configured');
         return;
     end
-    fprintf('✅ C++ compiler ready\n\n');
+    logger.info('✅ C++ compiler ready');
     
     % Step 2: Check/install hidapi
-    fprintf('Step 2: Checking hidapi library...\n');
-    if ~check_hidapi()
-        fprintf('❌ Installation failed: hidapi not found\n');
-        show_hidapi_install_instructions();
+    logger.info('Step 2: Checking hidapi library...');
+    if ~check_hidapi(logger)
+        logger.error('Installation failed: hidapi not found');
+        show_hidapi_install_instructions(logger);
         return;
     end
-    fprintf('✅ hidapi library found\n\n');
+    logger.info('✅ hidapi library found');
     
     % Step 3: Build MEX function
-    fprintf('Step 3: Building MEX function...\n');
+    logger.info('Step 3: Building MEX function...');
     try
         % Change to the mjc3 directory for building
         currentDir = pwd;
         cd(fileparts(mfilename('fullpath')));
         build_mjc3_mex();
         cd(currentDir);
-        fprintf('✅ MEX function built successfully\n\n');
+        logger.info('✅ MEX function built successfully');
     catch ME
-        fprintf('❌ MEX build failed: %s\n', ME.message);
+        logger.error('MEX build failed: %s', ME.message);
+        logger.debug('Build error details: %s', ME.getReport());
         return;
     end
     
     % Step 4: Test installation
-    fprintf('Step 4: Testing installation...\n');
-    if test_installation()
-        fprintf('✅ Installation test passed\n\n');
+    logger.info('Step 4: Testing installation...');
+    if test_installation(logger)
+        logger.info('✅ Installation test passed');
     else
-        fprintf('⚠️  Installation completed but tests failed\n');
-        fprintf('   This may be normal if MJC3 hardware is not connected\n\n');
+        logger.warning('⚠️ Installation completed but tests failed');
+        logger.info('This may be normal if MJC3 hardware is not connected');
     end
     
     % Step 5: Clean up deprecated files
-    fprintf('Step 5: Cleaning up deprecated files...\n');
-    cleanup_deprecated_files();
-    fprintf('✅ Cleanup completed\n\n');
+    logger.info('Step 5: Cleaning up deprecated files...');
+    cleanup_deprecated_files(logger);
+    logger.info('✅ Cleanup completed');
     
     % Step 6: Show usage instructions
-    show_usage_instructions();
+    show_usage_instructions(logger);
     
-    fprintf('🎉 MJC3 MEX Controller installation complete!\n');
-    fprintf('You can now use the high-performance MEX controller.\n\n');
+    logger.info('🎉 MJC3 MEX Controller installation complete!');
+    logger.info('You can now use the high-performance MEX controller.');
 end
 
-function success = check_compiler()
+function success = check_compiler(logger)
     % Check if MATLAB C++ compiler is configured
     try
         cc = mex.getCompilerConfigurations('C++', 'Selected');
         success = ~isempty(cc);
         if success
-            fprintf('   Using: %s\n', cc.Name);
+            logger.info('Using C++ compiler: %s', cc.Name);
+            logger.debug('Compiler details: %s', jsonencode(cc));
         end
-    catch
+    catch ME
         success = false;
+        logger.error('Compiler check failed: %s', ME.message);
     end
     
     if ~success
-        fprintf('   Please run: mex -setup\n');
-        fprintf('   On Windows: Install Visual Studio Community (free)\n');
-        fprintf('   On Linux: Install gcc/g++\n');
-        fprintf('   On macOS: Install Xcode Command Line Tools\n');
+        logger.warning('C++ compiler not configured');
+        logger.info('Please run: mex -setup');
+        logger.info('On Windows: Install Visual Studio Community (free)');
+        logger.info('On Linux: Install gcc/g++');
+        logger.info('On macOS: Install Xcode Command Line Tools');
     end
 end
 
-function success = check_hidapi()
+function success = check_hidapi(logger)
     % Check if hidapi is available
     success = false;
+    
+    logger.debug('Searching for hidapi library...');
     
     % Check vcpkg installation (Windows)
     if ispc
@@ -132,7 +141,8 @@ function success = check_hidapi()
         for i = 1:length(vcpkg_paths)
             include_path = fullfile(vcpkg_paths{i}, 'include');
             if exist(include_path, 'dir') && exist(fullfile(include_path, 'hidapi'), 'dir')
-                fprintf('   Found hidapi via vcpkg: %s\n', vcpkg_paths{i});
+                logger.info('Found hidapi via vcpkg: %s', vcpkg_paths{i});
+                logger.debug('hidapi include path: %s', include_path);
                 success = true;
                 return;
             end
@@ -144,7 +154,8 @@ function success = check_hidapi()
         system_paths = {'/usr/include', '/usr/local/include', '/opt/homebrew/include'};
         for i = 1:length(system_paths)
             if exist(fullfile(system_paths{i}, 'hidapi'), 'dir')
-                fprintf('   Found hidapi at: %s\n', system_paths{i});
+                logger.info('Found hidapi at: %s', system_paths{i});
+                logger.debug('hidapi system path: %s', system_paths{i});
                 success = true;
                 return;
             end
@@ -155,85 +166,102 @@ function success = check_hidapi()
     local_paths = {'external/hidapi', '../external/hidapi', 'C:/hidapi'};
     for i = 1:length(local_paths)
         if exist(fullfile(local_paths{i}, 'include'), 'dir')
-            fprintf('   Found hidapi at: %s\n', local_paths{i});
+            logger.info('Found hidapi at: %s', local_paths{i});
+            logger.debug('hidapi local path: %s', local_paths{i});
             success = true;
             return;
         end
     end
+    
+    if ~success
+        logger.warning('hidapi library not found in any standard location');
+    end
 end
 
-function show_hidapi_install_instructions()
-    fprintf('\nTo install hidapi:\n\n');
+function show_hidapi_install_instructions(logger)
+    logger.info('To install hidapi:');
     
     if ispc
-        fprintf('Windows (Recommended - vcpkg):\n');
-        fprintf('  1. Install vcpkg:\n');
-        fprintf('     git clone https://github.com/Microsoft/vcpkg.git\n');
-        fprintf('     cd vcpkg && .\\bootstrap-vcpkg.bat\n');
-        fprintf('  2. Install hidapi:\n');
-        fprintf('     .\\vcpkg install hidapi:x64-windows\n\n');
+        logger.info('Windows (Recommended - vcpkg):');
+        logger.info('  1. Install vcpkg:');
+        logger.info('     git clone https://github.com/Microsoft/vcpkg.git');
+        logger.info('     cd vcpkg && .\\bootstrap-vcpkg.bat');
+        logger.info('  2. Install hidapi:');
+        logger.info('     .\\vcpkg install hidapi:x64-windows');
         
-        fprintf('Windows (Alternative - Manual):\n');
-        fprintf('  1. Download from: https://github.com/libusb/hidapi/releases\n');
-        fprintf('  2. Extract to C:\\hidapi\\\n');
-        fprintf('  3. Ensure include/ and lib/ directories exist\n\n');
+        logger.info('Windows (Alternative - Manual):');
+        logger.info('  1. Download from: https://github.com/libusb/hidapi/releases');
+        logger.info('  2. Extract to C:\\hidapi\\');
+        logger.info('  3. Ensure include/ and lib/ directories exist');
         
     elseif ismac
-        fprintf('macOS:\n');
-        fprintf('  brew install hidapi\n');
-        fprintf('  # or\n');
-        fprintf('  sudo port install hidapi\n\n');
+        logger.info('macOS:');
+        logger.info('  brew install hidapi');
+        logger.info('  # or');
+        logger.info('  sudo port install hidapi');
         
     else % Linux
-        fprintf('Linux (Ubuntu/Debian):\n');
-        fprintf('  sudo apt-get install libhidapi-dev\n\n');
+        logger.info('Linux (Ubuntu/Debian):');
+        logger.info('  sudo apt-get install libhidapi-dev');
         
-        fprintf('Linux (CentOS/RHEL):\n');
-        fprintf('  sudo yum install hidapi-devel\n\n');
+        logger.info('Linux (CentOS/RHEL):');
+        logger.info('  sudo yum install hidapi-devel');
     end
     
-    fprintf('After installing hidapi, re-run this installation script.\n');
+    logger.info('After installing hidapi, re-run this installation script.');
 end
 
-function success = test_installation()
+function success = test_installation(logger)
     % Test the installed MEX function
     success = false;
     
     try
+        logger.debug('Testing MEX function installation...');
+        
         % Test MEX function exists and works
         if exist('mjc3_joystick_mex', 'file') ~= 3
-            fprintf('   MEX file not found\n');
+            logger.error('MEX file not found');
             return;
         end
+        
+        logger.debug('MEX file found, testing basic functionality...');
         
         % Test basic functionality
         result = mjc3_joystick_mex('test');
         if ~result
-            fprintf('   MEX function test failed\n');
+            logger.error('MEX function test failed');
             return;
         end
         
+        logger.debug('MEX function test passed, checking device connection...');
+        
         % Test device info (may fail if no hardware)
         info = mjc3_joystick_mex('info');
+        logger.debug('Device info: %s', jsonencode(info));
+        
         if info.connected
-            fprintf('   ✅ MJC3 device connected and ready\n');
+            logger.info('✅ MJC3 device connected and ready');
         else
-            fprintf('   ℹ️  MEX function works (MJC3 hardware not connected)\n');
+            logger.info('ℹ️ MEX function works (MJC3 hardware not connected)');
         end
+        
+        logger.debug('Testing controller creation...');
         
         % Test controller creation
         mockZController = MockZController();
         controller = MJC3_MEX_Controller(mockZController, 5);
         delete(controller);
         
+        logger.debug('Controller creation test passed');
         success = true;
         
     catch ME
-        fprintf('   Test error: %s\n', ME.message);
+        logger.error('Test error: %s', ME.message);
+        logger.debug('Test error details: %s', ME.getReport());
     end
 end
 
-function cleanup_deprecated_files()
+function cleanup_deprecated_files(logger)
     % Remove old controller files that are no longer needed
     deprecated_files = {
         'controllers/mjc3/MJC3_HID_Controller.m',
@@ -243,36 +271,42 @@ function cleanup_deprecated_files()
         'controllers/WindowsJoystickReader.m'
     };
     
+    logger.debug('Checking for deprecated files...');
+    
     for i = 1:length(deprecated_files)
         if exist(deprecated_files{i}, 'file')
             try
                 delete(deprecated_files{i});
-                fprintf('   Removed: %s\n', deprecated_files{i});
-            catch
-                fprintf('   Could not remove: %s\n', deprecated_files{i});
+                logger.info('Removed deprecated file: %s', deprecated_files{i});
+            catch ME
+                logger.warning('Could not remove deprecated file %s: %s', deprecated_files{i}, ME.message);
             end
         end
     end
 end
 
-function show_usage_instructions()
-    fprintf('Usage Instructions:\n');
-    fprintf('==================\n\n');
+function show_usage_instructions(logger)
+    logger.info('Usage Instructions:');
+    logger.info('==================');
     
-    fprintf('1. Basic Usage:\n');
-    fprintf('   zController = ScanImageZController(hSI.hMotors);\n');
-    fprintf('   controller = MJC3ControllerFactory.createController(zController);\n');
-    fprintf('   controller.start();\n\n');
+    logger.info('1. Basic Usage:');
+    logger.info('   zController = ScanImageZController(hSI.hMotors);');
+    logger.info('   controller = MJC3ControllerFactory.createController(zController);');
+    logger.info('   controller.start();');
     
-    fprintf('2. With UI Integration:\n');
-    fprintf('   hidController = HIDController(uiComponents, zController);\n');
-    fprintf('   hidController.enable();\n\n');
+    logger.info('2. With UI Integration:');
+    logger.info('   hidController = HIDController(uiComponents, zController);');
+    logger.info('   hidController.enable();');
     
-    fprintf('3. Check Available Controllers:\n');
-    fprintf('   MJC3ControllerFactory.listAvailableTypes();\n\n');
+    logger.info('3. Check Available Controllers:');
+    logger.info('   MJC3ControllerFactory.listAvailableTypes();');
     
-    fprintf('4. Test Hardware Connection:\n');
-    fprintf('   data = mjc3_joystick_mex(''read'', 100);\n');
-    fprintf('   info = mjc3_joystick_mex(''info'');\n\n');
+    logger.info('4. Test Hardware Connection:');
+    logger.info('   data = mjc3_joystick_mex(''read'', 100);');
+    logger.info('   info = mjc3_joystick_mex(''info'');');
+    
+    logger.info('5. Calibration:');
+    logger.info('   controller.calibrateAxis(''Z'', 100);');
+    logger.info('   status = controller.getCalibrationStatus();');
 end
 

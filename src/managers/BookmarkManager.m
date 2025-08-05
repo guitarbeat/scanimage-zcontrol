@@ -223,7 +223,8 @@ classdef BookmarkManager < handle
                 obj.MarkedPositions.YPositions = yPos;
                 obj.MarkedPositions.ZPositions = zPos;
                 obj.MarkedPositions.Metrics = metrics;
-                fprintf('BookmarkManager: Loaded %d bookmarks from metadata.\n', numel(labels));
+                % Note: This method doesn't have a logger property, so we'll use FoilviewUtils
+                FoilviewUtils.info('BookmarkManager', 'Loaded %d bookmarks from metadata', numel(labels));
             catch ME
                 FoilviewUtils.logException('BookmarkManager', ME, 'loadBookmarksFromMetadata failed');
             end

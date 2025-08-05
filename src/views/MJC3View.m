@@ -82,11 +82,21 @@ classdef MJC3View < handle
         
         % UI State
         WindowPosition = [300, 300, 400, 600]  % Default window size and position
+        
+        % Logging
+        Logger
+        
+        % Hardware detection cache
+        HardwareDetectionCache = struct('isDetected', false, 'lastCheck', 0, 'cacheTimeout', 5.0)
     end
     
     methods
         function obj = MJC3View()
             % Constructor: Creates the MJC3 control window
+            
+            % Initialize logger
+            obj.Logger = LoggingService('MJC3View', 'SuppressInitMessage', true);
+            
             obj.createUI();
             obj.setupCallbacks();
             obj.initialize();
@@ -94,7 +104,7 @@ classdef MJC3View < handle
         
         function delete(obj)
             % Destructor: Clean up resources
-            fprintf('MJC3View: Cleaning up resources...\n');
+            obj.Logger.info('Cleaning up MJC3 view resources...');
             
             % Stop monitoring timer
             obj.stopMonitoring();
@@ -103,13 +113,13 @@ classdef MJC3View < handle
             if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
                 try
                     if obj.IsEnabled
-                        fprintf('MJC3View: Stopping controller...\n');
+                        obj.Logger.info('Stopping HID controller...');
                         obj.HIDController.stop();
                         obj.IsEnabled = false;
                         obj.IsConnected = false;
                     end
                 catch ME
-                    fprintf('MJC3View: Warning - Error stopping controller: %s\n', ME.message);
+                    obj.Logger.warning('Error stopping HID controller: %s', ME.message);
                 end
             end
             
@@ -118,27 +128,64 @@ classdef MJC3View < handle
                 delete(obj.UIFigure);
             end
             
-            fprintf('MJC3View: Cleanup complete\n');
+            obj.Logger.info('MJC3 view cleanup complete');
         end
         
         function setController(obj, controller)
-            % Set the HID controller reference
-            obj.HIDController = controller;
-            
-            % Display controller type information
-            if ~isempty(controller)
-                controllerType = class(controller);
-                if contains(controllerType, 'MEX')
-                    fprintf('🚀 MJC3View: Using high-performance MEX controller\n');
+            % Set the HID controller reference with robust error handling
+            try
+                % Validate the controller if provided
+                if ~isempty(controller)
+                    if ~isvalid(controller)
+                        obj.Logger.warning('Invalid controller provided - ignoring');
+                        controller = [];
+                    else
+                        % Display controller type information
+                        controllerType = class(controller);
+                        if contains(controllerType, 'MEX')
+                            obj.Logger.info('Using high-performance MEX controller');
+                        else
+                            obj.Logger.info('Using %s controller', controllerType);
+                        end
+                    end
                 else
-                    fprintf('ℹ️  MJC3View: Using %s controller\n', controllerType);
+                    obj.Logger.warning('No controller provided (manual mode)');
                 end
-            else
-                fprintf('⚠️  MJC3View: No controller provided (manual mode)\n');
+                
+                % Set the controller reference
+                obj.HIDController = controller;
+                
+                % Check controller connection status
+                if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
+                    try
+                        % Check if controller reports being connected
+                        if ismethod(obj.HIDController, 'connectToMJC3')
+                            obj.IsConnected = obj.HIDController.connectToMJC3();
+                            obj.Logger.info('Controller connection status: %s', mat2str(obj.IsConnected));
+                        else
+                            % For simulation controllers, assume connected
+                            obj.IsConnected = true;
+                            obj.Logger.info('Simulation controller - assuming connected');
+                        end
+                    catch ME
+                        obj.Logger.warning('Error checking controller connection: %s', ME.message);
+                        obj.IsConnected = false;
+                    end
+                else
+                    obj.IsConnected = false;
+                end
+                
+                % Update UI state
+                obj.updateConnectionStatus();
+                obj.detectHardware(); % Check hardware detection status
+                
+            catch ME
+                obj.Logger.error('Error setting controller: %s', ME.message);
+                % Clear controller reference on error
+                obj.HIDController = [];
+                obj.IsEnabled = false;
+                obj.IsConnected = false;
             end
-            
-            obj.updateConnectionStatus();
-            obj.detectHardware(); % Check hardware detection status
         end
         
         function bringToFront(obj)
@@ -165,6 +212,15 @@ classdef MJC3View < handle
         
         function isDetected = checkHardwareDetection(obj)
             % Check if MJC3 hardware is detected (not necessarily connected)
+            % Uses caching to prevent repeated detection checks and logging
+            
+            % Check cache first
+            currentTime = now;
+            if currentTime - obj.HardwareDetectionCache.lastCheck < obj.HardwareDetectionCache.cacheTimeout / 86400
+                isDetected = obj.HardwareDetectionCache.isDetected;
+                return;
+            end
+            
             isDetected = false;
             
             try
@@ -175,21 +231,44 @@ classdef MJC3View < handle
                     
                     if status == 0 && contains(result, 'VID_1313')
                         isDetected = true;
+                        % Only log if this is a new detection (not cached)
+                        if ~obj.HardwareDetectionCache.isDetected
+                            obj.Logger.info('MJC3 hardware detected via Windows API');
+                        end
+                        % Update cache
+                        obj.HardwareDetectionCache.isDetected = isDetected;
+                        obj.HardwareDetectionCache.lastCheck = currentTime;
                         return;
                     end
                 catch
                     % Windows API failed, continue
+                    obj.Logger.debug('Windows API detection failed, trying alternative method');
                 end
                 
                 % Method 2: Check if controller reports detection
                 if ~isempty(obj.HIDController)
                     % Try the connectToMJC3 method to check detection
                     isDetected = obj.HIDController.connectToMJC3();
+                    if isDetected
+                        % Only log if this is a new detection (not cached)
+                        if ~obj.HardwareDetectionCache.isDetected
+                            obj.Logger.info('MJC3 hardware detected via controller');
+                        end
+                    else
+                        % Only log if this is a new non-detection (not cached)
+                        if obj.HardwareDetectionCache.isDetected
+                            obj.Logger.warning('MJC3 hardware not detected via controller');
+                        end
+                    end
                 end
                 
+                % Update cache
+                obj.HardwareDetectionCache.isDetected = isDetected;
+                obj.HardwareDetectionCache.lastCheck = currentTime;
+                
             catch ME
-                fprintf('Hardware detection check failed: %s\n', ME.message);
-                isDetected = false;
+                obj.Logger.error('Hardware detection check failed: %s', ME.message);
+                % Don't update cache on error, keep previous result
             end
         end
         
@@ -225,15 +304,19 @@ classdef MJC3View < handle
                     obj.StatusLabel.FontColor = [0.8 0.2 0.2];
                 end
             end
+            
+            % Log the current status for debugging
+            obj.Logger.debug('Connection status updated - IsEnabled: %s, IsConnected: %s, HardwareDetected: %s', ...
+                mat2str(obj.IsEnabled), mat2str(obj.IsConnected), mat2str(obj.checkHardwareDetection()));
         end
         
         function detectHardware(obj)
             % Detect MJC3 hardware and update status
             isDetected = obj.checkHardwareDetection();
             if isDetected
-                fprintf('MJC3 hardware detected\n');
+                obj.Logger.info('MJC3 hardware detected');
             else
-                fprintf('MJC3 hardware not detected\n');
+                obj.Logger.info('MJC3 hardware not detected');
             end
             obj.updateConnectionStatus();
         end
@@ -725,42 +808,96 @@ classdef MJC3View < handle
         end
         
         function startMonitoring(obj)
-            % Start real-time monitoring timer
-            if isempty(obj.UpdateTimer) || ~isvalid(obj.UpdateTimer)
-                obj.UpdateTimer = timer(...
-                    'ExecutionMode', 'fixedRate', ...
-                    'Period', 0.1, ...  % Update at 10 Hz
-                    'TimerFcn', @(~,~) obj.updateDisplay());
-                start(obj.UpdateTimer);
+            % Start real-time monitoring timer with robust error handling
+            try
+                % Stop any existing timer first
+                obj.stopMonitoring();
+                
+                % Validate objects before starting timer
+                if ~obj.validateObjects()
+                    obj.Logger.warning('Cannot start monitoring - objects not valid');
+                    return;
+                end
+                
+                if isempty(obj.UpdateTimer) || ~isvalid(obj.UpdateTimer)
+                    obj.UpdateTimer = timer(...
+                        'ExecutionMode', 'fixedRate', ...
+                        'Period', 0.1, ...  % Update at 10 Hz
+                        'TimerFcn', @(~,~) obj.updateDisplay());
+                    start(obj.UpdateTimer);
+                    obj.Logger.info('Monitoring timer started');
+                end
+            catch ME
+                obj.Logger.error('Failed to start monitoring timer: %s', ME.message);
+                % Clean up any partially created timer
+                if ~isempty(obj.UpdateTimer) && isvalid(obj.UpdateTimer)
+                    try
+                        stop(obj.UpdateTimer);
+                        delete(obj.UpdateTimer);
+                    catch
+                        % Ignore cleanup errors
+                    end
+                    obj.UpdateTimer = [];
+                end
             end
         end
         
         function stopMonitoring(obj)
-            % Stop monitoring timer
-            if ~isempty(obj.UpdateTimer) && isvalid(obj.UpdateTimer)
-                stop(obj.UpdateTimer);
-                delete(obj.UpdateTimer);
+            % Stop monitoring timer with robust error handling
+            try
+                if ~isempty(obj.UpdateTimer) && isvalid(obj.UpdateTimer)
+                    stop(obj.UpdateTimer);
+                    delete(obj.UpdateTimer);
+                    obj.UpdateTimer = [];
+                    obj.Logger.info('Monitoring timer stopped');
+                end
+            catch ME
+                obj.Logger.error('Error stopping monitoring timer: %s', ME.message);
+                % Force cleanup even if there's an error
+                try
+                    if ~isempty(obj.UpdateTimer)
+                        delete(obj.UpdateTimer);
+                    end
+                catch
+                    % Ignore cleanup errors
+                end
                 obj.UpdateTimer = [];
             end
         end
         
         function updateDisplay(obj)
-            % Update real-time display elements
-            if ~isempty(obj.HIDController) && obj.IsEnabled
-                % This would be called by the timer to update displays
-                % Implementation depends on how you want to interface with the controller
-                obj.updateAnalogControls();
+            % Update real-time display elements with robust error handling
+            try
+                % Validate all objects before proceeding
+                if ~obj.validateObjects()
+                    return;
+                end
+                
+                if ~isempty(obj.HIDController) && obj.IsEnabled
+                    % This would be called by the timer to update displays
+                    % Implementation depends on how you want to interface with the controller
+                    obj.updateAnalogControls();
+                end
+            catch ME
+                % Log error and stop monitoring to prevent repeated crashes
+                obj.Logger.error('Error in updateDisplay: %s', ME.message);
+                obj.stopMonitoring();
             end
         end
         
         function updateAnalogControls(obj)
             % Update analog control displays with real joystick data and calibration
-            if isempty(obj.HIDController) || ~obj.IsEnabled
-                return;
-            end
-            
-            % Try to get real joystick data if MEX controller is available
             try
+                % Validate objects before proceeding
+                if ~obj.validateObjects()
+                    return;
+                end
+                
+                if isempty(obj.HIDController) || ~obj.IsEnabled
+                    return;
+                end
+                
+                % Try to get real joystick data if MEX controller is available
                 if isa(obj.HIDController, 'MJC3_MEX_Controller')
                     % Get real-time joystick data from MEX controller
                     data = obj.HIDController.readJoystick();
@@ -777,7 +914,7 @@ classdef MJC3View < handle
                             calibratedZ = obj.HIDController.CalibrationService.applyCalibration('Z', zPos);
                             
                             % Update displays with calibrated values (-1.0 to 1.0)
-                            if ~isempty(obj.XValueDisplay)
+                            if ~isempty(obj.XValueDisplay) && isvalid(obj.XValueDisplay)
                                 obj.XValueDisplay.Text = sprintf('%.2f', calibratedX);
                                 % Color code based on activity
                                 if abs(calibratedX) > 0.01
@@ -787,7 +924,7 @@ classdef MJC3View < handle
                                 end
                             end
                             
-                            if ~isempty(obj.YValueDisplay)
+                            if ~isempty(obj.YValueDisplay) && isvalid(obj.YValueDisplay)
                                 obj.YValueDisplay.Text = sprintf('%.2f', calibratedY);
                                 % Color code based on activity
                                 if abs(calibratedY) > 0.01
@@ -797,7 +934,7 @@ classdef MJC3View < handle
                                 end
                             end
                             
-                            if ~isempty(obj.ZValueDisplay)
+                            if ~isempty(obj.ZValueDisplay) && isvalid(obj.ZValueDisplay)
                                 obj.ZValueDisplay.Text = sprintf('%.2f', calibratedZ);
                                 % Color code based on activity
                                 if abs(calibratedZ) > 0.01
@@ -808,15 +945,15 @@ classdef MJC3View < handle
                             end
                         else
                             % Fallback to raw values if no calibration service
-                            if ~isempty(obj.XValueDisplay)
+                            if ~isempty(obj.XValueDisplay) && isvalid(obj.XValueDisplay)
                                 obj.XValueDisplay.Text = sprintf('%d', xPos);
                                 obj.XValueDisplay.FontColor = [0.2 0.6 0.8];
                             end
-                            if ~isempty(obj.YValueDisplay)
+                            if ~isempty(obj.YValueDisplay) && isvalid(obj.YValueDisplay)
                                 obj.YValueDisplay.Text = sprintf('%d', yPos);
                                 obj.YValueDisplay.FontColor = [0.2 0.6 0.8];
                             end
-                            if ~isempty(obj.ZValueDisplay)
+                            if ~isempty(obj.ZValueDisplay) && isvalid(obj.ZValueDisplay)
                                 obj.ZValueDisplay.Text = sprintf('%d', zPos);
                                 obj.ZValueDisplay.FontColor = [0.2 0.6 0.8];
                             end
@@ -827,21 +964,63 @@ classdef MJC3View < handle
                 end
             catch ME
                 % Log error and fall back to placeholder
-                fprintf('Error updating analog controls: %s\n', ME.message);
+                obj.Logger.error('Error updating analog controls: %s', ME.message);
             end
             
             % Placeholder implementation for non-MEX controllers or errors
-            if ~isempty(obj.XValueDisplay)
-                obj.XValueDisplay.Text = '0';
-                obj.XValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
+            try
+                if ~isempty(obj.XValueDisplay) && isvalid(obj.XValueDisplay)
+                    obj.XValueDisplay.Text = '0';
+                    obj.XValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
+                end
+                if ~isempty(obj.YValueDisplay) && isvalid(obj.YValueDisplay)
+                    obj.YValueDisplay.Text = '0';
+                    obj.YValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
+                end
+                if ~isempty(obj.ZValueDisplay) && isvalid(obj.ZValueDisplay)
+                    obj.ZValueDisplay.Text = '0';
+                    obj.ZValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
+                end
+            catch ME
+                obj.Logger.error('Error setting placeholder values: %s', ME.message);
             end
-            if ~isempty(obj.YValueDisplay)
-                obj.YValueDisplay.Text = '0';
-                obj.YValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
-            end
-            if ~isempty(obj.ZValueDisplay)
-                obj.ZValueDisplay.Text = '0';
-                obj.ZValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
+        end
+        
+        function isValid = validateObjects(obj)
+            % Validate that all critical objects are still valid
+            isValid = true;
+            
+            try
+                % Check if the main UI figure is valid
+                if isempty(obj.UIFigure) || ~isvalid(obj.UIFigure)
+                    obj.Logger.warning('UIFigure is invalid or deleted');
+                    isValid = false;
+                    return;
+                end
+                
+                % Check if the controller is valid (if it exists)
+                if ~isempty(obj.HIDController) && ~isvalid(obj.HIDController)
+                    obj.Logger.warning('HIDController is invalid or deleted');
+                    obj.HIDController = []; % Clear invalid reference
+                    obj.IsEnabled = false;
+                    obj.IsConnected = false;
+                    isValid = false;
+                    return;
+                end
+                
+                % Check if critical UI components are valid
+                criticalComponents = {obj.EnableButton, obj.StatusLabel, obj.ConnectionStatus};
+                for i = 1:length(criticalComponents)
+                    if ~isempty(criticalComponents{i}) && ~isvalid(criticalComponents{i})
+                        obj.Logger.warning('Critical UI component %d is invalid', i);
+                        isValid = false;
+                        return;
+                    end
+                end
+                
+            catch ME
+                obj.Logger.error('Error validating objects: %s', ME.message);
+                isValid = false;
             end
         end
         
@@ -904,7 +1083,7 @@ classdef MJC3View < handle
                 end
                 
             catch ME
-                fprintf('Calibration failed for %s: %s\n', axisName, ME.message);
+                obj.Logger.error('Calibration failed for %s: %s', axisName, ME.message);
                 uialert(obj.UIFigure, sprintf('Calibration failed: %s', ME.message), ...
                     'Calibration Error', 'Icon', 'error');
             end
@@ -912,48 +1091,70 @@ classdef MJC3View < handle
         
         % Callback Methods
         function onEnableButtonPushed(obj)
-            % Toggle enable/disable state with detailed status feedback
-            
-            if ~obj.IsEnabled
-                % Trying to enable - check hardware first
-                if isempty(obj.HIDController)
-                    uialert(obj.UIFigure, 'No controller available. Please check hardware connection.', 'No Controller');
+            % Toggle enable/disable state with detailed status feedback and robust error handling
+            try
+                % Validate objects before proceeding
+                if ~obj.validateObjects()
+                    obj.Logger.warning('Cannot toggle enable state - objects not valid');
                     return;
                 end
                 
-                % Check if hardware is detected
-                isDetected = obj.checkHardwareDetection();
-                if ~isDetected
-                    uialert(obj.UIFigure, 'MJC3 hardware not detected. Please check USB connection and try again.', 'Hardware Not Found');
-                    return;
-                end
-                
-                % Try to start the controller
-                try
-                    obj.HIDController.start();
-                    obj.IsEnabled = true;
-                    obj.IsConnected = true;
-                    fprintf('MJC3 controller enabled and active\n');
-                catch ME
+                if ~obj.IsEnabled
+                    % Trying to enable - check hardware first
+                    if isempty(obj.HIDController)
+                        uialert(obj.UIFigure, 'No controller available. Please check hardware connection.', 'No Controller');
+                        return;
+                    end
+                    
+                    % Validate controller is still valid
+                    if ~isvalid(obj.HIDController)
+                        obj.Logger.warning('Controller is no longer valid');
+                        obj.HIDController = [];
+                        uialert(obj.UIFigure, 'Controller is no longer valid. Please restart the application.', 'Invalid Controller');
+                        return;
+                    end
+                    
+                    % Check if hardware is detected
+                    isDetected = obj.checkHardwareDetection();
+                    if ~isDetected
+                        uialert(obj.UIFigure, 'MJC3 hardware not detected. Please check USB connection and try again.', 'Hardware Not Found');
+                        return;
+                    end
+                    
+                    % Try to start the controller
+                    try
+                        obj.HIDController.start();
+                        obj.IsEnabled = true;
+                        obj.IsConnected = true;
+                        obj.Logger.info('MJC3 controller enabled and active');
+                    catch ME
+                        obj.IsEnabled = false;
+                        obj.IsConnected = false;
+                        uialert(obj.UIFigure, sprintf('Failed to start controller: %s\n\nHardware detected but connection failed. Try:\n• Reconnecting USB cable\n• Restarting application\n• Checking device permissions', ME.message), 'Connection Failed');
+                    end
+                else
+                    % Disabling controller
+                    if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
+                        try
+                            obj.HIDController.stop();
+                            obj.Logger.info('MJC3 controller disabled');
+                        catch ME
+                            obj.Logger.warning('Error stopping controller: %s', ME.message);
+                        end
+                    end
                     obj.IsEnabled = false;
                     obj.IsConnected = false;
-                    uialert(obj.UIFigure, sprintf('Failed to start controller: %s\n\nHardware detected but connection failed. Try:\n• Reconnecting USB cable\n• Restarting application\n• Checking device permissions', ME.message), 'Connection Failed');
                 end
-            else
-                % Disabling controller
-                if ~isempty(obj.HIDController)
-                    try
-                        obj.HIDController.stop();
-                        fprintf('MJC3 controller disabled\n');
-                    catch ME
-                        fprintf('Warning: Error stopping controller: %s\n', ME.message);
-                    end
-                end
+                
+                obj.updateUI();
+                
+            catch ME
+                obj.Logger.error('Error in enable/disable toggle: %s', ME.message);
+                % Reset to safe state
                 obj.IsEnabled = false;
                 obj.IsConnected = false;
+                obj.updateUI();
             end
-            
-            obj.updateUI();
         end
         
         function onStepFactorChanged(obj)
@@ -965,7 +1166,7 @@ classdef MJC3View < handle
         
         function onDetectButtonPushed(obj)
             % Manual hardware detection with detailed feedback
-            fprintf('Scanning for MJC3 hardware...\n');
+            obj.Logger.info('Scanning for MJC3 hardware...');
             
             % Show scanning status
             originalText = obj.ConnectionStatus.Text;
@@ -987,7 +1188,7 @@ classdef MJC3View < handle
                     'Status: Ready for connection\n' ...
                     'Click "Enable" to start using the joystick.']);
                 iconType = 'success';
-                fprintf('✅ MJC3 hardware detected successfully\n');
+                obj.Logger.info('✅ MJC3 hardware detected successfully');
             else
                 statusMsg = sprintf(['❌ MJC3 Hardware Not Found\n\n' ...
                     'Troubleshooting:\n' ...
@@ -998,7 +1199,7 @@ classdef MJC3View < handle
                     '• Restart the application\n\n' ...
                     'Looking for: Thorlabs MJC3 (VID: 0x1313, PID: 0x9000)']);
                 iconType = 'warning';
-                fprintf('❌ MJC3 hardware not detected\n');
+                obj.Logger.info('❌ MJC3 hardware not detected');
             end
             
             % Update status and show dialog
@@ -1008,33 +1209,34 @@ classdef MJC3View < handle
         
         function onWindowClose(obj)
             % Handle window close event - ensure proper cleanup
-            fprintf('MJC3View: Window close requested...\n');
+            obj.Logger.info('MJC3View: Window close requested...');
             
             % Stop the controller if it's running
             if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
                 try
                     if obj.IsEnabled
-                        fprintf('MJC3View: Stopping controller before close...\n');
+                        obj.Logger.info('MJC3View: Stopping controller before close...');
                         obj.HIDController.stop();
                         obj.IsEnabled = false;
                         obj.IsConnected = false;
                     end
                 catch ME
-                    fprintf('MJC3View: Warning - Error stopping controller: %s\n', ME.message);
+                    obj.Logger.warning('MJC3View: Warning - Error stopping controller: %s', ME.message);
                 end
             end
             
             % Delete the object (which will trigger the delete method)
+            obj.Logger.info('MJC3View: Deleting view object...');
             delete(obj);
         end
         
         function createNewMapping(obj)
             % Create new mapping file
             try
-                fprintf('Creating new mapping file...\n');
+                obj.Logger.info('Creating new mapping file...');
                 uialert(obj.UIFigure, 'New mapping file created successfully.', 'Mapping', 'Icon', 'success');
             catch ME
-                fprintf('Failed to create new mapping: %s\n', ME.message);
+                obj.Logger.error('Failed to create new mapping: %s', ME.message);
                 uialert(obj.UIFigure, 'Failed to create new mapping file.', 'Error', 'Icon', 'error');
             end
         end
@@ -1042,10 +1244,10 @@ classdef MJC3View < handle
         function saveMapping(obj)
             % Save current mapping
             try
-                fprintf('Saving current mapping...\n');
+                obj.Logger.info('Saving current mapping...');
                 uialert(obj.UIFigure, 'Mapping saved successfully.', 'Mapping', 'Icon', 'success');
             catch ME
-                fprintf('Failed to save mapping: %s\n', ME.message);
+                obj.Logger.error('Failed to save mapping: %s', ME.message);
                 uialert(obj.UIFigure, 'Failed to save mapping.', 'Error', 'Icon', 'error');
             end
         end
@@ -1053,10 +1255,10 @@ classdef MJC3View < handle
         function removeMapping(obj)
             % Remove current mapping
             try
-                fprintf('Removing current mapping...\n');
+                obj.Logger.info('Removing current mapping...');
                 uialert(obj.UIFigure, 'Mapping removed successfully.', 'Mapping', 'Icon', 'success');
             catch ME
-                fprintf('Failed to remove mapping: %s\n', ME.message);
+                obj.Logger.error('Failed to remove mapping: %s', ME.message);
                 uialert(obj.UIFigure, 'Failed to remove mapping.', 'Error', 'Icon', 'error');
             end
         end

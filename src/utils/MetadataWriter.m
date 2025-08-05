@@ -56,7 +56,8 @@ classdef MetadataWriter
                 metadataStr = MetadataWriter.formatMetadataString(metadata, bookmarkFields);
                 
                 if verbose
-                    fprintf('Writing to file: %s\n', filePath);
+                    % Note: This is a static method, so we'll use FoilviewUtils
+                    FoilviewUtils.info('MetadataWriter', 'Writing to file: %s', filePath);
                 end
                 
                 % Write to file with error handling

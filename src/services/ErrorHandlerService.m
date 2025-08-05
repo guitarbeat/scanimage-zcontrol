@@ -185,7 +185,7 @@ classdef ErrorHandlerService < handle
             %   level - Severity level (CRITICAL, ERROR, WARNING, INFO, DEBUG)
             %   message - Message to log
             
-            timestamp = datestr(now, 'yyyy-mm-dd HH:MM:SS');
+            timestamp = datestr(now, 'HH:MM:SS');
             logEntry = sprintf('[%s] %s: %s', timestamp, level, message);
             
             % Always output to console for immediate feedback

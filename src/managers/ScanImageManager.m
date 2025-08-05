@@ -60,6 +60,10 @@ classdef ScanImageManager < handle
         LastConnectionAttempt
         RetryCount = 0
         ZStepSize = NaN % * Caches the last known Z step size for bidirectional sync
+        Logger
+        
+        % Warning cache to prevent duplicate messages
+        WarningCache = struct('simulationModeWarned', false)
     end
     
     properties (Constant)
@@ -73,10 +77,17 @@ classdef ScanImageManager < handle
     
     methods (Access = public)
         function obj = ScanImageManager()
-            % Constructor - Initialize the ScanImage manager
-            obj.LastFrameTime = [];
-            obj.MetadataFile = [];
+            % Constructor - initialize ScanImage manager
             obj.HSI = [];
+            obj.MetadataFile = [];
+            obj.SimulationMode = true;
+            obj.IsInitialized = false;
+            
+            % Initialize logger (suppress init message to avoid duplicate logging)
+            obj.Logger = LoggingService('ScanImageManager', 'SuppressInitMessage', true);
+            
+            % * Defer connection attempt to improve loading performance
+            % Connection will be attempted when initialize() is called
         end
         
         function delete(obj)
@@ -90,33 +101,8 @@ classdef ScanImageManager < handle
                 obj.FoilviewApp = foilviewApp;
             end
             
-            try
-                % Check if ScanImage is available
-                if evalin('base', 'exist(''hSI'', ''var'')')
-                    obj.HSI = evalin('base', 'hSI');
-                    obj.SimulationMode = false;
-                    obj.IsInitialized = true;
-                    fprintf('ScanImageManager: Connected to ScanImage\n');
-                else
-                    error('hSI variable not found in base workspace');
-                end
-                
-                % Try to get metadata file path, but don't fail if it doesn't exist
-                try
-                    obj.MetadataFile = evalin('base', 'metadataFilePath');
-                catch
-                    obj.MetadataFile = [];
-                end
-                
-                % Note: Event listeners for frameAcquired and acqDone are not set up
-                % as these events may not be available in all ScanImage versions
-                % The application will still function without automatic metadata logging
-            catch ME
-                FoilviewUtils.logException('ScanImageManager', ME, 'Initialization failed');
-                obj.SimulationMode = true;
-                obj.IsInitialized = false;
-                fprintf('ScanImageManager: ScanImage not available - entering simulation mode\n');
-            end
+            % * Use the connect method to establish connection
+            [success, message] = obj.connect();
         end
         
         function cleanup(obj)
@@ -137,8 +123,6 @@ classdef ScanImageManager < handle
             % Returns success status and message for compatibility with FoilviewController
             
             try
-                fprintf('ScanImageManager: Attempting to connect to ScanImage...\n');
-                
                 % Try to get ScanImage handle - check if it exists first
                 try
                     if evalin('base', 'exist(''hSI'', ''var'')')
@@ -149,7 +133,11 @@ classdef ScanImageManager < handle
                         message = 'ScanImage not available - entering simulation mode';
                         obj.SimulationMode = true;
                         obj.IsInitialized = false;
-                        fprintf('ScanImageManager: %s\n', message);
+                        % Only log warning once to prevent duplicates
+                        if ~obj.WarningCache.simulationModeWarned
+                            obj.Logger.warning('ScanImageManager: %s', message);
+                            obj.WarningCache.simulationModeWarned = true;
+                        end
                         return;
                     end
                 catch
@@ -158,14 +146,18 @@ classdef ScanImageManager < handle
                     message = 'ScanImage not available - entering simulation mode';
                     obj.SimulationMode = true;
                     obj.IsInitialized = false;
-                    fprintf('ScanImageManager: %s\n', message);
+                    % Only log warning once to prevent duplicates
+                    if ~obj.WarningCache.simulationModeWarned
+                        obj.Logger.warning('ScanImageManager: %s', message);
+                        obj.WarningCache.simulationModeWarned = true;
+                    end
                     return;
                 end
                 
                 if isempty(obj.HSI)
                     success = false;
                     message = 'ScanImage not running';
-                    fprintf('ScanImageManager: %s\n', message);
+                    obj.Logger.warning('ScanImageManager: %s', message);
                     return;
                 end
                 
@@ -173,7 +165,7 @@ classdef ScanImageManager < handle
                 if ~isobject(obj.HSI) || ~isprop(obj.HSI, 'hScan2D')
                     success = false;
                     message = 'Invalid ScanImage handle';
-                    fprintf('ScanImageManager: %s\n', message);
+                    obj.Logger.warning('ScanImageManager: %s', message);
                     return;
                 end
                 
@@ -189,14 +181,14 @@ classdef ScanImageManager < handle
                 obj.SimulationMode = false;
                 obj.IsInitialized = true;
                 
-                fprintf('ScanImageManager: Successfully connected to ScanImage\n');
+                obj.Logger.info('ScanImageManager: Successfully connected to ScanImage');
                 
             catch ME
                 success = false;
                 message = sprintf('Connection failed: %s', ME.message);
                 obj.SimulationMode = true;
                 obj.IsInitialized = false;
-                fprintf('ScanImageManager: %s\n', message);
+                obj.Logger.error('ScanImageManager: %s', message);
             end
         end
         
@@ -557,9 +549,9 @@ classdef ScanImageManager < handle
                     currentPos = obj.getCurrentPosition(axisName);
                     newPosition = currentPos + microns;
                     if strcmpi(axisName, 'Z')
-                        fprintf('[Sim] Z: %+0.2f μm → %0.2f μm\n', microns, newPosition);
+                        obj.Logger.info('[Sim] Z: %+0.2f μm → %0.2f μm', microns, newPosition);
                     else
-                        fprintf('[Sim] %s: %+0.2f μm → %0.2f μm\n', axisName, microns, newPosition);
+                        obj.Logger.info('[Sim] %s: %+0.2f μm → %0.2f μm', axisName, microns, newPosition);
                     end
                     return;
                 end
@@ -576,7 +568,7 @@ classdef ScanImageManager < handle
                 end
                 
                 if obj.checkMotorErrorState(motorFig, axisName)
-                    fprintf('ScanImageManager: Attempting to clear motor error for %s axis\n', axisName);
+                    obj.Logger.warning('Attempting to clear motor error for %s axis', axisName);
                     obj.clearMotorError(motorFig, axisName);
                     pause(0.5); % Wait for error to clear
                     
@@ -603,7 +595,7 @@ classdef ScanImageManager < handle
                     % If the requested step is different from GUI, update GUI and cache
                     if isnan(guiZStep) || abs(guiZStep - requestedStep) > eps
                         obj.setZStepSizeInGUI(requestedStep);
-                        fprintf('ScanImageManager: Synced Z step size to %.2f μm\n', requestedStep);
+                        obj.Logger.info('Synced Z step size to %.2f μm', requestedStep);
                     else
                         obj.ZStepSize = guiZStep; % Keep cache updated
                     end
@@ -640,7 +632,7 @@ classdef ScanImageManager < handle
                 if isprop(buttonToPress, 'Callback') && ~isempty(buttonToPress.Callback)
                     try
                         buttonToPress.Callback(buttonToPress, []);
-                        fprintf('ScanImageManager: Triggered %s movement of %.1f μm\n', axisName, microns);
+                        obj.Logger.info('Triggered %s movement of %.1f μm', axisName, microns);
                     catch ME
                         if contains(ME.message, 'error state')
                             error('Motor is in error state. Please clear the error in ScanImage Motor Controls before attempting movement.');
@@ -659,7 +651,7 @@ classdef ScanImageManager < handle
                     newPosition = obj.getCurrentPosition(axisName);
                 end
                 
-                fprintf('ScanImageManager: %s stage moved %.1f μm from %.1f to %.1f μm\n', axisName, microns, currentPos, newPosition);
+                obj.Logger.info('%s stage moved %.1f μm from %.1f to %.1f μm', axisName, microns, currentPos, newPosition);
                 
             catch ME
                 errorMsg = sprintf('Movement error for %s axis: %s', axisName, ME.message);
@@ -715,7 +707,7 @@ classdef ScanImageManager < handle
                 if ~isempty(goButton) && isprop(goButton, 'Callback') && ~isempty(goButton.Callback)
                     try
                         goButton.Callback(goButton, []);
-                        fprintf('ScanImageManager: Triggered %s axis move to %.2f μm\n', axisName, value);
+                        obj.Logger.info('Triggered %s axis move to %.2f μm', axisName, value);
                     catch ME
                         FoilviewUtils.logException('ScanImageManager', ME, sprintf('Error triggering %s axis move', axisName));
                     end
@@ -770,7 +762,7 @@ classdef ScanImageManager < handle
                 
                 if ~isempty(pixelData)
                     sz = size(pixelData);
-                    fprintf('Image acquired: %s\n', mat2str(sz));
+                    obj.Logger.info('Image acquired: %s', mat2str(sz));
                 end
             catch ME
                 FoilviewUtils.logException('ScanImageManager', ME, 'getImageData failed');
@@ -831,7 +823,7 @@ classdef ScanImageManager < handle
                 errorIndicators = findall(motorFig, 'Style', 'text', 'String', '*Error*');
                 if ~isempty(errorIndicators)
                     isError = true;
-                    fprintf('ScanImageManager: Motor error detected in %s axis\n', axisName);
+                    obj.Logger.warning('Motor error detected in %s axis', axisName);
                     return;
                 end
                 
@@ -839,13 +831,13 @@ classdef ScanImageManager < handle
                 axisInfo = obj.getAxisInfo(motorFig, axisName);
                 if ~isempty(axisInfo.inc) && isprop(axisInfo.inc, 'Enable') && strcmp(axisInfo.inc.Enable, 'off')
                     isError = true;
-                    fprintf('ScanImageManager: Motor buttons disabled for %s axis\n', axisName);
+                    obj.Logger.warning('Motor buttons disabled for %s axis', axisName);
                     return;
                 end
                 
                 if ~isempty(axisInfo.dec) && isprop(axisInfo.dec, 'Enable') && strcmp(axisInfo.dec.Enable, 'off')
                     isError = true;
-                    fprintf('ScanImageManager: Motor buttons disabled for %s axis\n', axisName);
+                    obj.Logger.warning('Motor buttons disabled for %s axis', axisName);
                     return;
                 end
                 
@@ -864,7 +856,7 @@ classdef ScanImageManager < handle
                     for i = 1:length(clearButtons)
                         if isprop(clearButtons(i), 'Callback') && ~isempty(clearButtons(i).Callback)
                             clearButtons(i).Callback(clearButtons(i), []);
-                            fprintf('ScanImageManager: Attempted to clear motor error for %s axis\n', axisName);
+                            obj.Logger.info('Attempted to clear motor error for %s axis', axisName);
                             pause(0.5); % Give time for error to clear
                             return;
                         end
@@ -877,14 +869,14 @@ classdef ScanImageManager < handle
                     for i = 1:length(resetButtons)
                         if isprop(resetButtons(i), 'Callback') && ~isempty(resetButtons(i).Callback)
                             resetButtons(i).Callback(resetButtons(i), []);
-                            fprintf('ScanImageManager: Attempted to reset motor for %s axis\n', axisName);
+                            obj.Logger.info('Attempted to reset motor for %s axis', axisName);
                             pause(0.5); % Give time for reset
                             return;
                         end
                     end
                 end
                 
-                fprintf('ScanImageManager: No clear/reset buttons found for %s axis\n', axisName);
+                obj.Logger.warning('No clear/reset buttons found for %s axis', axisName);
                 
             catch ME
                 FoilviewUtils.logException('ScanImageManager', ME, 'Error clearing motor error');

@@ -1,22 +1,22 @@
 %==============================================================================
-% UIBUILDER.M
+% UiBuilder - Static UI Construction and Layout
 %==============================================================================
-% UI component builder utility for Foilview application.
 %
-% This class provides static methods to construct and configure UI components
-% for the Foilview application, supporting modular and reusable UI layouts.
-% It abstracts the complexity of MATLAB App Designer UI creation and enables
-% rapid prototyping and consistent UI design.
+% Purpose:
+%   Provides static UI construction and layout setup for the FoilView application.
+%   This class is responsible for creating the initial UI structure and component
+%   hierarchy, while UiComponents handles styling and runtime management.
 %
 % Key Features:
-%   - Modular UI component construction
-%   - Layout management for panels, grids, and tabs
-%   - Style and property configuration helpers
-%   - Support for custom and standard UI elements
+%   - One-time UI construction and layout setup
+%   - Component hierarchy and positioning
+%   - Grid layouts and component relationships
 %   - Integration with controller and service layers
+%   - Support for custom and standard UI elements
 %
 % Dependencies:
 %   - MATLAB App Designer: UI components
+%   - UiComponents: UI styling and constants
 %   - FoilviewUtils: UI style constants
 %
 % Author: Aaron W. (alw4834)
@@ -73,11 +73,13 @@ classdef UiBuilder
     % - Status and utility components
     % - Plot area and expansion controls
 
-
-
     methods (Static)
         function components = build()
             % Static entry point to construct and return all UI components as a struct.
+            % 
+            % Returns:
+            %   components: Struct containing all UI components organized by category
+            
             components = struct();
 
             % Create main window structure
@@ -112,29 +114,6 @@ classdef UiBuilder
             components.StatusControls.MJC3Button = components.ToolsWindow.MJC3Button;
             components.StatusControls.RefreshButton = components.ToolsWindow.RefreshButton;
             components.StatusControls.MetadataButton = components.ToolsWindow.MetadataButton;
-            
-            % Create dummy labels for compatibility (not in main layout)
-            dummyFigure = uifigure('Visible', 'off');
-            components.StatusControls.Label = uilabel(dummyFigure);
-            components.StatusControls.Label.Visible = 'off';
-            
-            % Create a dummy ShowPlotButton for compatibility (not in main layout)
-            dummyPanel = uipanel(dummyFigure);
-            dummyPanel.Visible = 'off';
-            components.StatusControls.ShowPlotButton = UiBuilder.createShowPlotButton(dummyPanel);
-            components.StatusControls.ShowPlotButton.Visible = 'off';
-            
-            % HIDControls compatibility
-            components.HIDControls = struct('MJC3Button', components.StatusControls.MJC3Button);
-
-            % Set up main window resize callback to update tools window position
-            components.UIFigure.SizeChangedFcn = @(src,~) UiBuilder.onMainWindowResize(src, components.ToolsWindow);
-            
-            % Keep the main window hidden initially
-            components.UIFigure.Visible = 'off';
-            
-            % Show only the tools window initially
-            components.ToolsWindow.show();
         end
     end
 

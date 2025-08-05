@@ -107,7 +107,7 @@ classdef FoilviewUtils < handle
             end
             
             % Create timestamp
-            timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss.SSS'));
+            timestamp = char(datetime('now', 'Format', 'HH:mm:ss'));
             
             % Create log entry
             levelName = FoilviewUtils.LOG_LEVEL_NAMES{level + 1};

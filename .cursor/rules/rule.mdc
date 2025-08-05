@@ -1,0 +1,131 @@
+---
+alwaysApply: true
+---
+
+# Prompt Optimization Rules
+
+## Core Issues to Check
+
+### 1. Contradictions
+- Two clauses that cannot both be followed
+- Examples: "Only positive numbers" + "Include negatives"
+
+### 2. Format Issues  
+- Missing output specifications
+- Unclear data types/structures
+- Incomplete templates
+
+### 3. Few-Shot Inconsistencies
+- Examples don't follow prompt rules
+- Models learn from examples over rules
+
+## How to Use with AI Assistants
+
+### Request Templates
+```
+"Check this prompt for:
+1. Contradictions
+2. Format issues  
+3. Missing specs
+4. Ambiguous instructions"
+
+"Optimize this prompt by:
+1. Identify issues
+2. Provide improved version
+3. Explain changes"
+```
+
+### Complete Template
+```
+Please optimize this prompt:
+
+**Original:** [prompt]
+**Use Case:** [purpose]
+**Examples:** [if any]
+**Concerns:** [worries]
+
+Please:
+1. Identify issues
+2. Provide improved version
+3. Explain changes
+4. Validate fixes
+```
+
+## Best Practices
+
+1. **Be Specific**: Define exact requirements
+2. **Be Consistent**: All parts work together
+3. **Be Complete**: Include all specs
+4. **Be Clear**: Avoid ambiguity
+5. **Be Tested**: Validate with examples
+
+## Common Fixes
+
+- **Contradictions**: Choose one approach consistently
+- **Format Issues**: Define complete schema with types
+- **Inconsistencies**: Update examples to match rules
+
+Reference: [OpenAI Cookbook](https://cookbook.openai.com/examples/optimize_prompts#4-run-optimization-workflow) # Prompt Optimization Rules
+
+## Core Issues to Check
+
+### 1. Contradictions
+- Two clauses that cannot both be followed
+- Examples: "Only positive numbers" + "Include negatives"
+
+### 2. Format Issues  
+- Missing output specifications
+- Unclear data types/structures
+- Incomplete templates
+
+### 3. Few-Shot Inconsistencies
+- Examples don't follow prompt rules
+- Models learn from examples over rules
+
+## How to Use with AI Assistants
+
+### Request Templates
+```
+"Check this prompt for:
+1. Contradictions
+2. Format issues  
+3. Missing specs
+4. Ambiguous instructions"
+
+"Optimize this prompt by:
+1. Identify issues
+2. Provide improved version
+3. Explain changes"
+```
+
+### Complete Template
+```
+Please optimize this prompt:
+
+**Original:** [prompt]
+**Use Case:** [purpose]
+**Examples:** [if any]
+**Concerns:** [worries]
+
+Please:
+1. Identify issues
+2. Provide improved version
+3. Explain changes
+4. Validate fixes
+```
+
+## Best Practices
+
+1. **Be Specific**: Define exact requirements
+2. **Be Consistent**: All parts work together
+3. **Be Complete**: Include all specs
+4. **Be Clear**: Avoid ambiguity
+5. **Be Tested**: Validate with examples
+
+## Common Fixes
+
+- **Contradictions**: Choose one approach consistently
+- **Format Issues**: Define complete schema with types
+- **Inconsistencies**: Update examples to match rules
+
+Reference: [OpenAI Cookbook](https://cookbook.openai.com/examples/optimize_prompts#4-run-optimization-workflow) 

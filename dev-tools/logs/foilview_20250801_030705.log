@@ -1,0 +1,5 @@
+[2025-08-01 03:07:05] INFO: ErrorHandlerService initialized successfully
+[2025-08-01 03:07:05] DEBUG: Generated user message for Test: ScanImage is not available. The application will run in simulation mode.
+[2025-08-01 03:07:05] DEBUG: Generated user message for Test: There was a problem creating the user interface. Please restart the application.
+[2025-08-01 03:07:05] DEBUG: Generated user message for Test: Connection timed out. Please check that ScanImage is running and try again.
+[2025-08-01 03:07:05] DEBUG: Generated user message for Test: The application is running low on memory. Please close other applications and try again.

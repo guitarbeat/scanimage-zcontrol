@@ -83,41 +83,7 @@ classdef CalibrationService < handle
             obj.Logger.info('Calibration service initialized');
         end
         
-        function calibrateAxis(obj, axisName, rawValues)
-            % Calibrate a specific axis using raw joystick samples
-            % axisName: 'X', 'Y', or 'Z'
-            % rawValues: Array of raw joystick values for the axis
-            
-            try
-                if isempty(rawValues)
-                    error('No raw values provided for calibration');
-                end
-                
-                obj.Logger.info('Calibrating %s axis with %d samples...', axisName, length(rawValues));
-                obj.Logger.debug('Raw values range: [%d, %d]', min(rawValues), max(rawValues));
-                
-                fieldName = obj.axisNameToField(axisName);
-                
-                % Calculate calibration parameters
-                calibration = obj.calculateCalibration(rawValues);
-                
-                % Store calibration data
-                obj.CalibrationData.(fieldName) = calibration;
-                
-                % Save to file
-                obj.saveCalibration();
-                
-                obj.Logger.info('%s axis calibrated successfully', axisName);
-                obj.Logger.debug('Calibration parameters - Center: %d, Range: [%d, %d], Sensitivity: %.2f', ...
-                    calibration.center, calibration.min, calibration.max, calibration.sensitivity);
-                
-            catch ME
-                obj.Logger.error('Failed to calibrate %s axis: %s', axisName, ME.message);
-                obj.Logger.debug('Calibration error details: %s', ME.getReport());
-                FoilviewUtils.logException('CalibrationService.calibrateAxis', ME);
-                error('Failed to calibrate %s axis: %s', axisName, ME.message);
-            end
-        end
+
         
         function calibratedValue = applyCalibration(obj, axisName, rawValue)
             % Apply calibration to a raw joystick value
@@ -164,6 +130,26 @@ classdef CalibrationService < handle
                 % Apply sensitivity and clamp to [-1, 1]
                 calibratedValue = normalized * calibration.sensitivity;
                 calibratedValue = max(-1.0, min(1.0, calibratedValue));
+                
+                % Apply invert sense if enabled
+                if isfield(calibration, 'invertSense') && calibration.invertSense
+                    calibratedValue = -calibratedValue;
+                end
+                
+                % Apply damping (simple exponential smoothing)
+                if isfield(calibration, 'damping') && calibration.damping > 0
+                    % Store previous value for damping calculation
+                    fieldName = obj.axisNameToField(axisName);
+                    prevFieldName = [fieldName '_prev'];
+                    
+                    if ~isfield(obj.CalibrationData, prevFieldName)
+                        obj.CalibrationData.(prevFieldName) = 0;
+                    end
+                    
+                    dampingFactor = calibration.damping / 100; % Convert to 0-1 range
+                    calibratedValue = (1 - dampingFactor) * calibratedValue + dampingFactor * obj.CalibrationData.(prevFieldName);
+                    obj.CalibrationData.(prevFieldName) = calibratedValue;
+                end
                 
             catch ME
                 obj.Logger.error('Error applying calibration to %s axis: %s', axisName, ME.message);
@@ -270,6 +256,165 @@ classdef CalibrationService < handle
                 obj.Logger.debug('Calibration status error details: %s', ME.getReport());
                 FoilviewUtils.logException('CalibrationService.getCalibrationStatus', ME);
                 status = obj.DefaultCalibration;
+            end
+        end
+        
+        function setManualCalibration(obj, axisName, negativePos, centerPos, positivePos, deadzone, resolution, damping, invertSense)
+            % Manually set calibration parameters for an axis
+            % axisName: 'X', 'Y', or 'Z'
+            % negativePos: Raw value at maximum negative deflection
+            % centerPos: Raw value at center/rest position
+            % positivePos: Raw value at maximum positive deflection
+            % deadzone: Dead zone around center (optional, default: 10)
+            % resolution: Movement resolution/sensitivity (optional, default: 20)
+            % damping: Movement damping factor (optional, default: 0)
+            % invertSense: Invert axis direction (optional, default: false)
+            
+            try
+                % Set default values for optional parameters
+                if nargin < 5, deadzone = obj.DEFAULT_DEADZONE; end
+                if nargin < 6, resolution = obj.DEFAULT_RESOLUTION; end
+                if nargin < 7, damping = obj.DEFAULT_DAMPING; end
+                if nargin < 8, invertSense = obj.DEFAULT_INVERT_SENSE; end
+                
+                % Validate inputs
+                if negativePos >= positivePos
+                    error('Negative position must be less than positive position');
+                end
+                
+                if centerPos < negativePos || centerPos > positivePos
+                    error('Center position must be between negative and positive positions');
+                end
+                
+                if deadzone < 0
+                    error('Dead zone must be non-negative');
+                end
+                
+                fieldName = obj.axisNameToField(axisName);
+                
+                % Calculate sensitivity based on range
+                totalRange = positivePos - negativePos;
+                if totalRange > 0
+                    sensitivity = 127 / (totalRange / 2); % Normalize to standard range
+                else
+                    sensitivity = obj.DEFAULT_SENSITIVITY;
+                end
+                
+                % Create calibration structure
+                calibration = struct(...
+                    'center', centerPos, ...
+                    'min', negativePos, ...
+                    'max', positivePos, ...
+                    'deadzone', deadzone, ...
+                    'resolution', resolution, ...
+                    'damping', damping, ...
+                    'sensitivity', sensitivity, ...
+                    'invertSense', invertSense);
+                
+                % Store calibration data
+                obj.CalibrationData.(fieldName) = calibration;
+                
+                % Save to file
+                obj.saveCalibration();
+                
+                obj.Logger.info('Manual calibration set for %s axis', axisName);
+                obj.Logger.debug('Manual calibration parameters - Neg: %d, Center: %d, Pos: %d, Deadzone: %d, Resolution: %d, Damping: %d, Invert: %s', ...
+                    negativePos, centerPos, positivePos, deadzone, resolution, damping, mat2str(invertSense));
+                
+            catch ME
+                obj.Logger.error('Failed to set manual calibration for %s axis: %s', axisName, ME.message);
+                obj.Logger.debug('Manual calibration error details: %s', ME.getReport());
+                FoilviewUtils.logException('CalibrationService.setManualCalibration', ME);
+                error('Failed to set manual calibration for %s axis: %s', axisName, ME.message);
+            end
+        end
+        
+        function setAxisParameter(obj, axisName, parameterName, value)
+            % Set a specific parameter for an axis
+            % axisName: 'X', 'Y', or 'Z'
+            % parameterName: 'deadzone', 'resolution', 'damping', 'invertSense', 'sensitivity'
+            % value: New parameter value
+            
+            try
+                fieldName = obj.axisNameToField(axisName);
+                
+                % Ensure axis has calibration data
+                if ~isfield(obj.CalibrationData, fieldName)
+                    obj.CalibrationData.(fieldName) = obj.DefaultCalibration.(fieldName);
+                end
+                
+                % Validate parameter name
+                validParams = {'deadzone', 'resolution', 'damping', 'invertSense', 'sensitivity'};
+                if ~ismember(parameterName, validParams)
+                    error('Invalid parameter name: %s. Valid parameters: %s', parameterName, strjoin(validParams, ', '));
+                end
+                
+                % Validate parameter value
+                switch parameterName
+                    case 'deadzone'
+                        if value < 0
+                            error('Dead zone must be non-negative');
+                        end
+                    case 'resolution'
+                        if value <= 0
+                            error('Resolution must be positive');
+                        end
+                    case 'damping'
+                        if value < 0
+                            error('Damping must be non-negative');
+                        end
+                    case 'sensitivity'
+                        if value <= 0
+                            error('Sensitivity must be positive');
+                        end
+                    case 'invertSense'
+                        if ~islogical(value)
+                            error('Invert sense must be true or false');
+                        end
+                end
+                
+                % Set parameter
+                obj.CalibrationData.(fieldName).(parameterName) = value;
+                
+                % Save to file
+                obj.saveCalibration();
+                
+                obj.Logger.info('Parameter %s set to %s for %s axis', parameterName, mat2str(value), axisName);
+                
+            catch ME
+                obj.Logger.error('Failed to set parameter %s for %s axis: %s', parameterName, axisName, ME.message);
+                obj.Logger.debug('Parameter setting error details: %s', ME.getReport());
+                FoilviewUtils.logException('CalibrationService.setAxisParameter', ME);
+                error('Failed to set parameter %s for %s axis: %s', parameterName, axisName, ME.message);
+            end
+        end
+        
+        function value = getAxisParameter(obj, axisName, parameterName)
+            % Get a specific parameter value for an axis
+            % axisName: 'X', 'Y', or 'Z'
+            % parameterName: 'center', 'min', 'max', 'deadzone', 'resolution', 'damping', 'invertSense', 'sensitivity'
+            % Returns: Parameter value
+            
+            try
+                fieldName = obj.axisNameToField(axisName);
+                
+                if isfield(obj.CalibrationData, fieldName)
+                    calibration = obj.CalibrationData.(fieldName);
+                else
+                    calibration = obj.DefaultCalibration.(fieldName);
+                end
+                
+                if isfield(calibration, parameterName)
+                    value = calibration.(parameterName);
+                else
+                    error('Invalid parameter name: %s', parameterName);
+                end
+                
+            catch ME
+                obj.Logger.error('Failed to get parameter %s for %s axis: %s', parameterName, axisName, ME.message);
+                obj.Logger.debug('Parameter retrieval error details: %s', ME.getReport());
+                FoilviewUtils.logException('CalibrationService.getAxisParameter', ME);
+                value = [];
             end
         end
     end

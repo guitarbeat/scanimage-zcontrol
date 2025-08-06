@@ -378,58 +378,7 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
         end
         
         % Calibration Methods
-        function calibrateAxis(obj, axisName, samples)
-            % Calibrate a specific axis using joystick samples
-            % axisName: 'X', 'Y', or 'Z'
-            % samples: Number of samples to collect (default: 100)
-            
-            if nargin < 3
-                samples = 100;
-            end
-            
-            try
-                obj.Logger.info('Starting calibration for %s axis (%d samples)...', axisName, samples);
-                obj.Logger.info('Please move the joystick through its full range for %s axis', axisName);
-                
-                % Collect samples
-                rawValues = [];
-                obj.Logger.debug('Collecting %d calibration samples...', samples);
-                
-                for i = 1:samples
-                    data = obj.readJoystick();
-                    if length(data) >= 3
-                        switch upper(axisName)
-                            case 'X'
-                                rawValues = [rawValues, data(1)];
-                            case 'Y'
-                                rawValues = [rawValues, data(2)];
-                            case 'Z'
-                                rawValues = [rawValues, data(3)];
-                        end
-                    end
-                    pause(0.01); % 10ms delay between samples
-                    
-                    % Log progress every 10 samples
-                    if mod(i, 10) == 0
-                        obj.Logger.debug('Calibration progress: %d/%d samples collected', i, samples);
-                    end
-                end
-                
-                obj.Logger.debug('Collected %d raw values for %s axis calibration', length(rawValues), axisName);
-                obj.Logger.debug('Raw value range: [%d, %d]', min(rawValues), max(rawValues));
-                
-                % Perform calibration
-                obj.CalibrationService.calibrateAxis(axisName, rawValues);
-                
-                obj.Logger.info('%s axis calibration completed successfully (%d samples)', axisName, length(rawValues));
-                obj.Logger.debug('Calibration data saved for %s axis', axisName);
-                
-            catch ME
-                obj.Logger.error('Calibration failed for %s axis: %s', axisName, ME.message);
-                obj.Logger.debug('Calibration error details: %s', ME.getReport());
-                error('Calibration failed: %s', ME.message);
-            end
-        end
+
         
         function resetCalibration(obj, axisName)
             % Reset calibration for a specific axis or all axes
@@ -472,6 +421,91 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                 obj.Logger.error('Failed to check calibration status for %s: %s', axisName, ME.message);
                 obj.Logger.debug('Calibration check error details: %s', ME.getReport());
                 isCalibrated = false;
+            end
+        end
+        
+        function setManualCalibration(obj, axisName, negativePos, centerPos, positivePos, deadzone, resolution, damping, invertSense)
+            % Set manual calibration parameters for an axis
+            % axisName: 'X', 'Y', or 'Z'
+            % negativePos: Raw value at maximum negative deflection
+            % centerPos: Raw value at center/rest position  
+            % positivePos: Raw value at maximum positive deflection
+            % deadzone: Dead zone around center (optional)
+            % resolution: Movement resolution/sensitivity (optional)
+            % damping: Movement damping factor (optional)
+            % invertSense: Invert axis direction (optional)
+            
+            try
+                obj.Logger.info('Setting manual calibration for %s axis...', axisName);
+                obj.CalibrationService.setManualCalibration(axisName, negativePos, centerPos, positivePos, deadzone, resolution, damping, invertSense);
+                obj.Logger.info('Manual calibration set successfully for %s axis', axisName);
+            catch ME
+                obj.Logger.error('Failed to set manual calibration for %s axis: %s', axisName, ME.message);
+                obj.Logger.debug('Manual calibration error details: %s', ME.getReport());
+                error('Manual calibration failed: %s', ME.message);
+            end
+        end
+        
+        function setAxisParameter(obj, axisName, parameterName, value)
+            % Set a specific calibration parameter for an axis
+            % axisName: 'X', 'Y', or 'Z'
+            % parameterName: 'deadzone', 'resolution', 'damping', 'invertSense', 'sensitivity'
+            % value: New parameter value
+            
+            try
+                obj.Logger.info('Setting %s parameter to %s for %s axis', parameterName, mat2str(value), axisName);
+                obj.CalibrationService.setAxisParameter(axisName, parameterName, value);
+                obj.Logger.info('Parameter %s updated successfully for %s axis', parameterName, axisName);
+            catch ME
+                obj.Logger.error('Failed to set parameter %s for %s axis: %s', parameterName, axisName, ME.message);
+                obj.Logger.debug('Parameter setting error details: %s', ME.getReport());
+                error('Parameter setting failed: %s', ME.message);
+            end
+        end
+        
+        function value = getAxisParameter(obj, axisName, parameterName)
+            % Get a specific calibration parameter for an axis
+            % axisName: 'X', 'Y', or 'Z'
+            % parameterName: 'center', 'min', 'max', 'deadzone', 'resolution', 'damping', 'invertSense', 'sensitivity'
+            % Returns: Parameter value
+            
+            try
+                value = obj.CalibrationService.getAxisParameter(axisName, parameterName);
+                obj.Logger.debug('Retrieved %s parameter for %s axis: %s', parameterName, axisName, mat2str(value));
+            catch ME
+                obj.Logger.error('Failed to get parameter %s for %s axis: %s', parameterName, axisName, ME.message);
+                obj.Logger.debug('Parameter retrieval error details: %s', ME.getReport());
+                value = [];
+            end
+        end
+        
+        function currentValue = getCurrentRawValue(obj, axisName)
+            % Get current raw joystick value for an axis (for manual calibration)
+            % axisName: 'X', 'Y', or 'Z'
+            % Returns: Current raw value for the specified axis
+            
+            try
+                data = obj.readJoystick();
+                if length(data) >= 3
+                    switch upper(axisName)
+                        case 'X'
+                            currentValue = data(1);
+                        case 'Y'
+                            currentValue = data(2);
+                        case 'Z'
+                            currentValue = data(3);
+                        otherwise
+                            error('Invalid axis name: %s', axisName);
+                    end
+                    obj.Logger.debug('Current raw value for %s axis: %d', axisName, currentValue);
+                else
+                    obj.Logger.warning('Invalid joystick data received');
+                    currentValue = 0;
+                end
+            catch ME
+                obj.Logger.error('Failed to get current raw value for %s axis: %s', axisName, ME.message);
+                obj.Logger.debug('Raw value retrieval error details: %s', ME.getReport());
+                currentValue = 0;
             end
         end
     end

@@ -10,6 +10,7 @@
 % Key Features:
 %   - Structured logging with timestamps and component context
 %   - Multiple log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+%   - Colored console output using cprintf for better readability
 %   - Configurable output (console, file, or both)
 %   - Component-specific logging with automatic context
 %   - Performance-optimized logging with level filtering
@@ -23,7 +24,8 @@
 %   - CRITICAL: Critical events that may prevent the application from running
 %
 % Dependencies:
-%   - None (standalone service)
+%   - cprintf (optional): For colored console output
+%     Download from: https://www.mathworks.com/matlabcentral/fileexchange/24093
 %
 % Author: Aaron W. (alw4834)
 % Created: 2024
@@ -49,6 +51,9 @@ classdef LoggingService < handle
         OutputToFile     % Whether to output to file
         LogFile          % Log file path (if file logging enabled)
         LogLevels        % Available log levels and their numeric values
+        UseColoredOutput % Whether to use colored console output
+        CprintfAvailable % Whether cprintf is available
+        ColorScheme      % Color scheme for different log levels
     end
     
     properties (Constant)
@@ -64,6 +69,7 @@ classdef LoggingService < handle
         DEFAULT_INCLUDE_TIMESTAMP = true
         DEFAULT_OUTPUT_TO_CONSOLE = true
         DEFAULT_OUTPUT_TO_FILE = false
+        DEFAULT_USE_COLORED_OUTPUT = true
     end
     
     methods
@@ -86,6 +92,7 @@ classdef LoggingService < handle
             addParameter(p, 'OutputToFile', obj.DEFAULT_OUTPUT_TO_FILE, @islogical);
             addParameter(p, 'LogFile', '', @ischar);
             addParameter(p, 'SuppressInitMessage', false, @islogical);
+            addParameter(p, 'UseColoredOutput', obj.DEFAULT_USE_COLORED_OUTPUT, @islogical);
             parse(p, varargin{:});
             
             % Set properties
@@ -94,11 +101,15 @@ classdef LoggingService < handle
             obj.OutputToConsole = p.Results.OutputToConsole;
             obj.OutputToFile = p.Results.OutputToFile;
             obj.LogFile = p.Results.LogFile;
+            obj.UseColoredOutput = p.Results.UseColoredOutput;
             
             % Initialize log levels mapping
             obj.LogLevels = containers.Map(...
                 {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}, ...
                 {obj.DEBUG, obj.INFO, obj.WARNING, obj.ERROR, obj.CRITICAL});
+            
+            % Initialize colored output
+            obj.initializeColoredOutput();
             
             % Initialize file logging if requested
             if obj.OutputToFile && isempty(obj.LogFile)
@@ -170,6 +181,18 @@ classdef LoggingService < handle
             obj.LogFile = '';
             obj.info('File logging disabled');
         end
+        
+        function enableColoredOutput(obj)
+            % Enable colored console output
+            obj.UseColoredOutput = true;
+            obj.info('Colored output enabled');
+        end
+        
+        function disableColoredOutput(obj)
+            % Disable colored console output
+            obj.UseColoredOutput = false;
+            obj.info('Colored output disabled');
+        end
     end
     
     methods (Access = private)
@@ -201,7 +224,7 @@ classdef LoggingService < handle
             
             % Output to console
             if obj.OutputToConsole
-                fprintf('%s\n', logEntry);
+                obj.outputToConsole(levelName, logEntry);
             end
             
             % Output to file
@@ -250,6 +273,53 @@ classdef LoggingService < handle
             
             timestamp = datestr(now, 'yyyymmdd_HHMMSS');
             obj.LogFile = fullfile(logDir, sprintf('foilview_%s.log', timestamp));
+        end
+        
+        function initializeColoredOutput(obj)
+            % Initialize colored output settings
+            % Check if cprintf is available
+            obj.CprintfAvailable = obj.checkCprintfAvailability();
+            
+            % Define color scheme for different log levels
+            obj.ColorScheme = containers.Map(...
+                {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}, ...
+                {'Comments', 'Text', 'SystemCommands', 'Errors', '*Errors'});
+        end
+        
+        function available = checkCprintfAvailability(obj)
+            % Check if cprintf function is available
+            try
+                % Try to call cprintf with minimal arguments to test availability
+                cprintf('Text', '');
+                available = true;
+            catch
+                available = false;
+            end
+        end
+        
+        function outputToConsole(obj, levelName, logEntry)
+            % Output log entry to console with optional coloring
+            if obj.UseColoredOutput && obj.CprintfAvailable
+                try
+                    % Get color for this log level
+                    color = obj.ColorScheme(levelName);
+                    
+                    % Use cprintf for colored output
+                    cprintf(color, '%s\n', logEntry);
+                catch ME
+                    % Fallback to regular fprintf if cprintf fails
+                    fprintf('%s\n', logEntry);
+                    
+                    % Disable colored output if cprintf consistently fails
+                    if obj.UseColoredOutput
+                        obj.UseColoredOutput = false;
+                        fprintf('[WARNING] [LoggingService] cprintf failed, disabling colored output: %s\n', ME.message);
+                    end
+                end
+            else
+                % Use regular fprintf
+                fprintf('%s\n', logEntry);
+            end
         end
     end
     

@@ -427,53 +427,31 @@ classdef MJC3View < handle
             
             % Calibration Section
             calibrationLabel = uilabel(obj.UIFigure);
-            calibrationLabel.Text = 'Axis Calibration:';
+            calibrationLabel.Text = 'Calibration:';
             calibrationLabel.FontSize = 14;
             calibrationLabel.FontWeight = 'bold';
             calibrationLabel.HorizontalAlignment = 'center';
             calibrationLabel.FontColor = [0.3 0.3 0.5];
-            calibrationLabel.Position = [20, 170, 310, 25];
+            calibrationLabel.Position = [20, 150, 310, 25];
             
-            % Calibration Buttons - Better organized in a row
-            xCalButton = uibutton(obj.UIFigure, 'push');
-            xCalButton.Text = 'X-Axis';
-            xCalButton.FontSize = 11;
-            xCalButton.BackgroundColor = [0.85 0.9 1.0];
-            xCalButton.Position = [30, 135, 65, 30];
-            xCalButton.ButtonPushedFcn = @(~,~) obj.calibrateAxis('X');
-            xCalButton.Tooltip = 'Calibrate X-axis (left/right movement)';
+            % Manual Calibration Button
+            manualCalButton = uibutton(obj.UIFigure, 'push');
+            manualCalButton.Text = 'Manual Calibration';
+            manualCalButton.FontSize = 12;
+            manualCalButton.FontWeight = 'bold';
+            manualCalButton.BackgroundColor = [0.85 0.9 1.0];
+            manualCalButton.Position = [30, 120, 200, 25];
+            manualCalButton.ButtonPushedFcn = @(~,~) obj.openManualCalibration();
+            manualCalButton.Tooltip = 'Open detailed calibration settings';
             
-            yCalButton = uibutton(obj.UIFigure, 'push');
-            yCalButton.Text = 'Y-Axis';
-            yCalButton.FontSize = 11;
-            yCalButton.BackgroundColor = [0.9 1.0 0.85];
-            yCalButton.Position = [105, 135, 65, 30];
-            yCalButton.ButtonPushedFcn = @(~,~) obj.calibrateAxis('Y');
-            yCalButton.Tooltip = 'Calibrate Y-axis (forward/back movement)';
-            
-            zCalButton = uibutton(obj.UIFigure, 'push');
-            zCalButton.Text = 'Z-Axis';
-            zCalButton.FontSize = 11;
-            zCalButton.BackgroundColor = [1.0 0.9 0.85];
-            zCalButton.Position = [180, 135, 65, 30];
-            zCalButton.ButtonPushedFcn = @(~,~) obj.calibrateAxis('Z');
-            zCalButton.Tooltip = 'Calibrate Z-axis (twist movement)';
-            
+            % Reset Calibration Button
             resetCalButton = uibutton(obj.UIFigure, 'push');
-            resetCalButton.Text = 'Reset All';
-            resetCalButton.FontSize = 11;
-            resetCalButton.BackgroundColor = [1.0 0.85 0.85];
-            resetCalButton.Position = [255, 135, 65, 30];
+            resetCalButton.Text = 'Reset';
+            resetCalButton.FontSize = 12;
+            resetCalButton.BackgroundColor = [0.95 0.9 0.9];
+            resetCalButton.Position = [240, 120, 80, 25];
             resetCalButton.ButtonPushedFcn = @(~,~) obj.resetCalibration();
             resetCalButton.Tooltip = 'Reset all calibration to defaults';
-            
-            % Calibration Status Display
-            calibrationStatusLabel = uilabel(obj.UIFigure);
-            calibrationStatusLabel.Text = 'Calibration Status: Using defaults';
-            calibrationStatusLabel.FontSize = 10;
-            calibrationStatusLabel.FontColor = [0.5 0.5 0.5];
-            calibrationStatusLabel.HorizontalAlignment = 'center';
-            calibrationStatusLabel.Position = [20, 110, 310, 20];
             
             % Status Section
             statusTitle = uilabel(obj.UIFigure);
@@ -646,70 +624,7 @@ classdef MJC3View < handle
         
 
         
-        function calibrateAxis(obj, axisName)
-            % Calibrate a specific axis using the new calibration system
-            try
-                % Show calibration instructions
-                msg = sprintf(['Calibrating %s axis...\n\n' ...
-                    'Instructions:\n' ...
-                    '1. Move the joystick through its FULL range\n' ...
-                    '2. Include all directions (left, right, up, down)\n' ...
-                    '3. The system will collect 100 samples\n' ...
-                    '4. This will take about 1 second\n\n' ...
-                    'Click OK to start calibration.'], axisName);
-                
-                response = uialert(obj.UIFigure, msg, 'Calibration', ...
-                    'Icon', 'info', 'Options', {'OK', 'Cancel'});
-                
-                if strcmp(response, 'Cancel')
-                    return;
-                end
-                
-                % Show progress dialog
-                progressDlg = uiprogressdlg(obj.UIFigure, ...
-                    'Title', sprintf('Calibrating %s Axis', axisName), ...
-                    'Message', 'Collecting joystick samples...', ...
-                    'Cancelable', 'off');
-                
-                try
-                    % Perform calibration using the controller
-                    if ~isempty(obj.HIDController) && ismethod(obj.HIDController, 'calibrateAxis')
-                        obj.HIDController.calibrateAxis(axisName, 100);
-                        
-                        % Update progress
-                        progressDlg.Message = 'Saving calibration data...';
-                        drawnow;
-                        
-                        % Show success message
-                        successMsg = sprintf(['✅ %s Axis Calibrated Successfully!\n\n' ...
-                            'Calibration data has been saved.\n' ...
-                            'The joystick will now use calibrated values for this axis.'], axisName);
-                        uialert(obj.UIFigure, successMsg, 'Calibration Complete', 'Icon', 'success');
-                        
-                    else
-                        error('Controller does not support calibration');
-                    end
-                    
-                catch ME
-                    % Show error message
-                    errorMsg = sprintf(['❌ Calibration Failed\n\n' ...
-                        'Error: %s\n\n' ...
-                        'Please try again or check hardware connection.'], ME.message);
-                    uialert(obj.UIFigure, errorMsg, 'Calibration Error', 'Icon', 'error');
-                    
-                finally
-                    % Close progress dialog
-                    if isvalid(progressDlg)
-                        close(progressDlg);
-                    end
-                end
-                
-            catch ME
-                obj.Logger.error('Calibration failed for %s: %s', axisName, ME.message);
-                uialert(obj.UIFigure, sprintf('Calibration failed: %s', ME.message), ...
-                    'Calibration Error', 'Icon', 'error');
-            end
-        end
+
         
         function resetCalibration(obj)
             % Reset all axis calibration to defaults
@@ -744,6 +659,25 @@ classdef MJC3View < handle
                 obj.Logger.error('Failed to reset calibration: %s', ME.message);
                 uialert(obj.UIFigure, sprintf('Reset failed: %s', ME.message), ...
                     'Reset Error', 'Icon', 'error');
+            end
+        end
+        
+        function openManualCalibration(obj)
+            % Open manual calibration dialog
+            try
+                if isempty(obj.HIDController)
+                    uialert(obj.UIFigure, 'No controller available for manual calibration.', ...
+                        'Manual Calibration Error', 'Icon', 'warning');
+                    return;
+                end
+                
+                obj.Logger.info('Opening manual calibration dialog');
+                obj.createManualCalibrationDialog();
+                
+            catch ME
+                obj.Logger.error('Failed to open manual calibration dialog: %s', ME.message);
+                uialert(obj.UIFigure, sprintf('Failed to open manual calibration: %s', ME.message), ...
+                    'Manual Calibration Error', 'Icon', 'error');
             end
         end
         
@@ -1153,6 +1087,600 @@ classdef MJC3View < handle
             catch ME
                 obj.Logger.warning('Error enabling button: %s', ME.message);
             end
+        end
+        
+        function createManualCalibrationDialog(obj)
+            % Create manual calibration dialog window
+            
+            % Create dialog figure
+            dlg = uifigure('Name', 'Manual Joystick Calibration', ...
+                'Position', [200, 200, 600, 500], ...
+                'Resize', 'off', ...
+                'WindowStyle', 'modal');
+            
+            % Main grid layout
+            mainGrid = uigridlayout(dlg, [4, 1]);
+            mainGrid.RowHeight = {'fit', '1x', 'fit', 'fit'};
+            mainGrid.Padding = [20, 20, 20, 20];
+            mainGrid.RowSpacing = 15;
+            
+            % Title
+            titleLabel = uilabel(mainGrid);
+            titleLabel.Text = 'Manual Joystick Calibration';
+            titleLabel.FontSize = 18;
+            titleLabel.FontWeight = 'bold';
+            titleLabel.HorizontalAlignment = 'center';
+            titleLabel.FontColor = [0.2 0.2 0.4];
+            
+            % Tab group for axes
+            tabGroup = uitabgroup(mainGrid);
+            
+            % Create tabs for each axis
+            axes = {'X', 'Y', 'Z'};
+            axisColors = {[0.85 0.9 1.0], [0.9 1.0 0.85], [1.0 0.9 0.85]};
+            
+            for i = 1:length(axes)
+                axisName = axes{i};
+                axisColor = axisColors{i};
+                
+                tab = uitab(tabGroup, 'Title', sprintf('%s Axis', axisName));
+                obj.createAxisCalibrationTab(tab, axisName, axisColor);
+            end
+            
+            % Instructions
+            instructionText = uitextarea(mainGrid);
+            instructionText.Value = {
+                'Manual Calibration Instructions:', ...
+                '1. Select an axis tab above', ...
+                '2. Move joystick to negative position and click "Set Negative"', ...
+                '3. Center joystick and click "Set Center"', ...
+                '4. Move joystick to positive position and click "Set Positive"', ...
+                '5. Adjust analog parameters as needed', ...
+                '6. Click "Apply" to save calibration for that axis'
+            };
+            instructionText.Editable = 'off';
+            instructionText.FontSize = 11;
+            instructionText.BackgroundColor = [0.95 0.95 0.98];
+            
+            % Button panel
+            buttonPanel = uipanel(mainGrid);
+            buttonPanel.BorderType = 'none';
+            
+            buttonGrid = uigridlayout(buttonPanel, [1, 3]);
+            buttonGrid.ColumnWidth = {'1x', 'fit', 'fit'};
+            buttonGrid.ColumnSpacing = 10;
+            
+            % Spacer
+            uilabel(buttonGrid);
+            
+            % Close button
+            closeBtn = uibutton(buttonGrid, 'push');
+            closeBtn.Text = 'Close';
+            closeBtn.FontSize = 12;
+            closeBtn.ButtonPushedFcn = @(~,~) close(dlg);
+            
+            % Help button
+            helpBtn = uibutton(buttonGrid, 'push');
+            helpBtn.Text = 'Help';
+            helpBtn.FontSize = 12;
+            helpBtn.ButtonPushedFcn = @(~,~) obj.showManualCalibrationHelp();
+        end
+        
+        function createAxisCalibrationTab(obj, parent, axisName, axisColor)
+            % Create calibration controls for a specific axis
+            
+            % Main grid for axis tab
+            axisGrid = uigridlayout(parent, [3, 2]);
+            axisGrid.RowHeight = {'fit', '1x', 'fit'};
+            axisGrid.ColumnWidth = {'1x', '1x'};
+            axisGrid.Padding = [15, 15, 15, 15];
+            axisGrid.RowSpacing = 15;
+            axisGrid.ColumnSpacing = 15;
+            
+            % Position Settings Panel
+            posPanel = uipanel(axisGrid);
+            posPanel.Title = sprintf('%s Axis Position Settings', axisName);
+            posPanel.FontWeight = 'bold';
+            posPanel.BackgroundColor = axisColor;
+            posPanel.Layout.Row = 1;
+            posPanel.Layout.Column = [1, 2];
+            
+            posGrid = uigridlayout(posPanel, [4, 4]);
+            posGrid.RowHeight = {'fit', 'fit', 'fit', 'fit'};
+            posGrid.ColumnWidth = {'fit', '1x', 'fit', 'fit'};
+            posGrid.Padding = [10, 10, 10, 10];
+            posGrid.RowSpacing = 8;
+            posGrid.ColumnSpacing = 10;
+            
+            % Current Value Display
+            uilabel(posGrid, 'Text', 'Current Value:', 'FontWeight', 'bold');
+            currentValueLabel = uilabel(posGrid, 'Text', '0', 'FontColor', [0.2 0.2 0.8]);
+            currentValueLabel.Tag = sprintf('CurrentValue_%s', axisName);
+            uilabel(posGrid); % Spacer
+            
+            refreshBtn = uibutton(posGrid, 'push');
+            refreshBtn.Text = 'Refresh';
+            refreshBtn.FontSize = 10;
+            refreshBtn.ButtonPushedFcn = @(~,~) obj.refreshCurrentValue(axisName, currentValueLabel);
+            
+            % Negative Position
+            uilabel(posGrid, 'Text', 'Negative Pos:', 'FontWeight', 'bold');
+            negField = uieditfield(posGrid, 'numeric');
+            negField.Value = obj.getAxisParameterSafe(axisName, 'min');
+            negField.Tag = sprintf('NegativePos_%s', axisName);
+            negField.Limits = [-127, 127];
+            
+            setNegBtn = uibutton(posGrid, 'push');
+            setNegBtn.Text = 'Set Negative';
+            setNegBtn.FontSize = 10;
+            setNegBtn.BackgroundColor = [1.0 0.9 0.9];
+            setNegBtn.ButtonPushedFcn = @(~,~) obj.setCurrentPosition(axisName, 'negative', negField, currentValueLabel);
+            
+            uilabel(posGrid); % Spacer
+            
+            % Center Position
+            uilabel(posGrid, 'Text', 'Center Pos:', 'FontWeight', 'bold');
+            centerField = uieditfield(posGrid, 'numeric');
+            centerField.Value = obj.getAxisParameterSafe(axisName, 'center');
+            centerField.Tag = sprintf('CenterPos_%s', axisName);
+            centerField.Limits = [-127, 127];
+            
+            setCenterBtn = uibutton(posGrid, 'push');
+            setCenterBtn.Text = 'Set Center';
+            setCenterBtn.FontSize = 10;
+            setCenterBtn.BackgroundColor = [0.9 1.0 0.9];
+            setCenterBtn.ButtonPushedFcn = @(~,~) obj.setCurrentPosition(axisName, 'center', centerField, currentValueLabel);
+            
+            uilabel(posGrid); % Spacer
+            
+            % Positive Position
+            uilabel(posGrid, 'Text', 'Positive Pos:', 'FontWeight', 'bold');
+            posField = uieditfield(posGrid, 'numeric');
+            posField.Value = obj.getAxisParameterSafe(axisName, 'max');
+            posField.Tag = sprintf('PositivePos_%s', axisName);
+            posField.Limits = [-127, 127];
+            
+            setPosBtn = uibutton(posGrid, 'push');
+            setPosBtn.Text = 'Set Positive';
+            setPosBtn.FontSize = 10;
+            setPosBtn.BackgroundColor = [0.9 0.9 1.0];
+            setPosBtn.ButtonPushedFcn = @(~,~) obj.setCurrentPosition(axisName, 'positive', posField, currentValueLabel);
+            
+            uilabel(posGrid); % Spacer
+            
+            % Analog Parameters Panel
+            analogPanel = uipanel(axisGrid);
+            analogPanel.Title = 'Analog Parameters';
+            analogPanel.FontWeight = 'bold';
+            analogPanel.Layout.Row = 2;
+            analogPanel.Layout.Column = 1;
+            
+            analogGrid = uigridlayout(analogPanel, [5, 2]);
+            analogGrid.RowHeight = {'fit', 'fit', 'fit', 'fit', 'fit'};
+            analogGrid.ColumnWidth = {'fit', '1x'};
+            analogGrid.Padding = [10, 10, 10, 10];
+            analogGrid.RowSpacing = 8;
+            analogGrid.ColumnSpacing = 10;
+            
+            % Dead Zone
+            uilabel(analogGrid, 'Text', 'Dead Zone:', 'FontWeight', 'bold');
+            deadzoneField = uieditfield(analogGrid, 'numeric');
+            deadzoneField.Value = obj.getAxisParameterSafe(axisName, 'deadzone');
+            deadzoneField.Tag = sprintf('Deadzone_%s', axisName);
+            deadzoneField.Limits = [0, 50];
+            deadzoneField.Tooltip = 'Range around center where no movement occurs';
+            
+            % Resolution
+            uilabel(analogGrid, 'Text', 'Resolution:', 'FontWeight', 'bold');
+            resolutionField = uieditfield(analogGrid, 'numeric');
+            resolutionField.Value = obj.getAxisParameterSafe(axisName, 'resolution');
+            resolutionField.Tag = sprintf('Resolution_%s', axisName);
+            resolutionField.Limits = [1, 100];
+            resolutionField.Tooltip = 'Movement sensitivity/granularity';
+            
+            % Damping
+            uilabel(analogGrid, 'Text', 'Damping:', 'FontWeight', 'bold');
+            dampingField = uieditfield(analogGrid, 'numeric');
+            dampingField.Value = obj.getAxisParameterSafe(axisName, 'damping');
+            dampingField.Tag = sprintf('Damping_%s', axisName);
+            dampingField.Limits = [0, 100];
+            dampingField.Tooltip = 'Movement smoothing factor (0-100%)';
+            
+            % Sensitivity
+            uilabel(analogGrid, 'Text', 'Sensitivity:', 'FontWeight', 'bold');
+            sensitivityField = uieditfield(analogGrid, 'numeric');
+            sensitivityField.Value = obj.getAxisParameterSafe(axisName, 'sensitivity');
+            sensitivityField.Tag = sprintf('Sensitivity_%s', axisName);
+            sensitivityField.Limits = [0.1, 5.0];
+            sensitivityField.Tooltip = 'Overall axis sensitivity multiplier';
+            
+            % Invert Sense
+            uilabel(analogGrid, 'Text', 'Invert Sense:', 'FontWeight', 'bold');
+            invertCheckbox = uicheckbox(analogGrid);
+            invertCheckbox.Value = obj.getAxisParameterSafe(axisName, 'invertSense');
+            invertCheckbox.Tag = sprintf('InvertSense_%s', axisName);
+            invertCheckbox.Text = 'Reverse axis direction';
+            
+            % Preview Panel
+            previewPanel = uipanel(axisGrid);
+            previewPanel.Title = 'Live Preview';
+            previewPanel.FontWeight = 'bold';
+            previewPanel.Layout.Row = 2;
+            previewPanel.Layout.Column = 2;
+            
+            previewGrid = uigridlayout(previewPanel, [4, 1]);
+            previewGrid.RowHeight = {'fit', 'fit', 'fit', '1x'};
+            previewGrid.Padding = [10, 10, 10, 10];
+            previewGrid.RowSpacing = 8;
+            
+            % Raw Value
+            rawLabel = uilabel(previewGrid, 'Text', 'Raw: 0', 'FontWeight', 'bold');
+            rawLabel.Tag = sprintf('RawPreview_%s', axisName);
+            
+            % Calibrated Value
+            calLabel = uilabel(previewGrid, 'Text', 'Calibrated: 0.00', 'FontWeight', 'bold');
+            calLabel.Tag = sprintf('CalibratedPreview_%s', axisName);
+            calLabel.FontColor = [0.2 0.6 0.2];
+            
+            % Movement Value
+            moveLabel = uilabel(previewGrid, 'Text', 'Movement: 0.00 μm', 'FontWeight', 'bold');
+            moveLabel.Tag = sprintf('MovementPreview_%s', axisName);
+            moveLabel.FontColor = [0.6 0.2 0.2];
+            
+            % Preview toggle
+            previewToggle = uibutton(previewGrid, 'state');
+            previewToggle.Text = 'Start Preview';
+            previewToggle.ValueChangedFcn = @(src,~) obj.togglePreview(axisName, src);
+            
+            % Apply Button
+            applyBtn = uibutton(axisGrid, 'push');
+            applyBtn.Text = sprintf('Apply %s Calibration', axisName);
+            applyBtn.FontSize = 12;
+            applyBtn.FontWeight = 'bold';
+            applyBtn.BackgroundColor = [0.2 0.7 0.2];
+            applyBtn.FontColor = [1 1 1];
+            applyBtn.Layout.Row = 3;
+            applyBtn.Layout.Column = [1, 2];
+            applyBtn.ButtonPushedFcn = @(~,~) obj.applyManualCalibration(axisName, parent);
+        end
+        
+        function value = getAxisParameterSafe(obj, axisName, parameterName)
+            % Safely get axis parameter with fallback to defaults
+            try
+                if ~isempty(obj.HIDController) && ismethod(obj.HIDController, 'getAxisParameter')
+                    value = obj.HIDController.getAxisParameter(axisName, parameterName);
+                    if isempty(value)
+                        value = obj.getDefaultParameter(parameterName);
+                    end
+                else
+                    value = obj.getDefaultParameter(parameterName);
+                end
+            catch
+                value = obj.getDefaultParameter(parameterName);
+            end
+        end
+        
+        function value = getDefaultParameter(~, parameterName)
+            % Get default parameter values
+            switch parameterName
+                case 'min'
+                    value = -127;
+                case 'center'
+                    value = 0;
+                case 'max'
+                    value = 127;
+                case 'deadzone'
+                    value = 10;
+                case 'resolution'
+                    value = 20;
+                case 'damping'
+                    value = 0;
+                case 'sensitivity'
+                    value = 1.0;
+                case 'invertSense'
+                    value = false;
+                otherwise
+                    value = 0;
+            end
+        end
+        
+        function refreshCurrentValue(obj, axisName, currentValueLabel)
+            % Refresh the current joystick value display
+            try
+                if ~isempty(obj.HIDController) && ismethod(obj.HIDController, 'getCurrentRawValue')
+                    currentValue = obj.HIDController.getCurrentRawValue(axisName);
+                    currentValueLabel.Text = sprintf('%d', currentValue);
+                    currentValueLabel.FontColor = [0.2 0.2 0.8];
+                else
+                    currentValueLabel.Text = 'N/A';
+                    currentValueLabel.FontColor = [0.8 0.2 0.2];
+                end
+            catch ME
+                obj.Logger.error('Failed to refresh current value for %s: %s', axisName, ME.message);
+                currentValueLabel.Text = 'Error';
+                currentValueLabel.FontColor = [0.8 0.2 0.2];
+            end
+        end
+        
+        function setCurrentPosition(obj, axisName, positionType, field, currentValueLabel)
+            % Set position field to current joystick value
+            try
+                if ~isempty(obj.HIDController) && ismethod(obj.HIDController, 'getCurrentRawValue')
+                    currentValue = obj.HIDController.getCurrentRawValue(axisName);
+                    field.Value = currentValue;
+                    currentValueLabel.Text = sprintf('%d', currentValue);
+                    obj.Logger.info('Set %s position for %s axis to %d', positionType, axisName, currentValue);
+                else
+                    uialert(field.Parent.Parent.Parent.Parent, 'No controller available to read current value.', ...
+                        'Set Position Error', 'Icon', 'warning');
+                end
+            catch ME
+                obj.Logger.error('Failed to set %s position for %s: %s', positionType, axisName, ME.message);
+                uialert(field.Parent.Parent.Parent.Parent, sprintf('Failed to set position: %s', ME.message), ...
+                    'Set Position Error', 'Icon', 'error');
+            end
+        end
+        
+        function applyManualCalibration(obj, axisName, parent)
+            % Apply manual calibration settings for an axis
+            try
+                % Get all field values from the UI
+                negField = findobj(parent, 'Tag', sprintf('NegativePos_%s', axisName));
+                centerField = findobj(parent, 'Tag', sprintf('CenterPos_%s', axisName));
+                posField = findobj(parent, 'Tag', sprintf('PositivePos_%s', axisName));
+                deadzoneField = findobj(parent, 'Tag', sprintf('Deadzone_%s', axisName));
+                resolutionField = findobj(parent, 'Tag', sprintf('Resolution_%s', axisName));
+                dampingField = findobj(parent, 'Tag', sprintf('Damping_%s', axisName));
+                sensitivityField = findobj(parent, 'Tag', sprintf('Sensitivity_%s', axisName));
+                invertCheckbox = findobj(parent, 'Tag', sprintf('InvertSense_%s', axisName));
+                
+                % Validate that all fields were found
+                if isempty(negField) || isempty(centerField) || isempty(posField)
+                    error('Could not find all required position fields');
+                end
+                
+                % Get values
+                negativePos = negField.Value;
+                centerPos = centerField.Value;
+                positivePos = posField.Value;
+                deadzone = deadzoneField.Value;
+                resolution = resolutionField.Value;
+                damping = dampingField.Value;
+                sensitivity = sensitivityField.Value;
+                invertSense = invertCheckbox.Value;
+                
+                % Apply calibration
+                if ~isempty(obj.HIDController) && ismethod(obj.HIDController, 'setManualCalibration')
+                    obj.HIDController.setManualCalibration(axisName, negativePos, centerPos, positivePos, ...
+                        deadzone, resolution, damping, invertSense);
+                    
+                    % Show success message
+                    uialert(parent.Parent.Parent, ...
+                        sprintf('✅ %s axis calibration applied successfully!', axisName), ...
+                        'Calibration Applied', 'Icon', 'success');
+                    
+                    obj.Logger.info('Manual calibration applied for %s axis', axisName);
+                else
+                    error('Controller does not support manual calibration');
+                end
+                
+            catch ME
+                obj.Logger.error('Failed to apply manual calibration for %s: %s', axisName, ME.message);
+                uialert(parent.Parent.Parent, sprintf('Failed to apply calibration: %s', ME.message), ...
+                    'Calibration Error', 'Icon', 'error');
+            end
+        end
+        
+        function showManualCalibrationHelp(obj)
+            % Show help dialog for manual calibration
+            helpText = {
+                'Manual Joystick Calibration Help', ...
+                '', ...
+                'Position Settings:', ...
+                '• Negative Position: Raw value when joystick is at maximum negative deflection', ...
+                '• Center Position: Raw value when joystick is at rest/center', ...
+                '• Positive Position: Raw value when joystick is at maximum positive deflection', ...
+                '', ...
+                'Analog Parameters:', ...
+                '• Dead Zone: Range around center where no movement occurs (0-50)', ...
+                '• Resolution: Movement sensitivity/granularity (1-100)', ...
+                '• Damping: Movement smoothing factor 0-100% (higher = smoother)', ...
+                '• Sensitivity: Overall axis sensitivity multiplier (0.1-5.0)', ...
+                '• Invert Sense: Reverse the direction of axis movement', ...
+                '', ...
+                'Calibration Process:', ...
+                '1. Move joystick to desired position', ...
+                '2. Click "Set Negative/Center/Positive" to capture current value', ...
+                '3. Adjust analog parameters as needed', ...
+                '4. Use Live Preview to test settings', ...
+                '5. Click "Apply" to save calibration', ...
+                '', ...
+                'Tips:', ...
+                '• Use "Refresh" to see current joystick value', ...
+                '• Test each axis independently', ...
+                '• Start with default parameters and adjust as needed'
+            };
+            
+            uialert(obj.UIFigure, helpText, 'Manual Calibration Help', 'Icon', 'info');
+        end
+        
+        function togglePreview(obj, axisName, toggleButton)
+            % Toggle live preview for an axis
+            try
+                if toggleButton.Value
+                    % Start preview
+                    toggleButton.Text = 'Stop Preview';
+                    obj.startAxisPreview(axisName);
+                else
+                    % Stop preview
+                    toggleButton.Text = 'Start Preview';
+                    obj.stopAxisPreview(axisName);
+                end
+            catch ME
+                obj.Logger.error('Failed to toggle preview for %s: %s', axisName, ME.message);
+                toggleButton.Value = false;
+                toggleButton.Text = 'Start Preview';
+            end
+        end
+        
+        function startAxisPreview(obj, axisName)
+            % Start live preview for an axis
+            try
+                % Create timer for this axis preview
+                timerName = sprintf('PreviewTimer_%s', axisName);
+                
+                % Stop any existing timer
+                obj.stopAxisPreview(axisName);
+                
+                % Create new timer
+                previewTimer = timer(...
+                    'ExecutionMode', 'fixedRate', ...
+                    'Period', 0.1, ...  % Update at 10 Hz
+                    'TimerFcn', @(~,~) obj.updateAxisPreview(axisName), ...
+                    'ErrorFcn', @(~,~) obj.handlePreviewError(axisName), ...
+                    'Name', timerName);
+                
+                % Store timer reference
+                if ~isprop(obj, 'PreviewTimers')
+                    addprop(obj, 'PreviewTimers');
+                    obj.PreviewTimers = containers.Map();
+                end
+                obj.PreviewTimers(axisName) = previewTimer;
+                
+                start(previewTimer);
+                obj.Logger.info('Started preview for %s axis', axisName);
+                
+            catch ME
+                obj.Logger.error('Failed to start preview for %s: %s', axisName, ME.message);
+            end
+        end
+        
+        function stopAxisPreview(obj, axisName)
+            % Stop live preview for an axis
+            try
+                if isprop(obj, 'PreviewTimers') && isKey(obj.PreviewTimers, axisName)
+                    previewTimer = obj.PreviewTimers(axisName);
+                    if isvalid(previewTimer)
+                        stop(previewTimer);
+                        delete(previewTimer);
+                    end
+                    remove(obj.PreviewTimers, axisName);
+                    obj.Logger.info('Stopped preview for %s axis', axisName);
+                end
+            catch ME
+                obj.Logger.error('Failed to stop preview for %s: %s', axisName, ME.message);
+            end
+        end
+        
+        function updateAxisPreview(obj, axisName)
+            % Update preview display for an axis
+            try
+                if isempty(obj.HIDController)
+                    return;
+                end
+                
+                % Get current raw value
+                rawValue = obj.HIDController.getCurrentRawValue(axisName);
+                
+                % Find preview labels
+                rawLabel = findobj(obj.UIFigure, 'Tag', sprintf('RawPreview_%s', axisName));
+                calLabel = findobj(obj.UIFigure, 'Tag', sprintf('CalibratedPreview_%s', axisName));
+                moveLabel = findobj(obj.UIFigure, 'Tag', sprintf('MovementPreview_%s', axisName));
+                
+                if ~isempty(rawLabel)
+                    rawLabel.Text = sprintf('Raw: %d', rawValue);
+                end
+                
+                % Calculate calibrated value (simplified for preview)
+                calibratedValue = obj.calculatePreviewCalibration(axisName, rawValue);
+                
+                if ~isempty(calLabel)
+                    calLabel.Text = sprintf('Calibrated: %.2f', calibratedValue);
+                end
+                
+                % Calculate movement (assuming 5 μm/unit step factor)
+                stepFactor = 5.0;
+                movement = calibratedValue * stepFactor;
+                
+                if ~isempty(moveLabel)
+                    moveLabel.Text = sprintf('Movement: %.2f μm', movement);
+                end
+                
+            catch ME
+                obj.Logger.error('Failed to update preview for %s: %s', axisName, ME.message);
+            end
+        end
+        
+        function calibratedValue = calculatePreviewCalibration(obj, axisName, rawValue)
+            % Calculate calibrated value for preview (simplified version)
+            try
+                % Get current UI values for preview calculation
+                parent = obj.UIFigure;
+                
+                negField = findobj(parent, 'Tag', sprintf('NegativePos_%s', axisName));
+                centerField = findobj(parent, 'Tag', sprintf('CenterPos_%s', axisName));
+                posField = findobj(parent, 'Tag', sprintf('PositivePos_%s', axisName));
+                deadzoneField = findobj(parent, 'Tag', sprintf('Deadzone_%s', axisName));
+                sensitivityField = findobj(parent, 'Tag', sprintf('Sensitivity_%s', axisName));
+                invertCheckbox = findobj(parent, 'Tag', sprintf('InvertSense_%s', axisName));
+                
+                if isempty(negField) || isempty(centerField) || isempty(posField)
+                    calibratedValue = rawValue / 127; % Fallback to simple scaling
+                    return;
+                end
+                
+                % Get values
+                negativePos = negField.Value;
+                centerPos = centerField.Value;
+                positivePos = posField.Value;
+                deadzone = deadzoneField.Value;
+                sensitivity = sensitivityField.Value;
+                invertSense = invertCheckbox.Value;
+                
+                % Apply dead zone
+                if abs(rawValue - centerPos) <= deadzone
+                    calibratedValue = 0;
+                    return;
+                end
+                
+                % Calculate normalized position (-1 to 1)
+                if rawValue > centerPos
+                    % Positive direction
+                    range = positivePos - centerPos;
+                    if range > 0
+                        normalized = (rawValue - centerPos) / range;
+                    else
+                        normalized = 0;
+                    end
+                else
+                    % Negative direction
+                    range = centerPos - negativePos;
+                    if range > 0
+                        normalized = -(centerPos - rawValue) / range;
+                    else
+                        normalized = 0;
+                    end
+                end
+                
+                % Apply sensitivity and clamp to [-1, 1]
+                calibratedValue = normalized * sensitivity;
+                calibratedValue = max(-1.0, min(1.0, calibratedValue));
+                
+                % Apply invert sense if enabled
+                if invertSense
+                    calibratedValue = -calibratedValue;
+                end
+                
+            catch ME
+                obj.Logger.error('Failed to calculate preview calibration for %s: %s', axisName, ME.message);
+                calibratedValue = rawValue / 127; % Fallback
+            end
+        end
+        
+        function handlePreviewError(obj, axisName)
+            % Handle preview timer errors
+            obj.Logger.error('Preview timer error for %s axis', axisName);
+            obj.stopAxisPreview(axisName);
         end
     end
 end

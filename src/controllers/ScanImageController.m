@@ -45,6 +45,7 @@ classdef ScanImageController < handle
         xAxisIndex  % Index of X-axis (typically 1)
         yAxisIndex  % Index of Y-axis (typically 2)
         zAxisIndex  % Index of Z-axis (typically 3)
+        Logger      % LoggingService instance
     end
     
     methods
@@ -61,6 +62,9 @@ classdef ScanImageController < handle
                 hMotors = [];
             end
             
+            % Initialize LoggingService
+            obj.Logger = LoggingService('ScanImageController', 'SuppressInitMessage', true);
+            
             obj.hMotors = hMotors;
             obj.xAxisIndex = 1; % X is typically the 1st axis in ScanImage
             obj.yAxisIndex = 2; % Y is typically the 2nd axis in ScanImage
@@ -68,23 +72,13 @@ classdef ScanImageController < handle
             
             % Check if we're in simulation mode
             if isempty(hMotors)
-                % Use logging service instead of fprintf
-                if exist('obj', 'var') && isprop(obj, 'Logger')
-                    obj.Logger.info('ScanImageController initialized in simulation mode');
-                else
-                    fprintf('ScanImageController initialized in simulation mode\n');
-                end
+                obj.Logger.info('ScanImageController initialized in simulation mode');
             else
                 % Verify the motors handle is valid
                 if ~isprop(hMotors, 'axesPosition')
                     error('Invalid hMotors handle - missing axesPosition property');
                 end
-                % Use logging service instead of fprintf
-                if exist('obj', 'var') && isprop(obj, 'Logger')
-                    obj.Logger.info('ScanImageController initialized for X, Y, Z-axis control');
-                else
-                    fprintf('ScanImageController initialized for X, Y, Z-axis control\n');
-                end
+                obj.Logger.info('ScanImageController initialized for X, Y, Z-axis control');
             end
         end
         
@@ -211,8 +205,8 @@ classdef ScanImageController < handle
             try
                 % Check if we're in simulation mode
                 if isempty(obj.hMotors)
-                    % Simulation mode - just log the movement
-                    fprintf('SIMULATION: %s-axis would move by %.2f μm\n', axisName, distance);
+                    % Simulation mode - log the movement using LoggingService
+                    obj.Logger.info('SIMULATION: %s-axis would move by %.2f μm', axisName, distance);
                     success = true;
                     return;
                 end
@@ -231,9 +225,9 @@ classdef ScanImageController < handle
                 success = obj.moveAxisToAbsolute(axisName, targetPos, axisIndex);
                 
                 if success
-                    fprintf('%s-axis moved by %.2f μm (to %.2f μm)\n', axisName, distance, targetPos);
+                    obj.Logger.info('%s-axis moved by %.2f μm (to %.2f μm)', axisName, distance, targetPos);
                 else
-                    warning('ScanImageController:MoveFailed', 'Failed to move %s-axis by %.2f μm', axisName, distance);
+                    obj.Logger.warning('Failed to move %s-axis by %.2f μm', axisName, distance);
                 end
                 
             catch ME
@@ -257,8 +251,8 @@ classdef ScanImageController < handle
             try
                 % Check if we're in simulation mode
                 if isempty(obj.hMotors)
-                    % Simulation mode - just log the movement
-                    fprintf('SIMULATION: %s-axis would move to %.2f μm\n', axisName, targetPos);
+                    % Simulation mode - log the movement using LoggingService
+                    obj.Logger.info('SIMULATION: %s-axis would move to %.2f μm', axisName, targetPos);
                     success = true;
                     return;
                 end

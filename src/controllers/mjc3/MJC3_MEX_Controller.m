@@ -322,7 +322,7 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
                     if ~success
                         obj.Logger.warning('Failed to move Z-axis by %.2f μm', dz);
                     else
-                        obj.Logger.debug('Z-axis moved by %.2f μm (calibrated: %.3f, speed: %.2f)', dz, calibratedZ, speedFactor);
+                        obj.Logger.debug('Z-axis moved by %.2f μm (raw: %d, calibrated: %.3f, speed: %.2f)', dz, zVal, calibratedZ, speedFactor);
                     end
                 end
                 

@@ -21,7 +21,7 @@ classdef ScanImageMetadata < handle
             obj.MetadataFile = filePath;
         end
         
-        function saveImageMetadata(obj, hSI, simulationMode, foilviewApp)
+        function saveImageMetadata(obj, src, hSI, metadataFile, simulationMode, foilviewApp)
             %SAVEIMAGEMETADATA Logs metadata for each acquired frame
             try
                 % Skip frames that are too close together (max 5 frames/sec for metadata logging)
@@ -37,9 +37,17 @@ classdef ScanImageMetadata < handle
                     return;
                 end
                 
-                % Check if metadata file is configured
-                if isempty(obj.MetadataFile)
-                    return; % Skip if no metadata file is configured
+                % Get handles with minimal overhead
+                if isempty(hSI) || isempty(metadataFile)
+                    [hSI, metadataFile] = obj.getHandles(src);
+                    if isempty(metadataFile)
+                        return; % Skip if no metadata file is configured
+                    end
+                end
+                
+                % Check validity and mode with minimal overhead
+                if ~obj.isValidFrame(hSI) || ~obj.isGrabMode(hSI)
+                    return;
                 end
                 
                 % Collect metadata efficiently
@@ -47,11 +55,18 @@ classdef ScanImageMetadata < handle
                 
                 % Write to file with error handling
                 if ~isempty(metadata)
-                    obj.writeMetadataToFile(metadata, obj.MetadataFile, false);
+                    obj.writeMetadataToFile(metadata, metadataFile, false);
                 end
                 
             catch ME
-                obj.Logger.error('saveImageMetadata failed: %s', ME.message);
+                % Only report serious errors, not routine failures
+                if contains(ME.message, 'Permission denied') || contains(ME.message, 'No such file')
+                    % Reset persistent variables to force rechecking
+                    hSI = [];
+                    metadataFile = [];
+                else
+                    warning('%s: %s', ME.identifier, ME.message);
+                end
             end
         end
         
@@ -220,6 +235,46 @@ classdef ScanImageMetadata < handle
             %CLEANUPMETADATALOGGING Cleanup metadata logging resources
             obj.LastFrameTime = [];
             obj.Logger.info('Metadata logging cleanup completed');
+        end
+        
+        function [hSI, metadataFile] = getHandles(obj, src)
+            %GETHANDLES Get handles with minimal overhead
+            if isobject(src) && isfield(src, 'hSI')
+                hSI = src.hSI;
+            else
+                try
+                    hSI = evalin('base', 'hSI');
+                catch
+                    hSI = [];
+                    metadataFile = '';
+                    return;
+                end
+            end
+            
+            try
+                metadataFile = evalin('base', 'metadataFilePath');
+                if ~ischar(metadataFile) || isempty(metadataFile)
+                    metadataFile = '';
+                end
+            catch
+                metadataFile = '';
+            end
+        end
+        
+        function valid = isValidFrame(obj, hSI)
+            %ISVALIDFRAME Check if frame is valid for metadata logging
+            valid = ~isempty(hSI) && isprop(hSI, 'hScan2D') && ~isempty(hSI.hScan2D) && ...
+                    isprop(hSI.hScan2D, 'logFileStem') && ~isempty(hSI.hScan2D.logFileStem);
+        end
+        
+        function isGrab = isGrabMode(obj, hSI)
+            %ISGRABMODE Check if we're in GRAB mode vs FOCUS mode
+            try
+                acqMode = hSI.acqState;
+                isGrab = strcmpi(acqMode, 'grab');
+            catch
+                isGrab = false;
+            end
         end
     end
     

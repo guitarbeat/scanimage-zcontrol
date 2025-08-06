@@ -39,37 +39,20 @@ classdef MJC3View < handle
         UIFigure
         MainLayout
         
-        % Control Components
+        % Essential Control Components (simplified)
         EnableButton
         StatusLabel
         StepFactorField
         ConnectionStatus
         
-        % Analog Controls (Z, Y, X)
-        ZValueDisplay
-        XValueDisplay
-        YValueDisplay
-        ZSensitivityField
-        XSensitivityField
-        YSensitivityField
-        ZActionDropdown
-        XActionDropdown
-        YActionDropdown
-        
-        % Button Controls
-        Button1StateIndicator
-        Button1TargetDropdown
-        Button1ActionDropdown
-        
-        % Mapping Controls
-        MappingFileDropdown
-        NewMappingButton
-        SaveMappingButton
-        RemoveMappingButton
-        
         % State Management (public for testing and external access)
         IsEnabled = false
         IsConnected = false
+        
+        % Crash prevention flags (public for testing and external monitoring)
+        IsClosing = false
+        IsDeleting = false
+        CleanupComplete = false
     end
     
     properties (Access = private)
@@ -103,32 +86,34 @@ classdef MJC3View < handle
         end
         
         function delete(obj)
-            % Destructor: Clean up resources
-            obj.Logger.info('Cleaning up MJC3 view resources...');
+            % Destructor: Clean up resources with crash prevention
             
-            % Stop monitoring timer
-            obj.stopMonitoring();
-            
-            % Stop and disconnect the controller
-            if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
-                try
-                    if obj.IsEnabled
-                        obj.Logger.info('Stopping HID controller...');
-                        obj.HIDController.stop();
-                        obj.IsEnabled = false;
-                        obj.IsConnected = false;
-                    end
-                catch ME
-                    obj.Logger.warning('Error stopping HID controller: %s', ME.message);
-                end
+            % Prevent recursive deletion
+            if obj.IsDeleting || obj.CleanupComplete
+                return;
             end
+            obj.IsDeleting = true;
             
-            % Delete UI figure
-            if ~isempty(obj.UIFigure) && isvalid(obj.UIFigure)
-                delete(obj.UIFigure);
+            try
+                obj.Logger.info('Cleaning up MJC3 view resources...');
+                
+                % Stop monitoring timer first (most crash-prone)
+                obj.safeStopMonitoring();
+                
+                % Stop and disconnect the controller
+                obj.safeStopController();
+                
+                % Delete UI figure safely
+                obj.safeDeleteUIFigure();
+                
+                obj.CleanupComplete = true;
+                obj.Logger.info('MJC3 view cleanup complete');
+                
+            catch ME
+                obj.Logger.error('Error during cleanup: %s', ME.message);
+                % Force cleanup completion to prevent hanging
+                obj.CleanupComplete = true;
             end
-            
-            obj.Logger.info('MJC3 view cleanup complete');
         end
         
         function setController(obj, controller)
@@ -161,7 +146,7 @@ classdef MJC3View < handle
                         % Check if controller reports being connected
                         if ismethod(obj.HIDController, 'connectToMJC3')
                             obj.IsConnected = obj.HIDController.connectToMJC3();
-                            obj.Logger.info('Controller connection status: %s', mat2str(obj.IsConnected));
+                            obj.Logger.debug('Controller connection status: %s', mat2str(obj.IsConnected));
                         else
                             % For simulation controllers, assume connected
                             obj.IsConnected = true;
@@ -178,6 +163,7 @@ classdef MJC3View < handle
                 % Update UI state
                 obj.updateConnectionStatus();
                 obj.detectHardware(); % Check hardware detection status
+                obj.updateUI(); % Update button state based on new controller
                 
             catch ME
                 obj.Logger.error('Error setting controller: %s', ME.message);
@@ -324,453 +310,232 @@ classdef MJC3View < handle
     
     methods (Access = private)
         function createUI(obj)
-            % Create and configure all UI components
+            % Create and configure all UI components - MAXIMUM COMPATIBILITY VERSION
             
-            % Main Figure
-            obj.UIFigure = uifigure('Visible', 'off');
-            obj.UIFigure.Name = 'MJC3 Joystick Control';
-            obj.UIFigure.Position = obj.WindowPosition;
-            obj.UIFigure.AutoResizeChildren = 'on';
-            obj.UIFigure.Color = [0.94 0.94 0.94];
-            
-            % Main Layout - Simplified to 5 sections
-            obj.MainLayout = uigridlayout(obj.UIFigure);
-            obj.MainLayout.ColumnWidth = {'1x'};
-            obj.MainLayout.RowHeight = {'fit', 'fit', 'fit', 'fit', 'fit'};
-            obj.MainLayout.Padding = [10 10 10 10];
-            obj.MainLayout.RowSpacing = 10;
-            
-            % Create UI sections - Simplified
-            obj.createHeaderSection();
-            obj.createControlSection();
-            obj.createAnalogControlsSection();
-            obj.createButtonControlsSection();
-            obj.createMappingControlsSection();
-            
-            % Make figure visible
-            obj.UIFigure.Visible = 'on';
+            try
+                % Main Figure - Use basic uifigure only
+                obj.UIFigure = uifigure('Visible', 'off');
+                obj.UIFigure.Name = 'MJC3 Joystick Control';
+                obj.UIFigure.Position = [300, 300, 350, 480];
+                obj.UIFigure.Color = [0.96 0.96 0.98];
+                
+                % Use absolute positioning instead of grid layout for maximum compatibility
+                obj.createBasicUI();
+                
+                % Make figure visible
+                obj.UIFigure.Visible = 'on';
+                
+            catch ME
+                obj.Logger.error('Error creating UI: %s', ME.message);
+                % Clean up on error
+                if ~isempty(obj.UIFigure) && isvalid(obj.UIFigure)
+                    delete(obj.UIFigure);
+                    obj.UIFigure = [];
+                end
+                rethrow(ME);
+            end
         end
         
-        function createHeaderSection(obj)
-            % Create header with title and connection status
-            headerPanel = uipanel(obj.MainLayout);
-            headerPanel.Layout.Row = 1;
-            headerPanel.Title = '';
-            headerPanel.BorderType = 'none';
-            headerPanel.BackgroundColor = [0.94 0.94 0.94];
+        function createBasicUI(obj)
+            % Create UI using basic components with absolute positioning for maximum compatibility
             
-            headerGrid = uigridlayout(headerPanel, [2, 1]);
-            headerGrid.RowHeight = {'fit', 'fit'};
-            headerGrid.Padding = [5 5 5 5];
-            headerGrid.RowSpacing = 5;
-            
-            % Title and Help Button
-            titlePanel = uipanel(headerGrid);
-            titlePanel.Layout.Row = 1;
-            titlePanel.BorderType = 'none';
-            titlePanel.BackgroundColor = [0.94 0.94 0.94];
-            
-            titleGrid = uigridlayout(titlePanel, [1, 2]);
-            titleGrid.ColumnWidth = {'1x', 'fit'};
-            titleGrid.Padding = [0 0 0 0];
-            titleGrid.ColumnSpacing = 10;
-            
-            titleLabel = uilabel(titleGrid);
-            titleLabel.Text = '🕹️ MJC3 Joystick Control';
+            % Title
+            titleLabel = uilabel(obj.UIFigure);
+            titleLabel.Text = 'MJC3 Joystick Control';
             titleLabel.FontSize = 18;
             titleLabel.FontWeight = 'bold';
             titleLabel.HorizontalAlignment = 'center';
-            
-            helpButton = uibutton(titleGrid, 'push');
-            helpButton.Text = '❓';
-            helpButton.FontSize = 16;
-            helpButton.FontWeight = 'bold';
-            helpButton.BackgroundColor = [0.2 0.6 0.8];
-            helpButton.FontColor = [1 1 1];
-            helpButton.Tooltip = 'Show help and usage instructions';
-            helpButton.ButtonPushedFcn = @(~,~) obj.showHelp();
+            titleLabel.FontColor = [0.2 0.2 0.4];
+            titleLabel.Position = [20, 400, 310, 30];
             
             % Connection Status
-            obj.ConnectionStatus = uilabel(headerGrid);
-            obj.ConnectionStatus.Text = '🔴 Disconnected';
+            obj.ConnectionStatus = uilabel(obj.UIFigure);
+            obj.ConnectionStatus.Text = 'Disconnected';
             obj.ConnectionStatus.FontSize = 14;
             obj.ConnectionStatus.FontWeight = 'bold';
             obj.ConnectionStatus.HorizontalAlignment = 'center';
             obj.ConnectionStatus.FontColor = [0.8 0.2 0.2];
-            obj.ConnectionStatus.Layout.Row = 2;
-        end
-        
-        function createControlSection(obj)
-            % Create main control buttons and settings
-            controlPanel = uipanel(obj.MainLayout);
-            controlPanel.Layout.Row = 2;
-            controlPanel.Title = 'Control';
-            controlPanel.FontSize = 14;
-            controlPanel.FontWeight = 'bold';
-            controlPanel.BackgroundColor = [0.98 0.98 1.0];
+            obj.ConnectionStatus.Position = [20, 370, 310, 25];
             
-            controlGrid = uigridlayout(controlPanel, [3, 2]);
-            controlGrid.RowHeight = {'fit', 'fit', 'fit'};
-            controlGrid.ColumnWidth = {'1x', '1x'};
-            controlGrid.Padding = [10 10 10 10];
-            controlGrid.RowSpacing = 8;
-            controlGrid.ColumnSpacing = 10;
-            
-            % Enable/Disable Button
-            obj.EnableButton = uibutton(controlGrid, 'push');
-            obj.EnableButton.Text = '▶ Enable';
-            obj.EnableButton.Layout.Row = 1;
-            obj.EnableButton.Layout.Column = [1 2];
+            % Enable Button - Large and prominent
+            obj.EnableButton = uibutton(obj.UIFigure, 'push');
+            obj.EnableButton.Text = 'Enable Joystick';
+            obj.EnableButton.FontSize = 16;
+            obj.EnableButton.FontWeight = 'bold';
             obj.EnableButton.BackgroundColor = [0.16 0.68 0.38];
             obj.EnableButton.FontColor = [1 1 1];
-            obj.EnableButton.FontSize = 14;
-            obj.EnableButton.FontWeight = 'bold';
-            obj.EnableButton.Tooltip = 'Enable/Disable MJC3 joystick control. When enabled, the joystick will control stage movement.';
+            obj.EnableButton.Position = [50, 320, 250, 40];
+            obj.EnableButton.Tooltip = 'Click to enable/disable joystick control';
             
-            % Step Factor Control
-            stepLabel = uilabel(controlGrid);
-            stepLabel.Text = 'Step Factor:';
-            stepLabel.FontSize = 12;
-            stepLabel.FontWeight = 'bold';
-            stepLabel.Layout.Row = 2;
-            stepLabel.Layout.Column = 1;
-            stepLabel.HorizontalAlignment = 'right';
+            % Speed Section
+            speedLabel = uilabel(obj.UIFigure);
+            speedLabel.Text = 'Movement Speed:';
+            speedLabel.FontSize = 14;
+            speedLabel.FontWeight = 'bold';
+            speedLabel.HorizontalAlignment = 'center';
+            speedLabel.FontColor = [0.3 0.3 0.5];
+            speedLabel.Position = [20, 280, 310, 25];
             
-            stepPanel = uipanel(controlGrid);
-            stepPanel.Layout.Row = 2;
-            stepPanel.Layout.Column = 2;
-            stepPanel.BorderType = 'none';
-            stepPanel.BackgroundColor = [0.98 0.98 1.0];
+            % Speed Buttons
+            slowButton = uibutton(obj.UIFigure, 'push');
+            slowButton.Text = 'Slow';
+            slowButton.FontSize = 12;
+            slowButton.BackgroundColor = [0.9 0.9 0.95];
+            slowButton.Position = [30, 245, 80, 30];
+            slowButton.ButtonPushedFcn = @(~,~) obj.setSpeed(1);
+            slowButton.Tooltip = 'Slow, precise movement (1 μm/unit)';
             
-            stepGrid = uigridlayout(stepPanel, [1, 2]);
-            stepGrid.ColumnWidth = {'1x', 'fit'};
-            stepGrid.Padding = [0 0 0 0];
-            stepGrid.ColumnSpacing = 5;
+            mediumButton = uibutton(obj.UIFigure, 'push');
+            mediumButton.Text = 'Medium';
+            mediumButton.FontSize = 12;
+            mediumButton.BackgroundColor = [0.8 0.9 0.8];
+            mediumButton.Position = [135, 245, 80, 30];
+            mediumButton.ButtonPushedFcn = @(~,~) obj.setSpeed(5);
+            mediumButton.Tooltip = 'Medium speed movement (5 μm/unit)';
             
-            obj.StepFactorField = uieditfield(stepGrid, 'numeric');
+            fastButton = uibutton(obj.UIFigure, 'push');
+            fastButton.Text = 'Fast';
+            fastButton.FontSize = 12;
+            fastButton.BackgroundColor = [0.9 0.8 0.8];
+            fastButton.Position = [240, 245, 80, 30];
+            fastButton.ButtonPushedFcn = @(~,~) obj.setSpeed(20);
+            fastButton.Tooltip = 'Fast movement (20 μm/unit)';
+            
+            % Current Speed Display
+            speedFieldLabel = uilabel(obj.UIFigure);
+            speedFieldLabel.Text = 'Custom Speed:';
+            speedFieldLabel.FontSize = 12;
+            speedFieldLabel.FontWeight = 'bold';
+            speedFieldLabel.HorizontalAlignment = 'left';
+            speedFieldLabel.FontColor = [0.3 0.3 0.5];
+            speedFieldLabel.Position = [30, 210, 120, 20];
+            
+            obj.StepFactorField = uieditfield(obj.UIFigure, 'numeric');
             obj.StepFactorField.Value = 5;
             obj.StepFactorField.FontSize = 12;
             obj.StepFactorField.Limits = [0.1 100];
-            obj.StepFactorField.Tooltip = 'Micrometers moved per unit of joystick deflection. Higher values = faster movement.';
+            obj.StepFactorField.HorizontalAlignment = 'center';
+            obj.StepFactorField.Position = [160, 208, 80, 25];
+            obj.StepFactorField.Tooltip = 'Custom speed: micrometers moved per joystick unit';
             
-            stepUnits = uilabel(stepGrid);
-            stepUnits.Text = 'μm/unit';
-            stepUnits.FontSize = 12;
-            stepUnits.FontColor = [0.5 0.5 0.5];
+            speedUnitsLabel = uilabel(obj.UIFigure);
+            speedUnitsLabel.Text = 'μm/unit';
+            speedUnitsLabel.FontSize = 11;
+            speedUnitsLabel.FontColor = [0.5 0.5 0.5];
+            speedUnitsLabel.HorizontalAlignment = 'left';
+            speedUnitsLabel.Position = [250, 210, 60, 20];
             
-            % Status Display
-            statusLabel = uilabel(controlGrid);
-            statusLabel.Text = 'Status:';
-            statusLabel.FontSize = 12;
-            statusLabel.FontWeight = 'bold';
-            statusLabel.Layout.Row = 3;
-            statusLabel.Layout.Column = 1;
-            statusLabel.HorizontalAlignment = 'right';
+            % Calibration Section
+            calibrationLabel = uilabel(obj.UIFigure);
+            calibrationLabel.Text = 'Axis Calibration:';
+            calibrationLabel.FontSize = 14;
+            calibrationLabel.FontWeight = 'bold';
+            calibrationLabel.HorizontalAlignment = 'center';
+            calibrationLabel.FontColor = [0.3 0.3 0.5];
+            calibrationLabel.Position = [20, 170, 310, 25];
             
-            obj.StatusLabel = uilabel(controlGrid);
+            % Calibration Buttons - Better organized in a row
+            xCalButton = uibutton(obj.UIFigure, 'push');
+            xCalButton.Text = 'X-Axis';
+            xCalButton.FontSize = 11;
+            xCalButton.BackgroundColor = [0.85 0.9 1.0];
+            xCalButton.Position = [30, 135, 65, 30];
+            xCalButton.ButtonPushedFcn = @(~,~) obj.calibrateAxis('X');
+            xCalButton.Tooltip = 'Calibrate X-axis (left/right movement)';
+            
+            yCalButton = uibutton(obj.UIFigure, 'push');
+            yCalButton.Text = 'Y-Axis';
+            yCalButton.FontSize = 11;
+            yCalButton.BackgroundColor = [0.9 1.0 0.85];
+            yCalButton.Position = [105, 135, 65, 30];
+            yCalButton.ButtonPushedFcn = @(~,~) obj.calibrateAxis('Y');
+            yCalButton.Tooltip = 'Calibrate Y-axis (forward/back movement)';
+            
+            zCalButton = uibutton(obj.UIFigure, 'push');
+            zCalButton.Text = 'Z-Axis';
+            zCalButton.FontSize = 11;
+            zCalButton.BackgroundColor = [1.0 0.9 0.85];
+            zCalButton.Position = [180, 135, 65, 30];
+            zCalButton.ButtonPushedFcn = @(~,~) obj.calibrateAxis('Z');
+            zCalButton.Tooltip = 'Calibrate Z-axis (twist movement)';
+            
+            resetCalButton = uibutton(obj.UIFigure, 'push');
+            resetCalButton.Text = 'Reset All';
+            resetCalButton.FontSize = 11;
+            resetCalButton.BackgroundColor = [1.0 0.85 0.85];
+            resetCalButton.Position = [255, 135, 65, 30];
+            resetCalButton.ButtonPushedFcn = @(~,~) obj.resetCalibration();
+            resetCalButton.Tooltip = 'Reset all calibration to defaults';
+            
+            % Calibration Status Display
+            calibrationStatusLabel = uilabel(obj.UIFigure);
+            calibrationStatusLabel.Text = 'Calibration Status: Using defaults';
+            calibrationStatusLabel.FontSize = 10;
+            calibrationStatusLabel.FontColor = [0.5 0.5 0.5];
+            calibrationStatusLabel.HorizontalAlignment = 'center';
+            calibrationStatusLabel.Position = [20, 110, 310, 20];
+            
+            % Status Section
+            statusTitle = uilabel(obj.UIFigure);
+            statusTitle.Text = 'Status:';
+            statusTitle.FontSize = 12;
+            statusTitle.FontWeight = 'bold';
+            statusTitle.HorizontalAlignment = 'center';
+            statusTitle.FontColor = [0.3 0.3 0.5];
+            statusTitle.Position = [20, 75, 310, 20];
+            
+            obj.StatusLabel = uilabel(obj.UIFigure);
             obj.StatusLabel.Text = 'Ready';
-            obj.StatusLabel.FontSize = 12;
+            obj.StatusLabel.FontSize = 14;
+            obj.StatusLabel.FontWeight = 'bold';
+            obj.StatusLabel.HorizontalAlignment = 'center';
             obj.StatusLabel.FontColor = [0.5 0.5 0.5];
-            obj.StatusLabel.Layout.Row = 3;
-            obj.StatusLabel.Layout.Column = 2;
+            obj.StatusLabel.Position = [20, 45, 310, 25];
+            
+            % Help Button
+            helpButton = uibutton(obj.UIFigure, 'push');
+            helpButton.Text = '?';
+            helpButton.FontSize = 14;
+            helpButton.FontWeight = 'bold';
+            helpButton.BackgroundColor = [0.9 0.9 0.9];
+            helpButton.Position = [20, 15, 30, 25];
+            helpButton.ButtonPushedFcn = @(~,~) obj.showHelp();
+            helpButton.Tooltip = 'Show help and usage instructions';
         end
         
-        function createAnalogControlsSection(obj)
-            % Create analog controls section based on reference image
-            analogPanel = uipanel(obj.MainLayout);
-            analogPanel.Layout.Row = 3;
-            analogPanel.Title = 'Analog Controls';
-            analogPanel.FontSize = 14;
-            analogPanel.FontWeight = 'bold';
-            analogPanel.BackgroundColor = [0.95 0.98 0.95];
-            
-            % Create grid for analog controls
-            analogGrid = uigridlayout(analogPanel, [4, 5]);
-            analogGrid.RowHeight = {'fit', 'fit', 'fit', 'fit'};
-            analogGrid.ColumnWidth = {'fit', 'fit', '1x', 'fit', 'fit'};
-            analogGrid.Padding = [10 10 10 10];
-            analogGrid.RowSpacing = 8;
-            analogGrid.ColumnSpacing = 10;
-            
-            % Headers
-            obj.createAnalogHeader(analogGrid);
-            
-            % Analog Z Control
-            obj.createAnalogControl(analogGrid, 'Analog Z', 2);
-            
-            % Analog X Control  
-            obj.createAnalogControl(analogGrid, 'Analog X', 3);
-            
-            % Analog Y Control
-            obj.createAnalogControl(analogGrid, 'Analog Y', 4);
-        end
+
         
-        function createButtonControlsSection(obj)
-            % Create button controls section
-            buttonPanel = uipanel(obj.MainLayout);
-            buttonPanel.Layout.Row = 4;
-            buttonPanel.Title = 'Buttons';
-            buttonPanel.FontSize = 14;
-            buttonPanel.FontWeight = 'bold';
-            buttonPanel.BackgroundColor = [0.98 0.95 0.90];
-            
-            % Create grid for button controls
-            buttonGrid = uigridlayout(buttonPanel, [2, 4]);
-            buttonGrid.RowHeight = {'fit', 'fit'};
-            buttonGrid.ColumnWidth = {'fit', 'fit', '1x', 'fit'};
-            buttonGrid.Padding = [10 10 10 10];
-            buttonGrid.RowSpacing = 8;
-            buttonGrid.ColumnSpacing = 10;
-            
-            % Headers
-            buttonHeader = uilabel(buttonGrid);
-            buttonHeader.Text = 'Button';
-            buttonHeader.FontSize = 12;
-            buttonHeader.FontWeight = 'bold';
-            buttonHeader.Layout.Row = 1;
-            buttonHeader.Layout.Column = 1;
-            
-            stateHeader = uilabel(buttonGrid);
-            stateHeader.Text = 'State';
-            stateHeader.FontSize = 12;
-            stateHeader.FontWeight = 'bold';
-            stateHeader.Layout.Row = 1;
-            stateHeader.Layout.Column = 2;
-            
-            targetHeader = uilabel(buttonGrid);
-            targetHeader.Text = 'Target';
-            targetHeader.FontSize = 12;
-            targetHeader.FontWeight = 'bold';
-            targetHeader.Layout.Row = 1;
-            targetHeader.Layout.Column = 3;
-            
-            actionHeader = uilabel(buttonGrid);
-            actionHeader.Text = 'Action';
-            actionHeader.FontSize = 12;
-            actionHeader.FontWeight = 'bold';
-            actionHeader.Layout.Row = 1;
-            actionHeader.Layout.Column = 4;
-            
-            % Button 1 Row
-            button1Label = uilabel(buttonGrid);
-            button1Label.Text = 'Button 1';
-            button1Label.FontSize = 12;
-            button1Label.FontWeight = 'bold';
-            button1Label.Layout.Row = 2;
-            button1Label.Layout.Column = 1;
-            
-            % State indicator (green circle)
-            obj.Button1StateIndicator = uilabel(buttonGrid);
-            obj.Button1StateIndicator.Text = '●';
-            obj.Button1StateIndicator.FontSize = 16;
-            obj.Button1StateIndicator.FontColor = [0.16 0.68 0.38]; % Green
-            obj.Button1StateIndicator.HorizontalAlignment = 'center';
-            obj.Button1StateIndicator.Layout.Row = 2;
-            obj.Button1StateIndicator.Layout.Column = 2;
-            
-            % Target dropdown
-            obj.Button1TargetDropdown = uidropdown(buttonGrid);
-            obj.Button1TargetDropdown.Items = {'Selected', 'All', 'None'};
-            obj.Button1TargetDropdown.Value = 'Selected';
-            obj.Button1TargetDropdown.FontSize = 12;
-            obj.Button1TargetDropdown.Layout.Row = 2;
-            obj.Button1TargetDropdown.Layout.Column = 3;
-            
-            % Action dropdown
-            obj.Button1ActionDropdown = uidropdown(buttonGrid);
-            obj.Button1ActionDropdown.Items = {'Fire 1', 'Fire 2', 'Fire 3', 'None'};
-            obj.Button1ActionDropdown.Value = 'Fire 1';
-            obj.Button1ActionDropdown.FontSize = 12;
-            obj.Button1ActionDropdown.Layout.Row = 2;
-            obj.Button1ActionDropdown.Layout.Column = 4;
-        end
-        
-        function createMappingControlsSection(obj)
-            % Create mapping controls section
-            mappingPanel = uipanel(obj.MainLayout);
-            mappingPanel.Layout.Row = 5;
-            mappingPanel.Title = 'Mapping';
-            mappingPanel.FontSize = 14;
-            mappingPanel.FontWeight = 'bold';
-            mappingPanel.BackgroundColor = [0.95 0.95 0.98];
-            
-            % Create grid for mapping controls
-            mappingGrid = uigridlayout(mappingPanel, [2, 4]);
-            mappingGrid.RowHeight = {'fit', 'fit'};
-            mappingGrid.ColumnWidth = {'fit', '1x', 'fit', 'fit'};
-            mappingGrid.Padding = [10 10 10 10];
-            mappingGrid.RowSpacing = 8;
-            mappingGrid.ColumnSpacing = 10;
-            
-            % Mapping file label
-            mappingLabel = uilabel(mappingGrid);
-            mappingLabel.Text = 'Mapping File:';
-            mappingLabel.FontSize = 12;
-            mappingLabel.FontWeight = 'bold';
-            mappingLabel.Layout.Row = 1;
-            mappingLabel.Layout.Column = 1;
-            
-            % Mapping file dropdown
-            obj.MappingFileDropdown = uidropdown(mappingGrid);
-            obj.MappingFileDropdown.Items = {'Joystick', 'Custom 1', 'Custom 2'};
-            obj.MappingFileDropdown.Value = 'Joystick';
-            obj.MappingFileDropdown.FontSize = 12;
-            obj.MappingFileDropdown.Layout.Row = 1;
-            obj.MappingFileDropdown.Layout.Column = 2;
-            
-            % New button
-            obj.NewMappingButton = uibutton(mappingGrid, 'push');
-            obj.NewMappingButton.Text = 'New';
-            obj.NewMappingButton.FontSize = 11;
-            obj.NewMappingButton.BackgroundColor = [0.16 0.68 0.38];
-            obj.NewMappingButton.FontColor = [1 1 1];
-            obj.NewMappingButton.Tooltip = 'Create new mapping file';
-            obj.NewMappingButton.Layout.Row = 1;
-            obj.NewMappingButton.Layout.Column = 3;
-            obj.NewMappingButton.ButtonPushedFcn = @(~,~) obj.createNewMapping();
-            
-            % Save button
-            obj.SaveMappingButton = uibutton(mappingGrid, 'push');
-            obj.SaveMappingButton.Text = 'Save';
-            obj.SaveMappingButton.FontSize = 11;
-            obj.SaveMappingButton.BackgroundColor = [0.2 0.6 0.8];
-            obj.SaveMappingButton.FontColor = [1 1 1];
-            obj.SaveMappingButton.Tooltip = 'Save current mapping';
-            obj.SaveMappingButton.Layout.Row = 1;
-            obj.SaveMappingButton.Layout.Column = 4;
-            obj.SaveMappingButton.ButtonPushedFcn = @(~,~) obj.saveMapping();
-            
-            % Remove button
-            obj.RemoveMappingButton = uibutton(mappingGrid, 'push');
-            obj.RemoveMappingButton.Text = 'Remove';
-            obj.RemoveMappingButton.FontSize = 11;
-            obj.RemoveMappingButton.BackgroundColor = [0.86 0.24 0.24];
-            obj.RemoveMappingButton.FontColor = [1 1 1];
-            obj.RemoveMappingButton.Tooltip = 'Remove current mapping';
-            obj.RemoveMappingButton.Layout.Row = 2;
-            obj.RemoveMappingButton.Layout.Column = 4;
-            obj.RemoveMappingButton.ButtonPushedFcn = @(~,~) obj.removeMapping();
-        end
-        
-        function createAnalogHeader(~, grid)
-            % Create header row for analog controls
-            % Control Name
-            nameHeader = uilabel(grid);
-            nameHeader.Text = 'Control';
-            nameHeader.FontSize = 12;
-            nameHeader.FontWeight = 'bold';
-            nameHeader.Layout.Row = 1;
-            nameHeader.Layout.Column = 1;
-            
-            % Current Value
-            valueHeader = uilabel(grid);
-            valueHeader.Text = 'Value';
-            valueHeader.FontSize = 12;
-            valueHeader.FontWeight = 'bold';
-            valueHeader.Layout.Row = 1;
-            valueHeader.Layout.Column = 2;
-            
-            % Sensitivity
-            sensHeader = uilabel(grid);
-            sensHeader.Text = 'Sensitivity';
-            sensHeader.FontSize = 12;
-            sensHeader.FontWeight = 'bold';
-            sensHeader.Layout.Row = 1;
-            sensHeader.Layout.Column = 3;
-            
-            % Action
-            actionHeader = uilabel(grid);
-            actionHeader.Text = 'Action';
-            actionHeader.FontSize = 12;
-            actionHeader.FontWeight = 'bold';
-            actionHeader.Layout.Row = 1;
-            actionHeader.Layout.Column = 4;
-            
-            % Calibrate
-            calibHeader = uilabel(grid);
-            calibHeader.Text = '';
-            calibHeader.Layout.Row = 1;
-            calibHeader.Layout.Column = 5;
-        end
-        
-        function createAnalogControl(obj, grid, controlName, row)
-            % Create a single analog control row
-            
-            % Control Name
-            nameLabel = uilabel(grid);
-            nameLabel.Text = controlName;
-            nameLabel.FontSize = 12;
-            nameLabel.FontWeight = 'bold';
-            nameLabel.Layout.Row = row;
-            nameLabel.Layout.Column = 1;
-            
-            % Current Value Display
-            valueDisplay = uilabel(grid);
-            valueDisplay.Text = '0';
-            valueDisplay.FontSize = 12;
-            valueDisplay.FontColor = [0.2 0.6 0.8];
-            valueDisplay.Layout.Row = row;
-            valueDisplay.Layout.Column = 2;
-            
-            % Store reference based on control name
-            switch controlName
-                case 'Analog Z'
-                    obj.ZValueDisplay = valueDisplay;
-                case 'Analog X'
-                    obj.XValueDisplay = valueDisplay;
-                case 'Analog Y'
-                    obj.YValueDisplay = valueDisplay;
+        function setSpeed(obj, speed)
+            % Set joystick movement speed with user-friendly presets
+            try
+                obj.StepFactorField.Value = speed;
+                
+                % Update controller if available
+                if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
+                    obj.HIDController.setStepFactor(speed);
+                end
+                
+                % Provide feedback with simple if-else instead of containers.Map
+                if speed == 1
+                    speedName = 'Slow';
+                elseif speed == 5
+                    speedName = 'Medium';
+                elseif speed == 20
+                    speedName = 'Fast';
+                else
+                    speedName = 'Custom';
+                end
+                
+                obj.Logger.info('Speed set to %s (%.1f μm/unit)', speedName, speed);
+                
+            catch ME
+                obj.Logger.error('Error setting speed: %s', ME.message);
             end
-            
-            % Sensitivity Input Field
-            sensField = uieditfield(grid, 'numeric');
-            sensField.Value = 5;
-            sensField.FontSize = 12;
-            sensField.Limits = [0.1 100];
-            sensField.Tooltip = sprintf('Sensitivity for %s. Controls how much the joystick movement affects stage position.', controlName);
-            sensField.Layout.Row = row;
-            sensField.Layout.Column = 3;
-            
-            % Store reference based on control name
-            switch controlName
-                case 'Analog Z'
-                    obj.ZSensitivityField = sensField;
-                case 'Analog X'
-                    obj.XSensitivityField = sensField;
-                case 'Analog Y'
-                    obj.YSensitivityField = sensField;
-            end
-            
-            % Action Dropdown
-            actionDropdown = uidropdown(grid);
-            actionDropdown.Items = {'Move Continuous', 'Delta 1', 'Delta 2', 'Delta 3'};
-            actionDropdown.Value = 'Move Continuous';
-            actionDropdown.FontSize = 12;
-            actionDropdown.Tooltip = sprintf('Action type for %s. Move Continuous = real-time movement, Delta = fixed step sizes.', controlName);
-            actionDropdown.Layout.Row = row;
-            actionDropdown.Layout.Column = 4;
-            
-            % Store reference based on control name
-            switch controlName
-                case 'Analog Z'
-                    obj.ZActionDropdown = actionDropdown;
-                case 'Analog X'
-                    obj.XActionDropdown = actionDropdown;
-                case 'Analog Y'
-                    obj.YActionDropdown = actionDropdown;
-            end
-            
-            % Calibrate Button
-            calibBtn = uibutton(grid, 'push');
-            calibBtn.Text = 'Calibrate';
-            calibBtn.FontSize = 11;
-            calibBtn.BackgroundColor = [0.2 0.6 0.8];
-            calibBtn.FontColor = [1 1 1];
-            calibBtn.Tooltip = sprintf('Calibrate %s. Move the joystick through its full range to improve accuracy.', controlName);
-            calibBtn.Layout.Row = row;
-            calibBtn.Layout.Column = 5;
-            calibBtn.ButtonPushedFcn = @(~,~) obj.calibrateAxis(controlName);
         end
+        
+
+        
+
         
         function setupCallbacks(obj)
             % Set up all UI callback functions
@@ -792,26 +557,51 @@ classdef MJC3View < handle
         function updateUI(obj)
             % Update UI state based on current conditions
             
-            if obj.IsEnabled
-                obj.EnableButton.Text = '⏸ Disable';
-                obj.EnableButton.BackgroundColor = [0.86 0.24 0.24];
-                obj.StatusLabel.Text = 'Active';
-                obj.StatusLabel.FontColor = [0.16 0.68 0.38];
-            else
-                obj.EnableButton.Text = '▶ Enable';
-                obj.EnableButton.BackgroundColor = [0.16 0.68 0.38];
-                obj.StatusLabel.Text = 'Inactive';
-                obj.StatusLabel.FontColor = [0.5 0.5 0.5];
+            try
+                if obj.IsEnabled
+                    obj.Logger.debug('Updating UI to ENABLED state');
+                    obj.EnableButton.Text = 'Disable';  % Remove emoji for compatibility
+                    obj.EnableButton.BackgroundColor = [0.86 0.24 0.24];
+                    obj.StatusLabel.Text = 'Active';
+                    obj.StatusLabel.FontColor = [0.16 0.68 0.38];
+                else
+                    obj.Logger.debug('Updating UI to DISABLED state');
+                    % Check if we have a controller to determine button state
+                    if isempty(obj.HIDController)
+                        obj.EnableButton.Text = 'No Controller';  % Remove emoji for compatibility
+                        obj.EnableButton.BackgroundColor = [0.7 0.7 0.7];
+                        obj.EnableButton.Enable = 'off';  % Disable button when no controller
+                        obj.StatusLabel.Text = 'No Controller Available';
+                        obj.StatusLabel.FontColor = [0.8 0.4 0.4];
+                    else
+                        obj.EnableButton.Text = 'Enable';  % Remove emoji for compatibility
+                        obj.EnableButton.BackgroundColor = [0.16 0.68 0.38];
+                        obj.EnableButton.Enable = 'on';   % Enable button when controller available
+                        obj.StatusLabel.Text = 'Ready to Enable';
+                        obj.StatusLabel.FontColor = [0.5 0.5 0.5];
+                    end
+                end
+                
+                obj.updateConnectionStatus();
+                
+                % Force UI refresh
+                drawnow;
+                
+            catch ME
+                obj.Logger.error('Error updating UI: %s', ME.message);
             end
-            
-            obj.updateConnectionStatus();
         end
         
         function startMonitoring(obj)
             % Start real-time monitoring timer with robust error handling
             try
+                % Don't start if we're closing or deleting
+                if obj.IsClosing || obj.IsDeleting
+                    return;
+                end
+                
                 % Stop any existing timer first
-                obj.stopMonitoring();
+                obj.safeStopMonitoring();
                 
                 % Validate objects before starting timer
                 if ~obj.validateObjects()
@@ -823,206 +613,38 @@ classdef MJC3View < handle
                     obj.UpdateTimer = timer(...
                         'ExecutionMode', 'fixedRate', ...
                         'Period', 0.1, ...  % Update at 10 Hz
-                        'TimerFcn', @(~,~) obj.updateDisplay());
+                        'TimerFcn', @(~,~) obj.safeUpdateDisplay(), ...
+                        'ErrorFcn', @(~,~) obj.handleTimerError());
                     start(obj.UpdateTimer);
                     obj.Logger.info('Monitoring timer started');
                 end
             catch ME
                 obj.Logger.error('Failed to start monitoring timer: %s', ME.message);
-                % Clean up any partially created timer
-                if ~isempty(obj.UpdateTimer) && isvalid(obj.UpdateTimer)
-                    try
-                        stop(obj.UpdateTimer);
-                        delete(obj.UpdateTimer);
-                    catch
-                        % Ignore cleanup errors
-                    end
-                    obj.UpdateTimer = [];
-                end
+                obj.safeStopMonitoring();
             end
         end
         
         function stopMonitoring(obj)
-            % Stop monitoring timer with robust error handling
-            try
-                if ~isempty(obj.UpdateTimer) && isvalid(obj.UpdateTimer)
-                    stop(obj.UpdateTimer);
-                    delete(obj.UpdateTimer);
-                    obj.UpdateTimer = [];
-                    obj.Logger.info('Monitoring timer stopped');
-                end
-            catch ME
-                obj.Logger.error('Error stopping monitoring timer: %s', ME.message);
-                % Force cleanup even if there's an error
-                try
-                    if ~isempty(obj.UpdateTimer)
-                        delete(obj.UpdateTimer);
-                    end
-                catch
-                    % Ignore cleanup errors
-                end
-                obj.UpdateTimer = [];
-            end
+            % Stop monitoring timer with robust error handling (legacy method)
+            obj.safeStopMonitoring();
         end
         
         function updateDisplay(obj)
-            % Update real-time display elements with robust error handling
-            try
-                % Validate all objects before proceeding
-                if ~obj.validateObjects()
-                    return;
-                end
-                
-                if ~isempty(obj.HIDController) && obj.IsEnabled
-                    % This would be called by the timer to update displays
-                    % Implementation depends on how you want to interface with the controller
-                    obj.updateAnalogControls();
-                end
-            catch ME
-                % Log error and stop monitoring to prevent repeated crashes
-                obj.Logger.error('Error in updateDisplay: %s', ME.message);
-                obj.stopMonitoring();
-            end
+            % Update real-time display elements with robust error handling (legacy method)
+            obj.safeUpdateDisplay();
         end
         
         function updateAnalogControls(obj)
-            % Update analog control displays with real joystick data and calibration
-            try
-                % Validate objects before proceeding
-                if ~obj.validateObjects()
-                    return;
-                end
-                
-                if isempty(obj.HIDController) || ~obj.IsEnabled
-                    return;
-                end
-                
-                % Try to get real joystick data if MEX controller is available
-                if isa(obj.HIDController, 'MJC3_MEX_Controller')
-                    % Get real-time joystick data from MEX controller
-                    data = obj.HIDController.readJoystick();
-                    if length(data) >= 5
-                        xPos = data(1);  % X position (0-255)
-                        yPos = data(2);  % Y position (0-255)
-                        zPos = data(3);  % Z position (0-255)
-                        
-                        % Apply calibration if available
-                        if isprop(obj.HIDController, 'CalibrationService') && ~isempty(obj.HIDController.CalibrationService)
-                            % Get calibrated values
-                            calibratedX = obj.HIDController.CalibrationService.applyCalibration('X', xPos);
-                            calibratedY = obj.HIDController.CalibrationService.applyCalibration('Y', yPos);
-                            calibratedZ = obj.HIDController.CalibrationService.applyCalibration('Z', zPos);
-                            
-                            % Update displays with calibrated values (-1.0 to 1.0)
-                            if ~isempty(obj.XValueDisplay) && isvalid(obj.XValueDisplay)
-                                obj.XValueDisplay.Text = sprintf('%.2f', calibratedX);
-                                % Color code based on activity
-                                if abs(calibratedX) > 0.01
-                                    obj.XValueDisplay.FontColor = [0.2 0.8 0.2]; % Green for active
-                                else
-                                    obj.XValueDisplay.FontColor = [0.2 0.6 0.8]; % Blue for inactive
-                                end
-                            end
-                            
-                            if ~isempty(obj.YValueDisplay) && isvalid(obj.YValueDisplay)
-                                obj.YValueDisplay.Text = sprintf('%.2f', calibratedY);
-                                % Color code based on activity
-                                if abs(calibratedY) > 0.01
-                                    obj.YValueDisplay.FontColor = [0.2 0.8 0.2]; % Green for active
-                                else
-                                    obj.YValueDisplay.FontColor = [0.2 0.6 0.8]; % Blue for inactive
-                                end
-                            end
-                            
-                            if ~isempty(obj.ZValueDisplay) && isvalid(obj.ZValueDisplay)
-                                obj.ZValueDisplay.Text = sprintf('%.2f', calibratedZ);
-                                % Color code based on activity
-                                if abs(calibratedZ) > 0.01
-                                    obj.ZValueDisplay.FontColor = [0.2 0.8 0.2]; % Green for active
-                                else
-                                    obj.ZValueDisplay.FontColor = [0.2 0.6 0.8]; % Blue for inactive
-                                end
-                            end
-                        else
-                            % Fallback to raw values if no calibration service
-                            if ~isempty(obj.XValueDisplay) && isvalid(obj.XValueDisplay)
-                                obj.XValueDisplay.Text = sprintf('%d', xPos);
-                                obj.XValueDisplay.FontColor = [0.2 0.6 0.8];
-                            end
-                            if ~isempty(obj.YValueDisplay) && isvalid(obj.YValueDisplay)
-                                obj.YValueDisplay.Text = sprintf('%d', yPos);
-                                obj.YValueDisplay.FontColor = [0.2 0.6 0.8];
-                            end
-                            if ~isempty(obj.ZValueDisplay) && isvalid(obj.ZValueDisplay)
-                                obj.ZValueDisplay.Text = sprintf('%d', zPos);
-                                obj.ZValueDisplay.FontColor = [0.2 0.6 0.8];
-                            end
-                        end
-                        
-                        return;
-                    end
-                end
-            catch ME
-                % Log error and fall back to placeholder
-                obj.Logger.error('Error updating analog controls: %s', ME.message);
-            end
+            % Simplified version - no analog displays in the basic interface
+            % The joystick data is still being processed by the controller,
+            % but we don't need to update any display components since they were removed
+            % for simplification. The actual joystick movement is handled by the controller.
             
-            % Placeholder implementation for non-MEX controllers or errors
-            try
-                if ~isempty(obj.XValueDisplay) && isvalid(obj.XValueDisplay)
-                    obj.XValueDisplay.Text = '0';
-                    obj.XValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
-                end
-                if ~isempty(obj.YValueDisplay) && isvalid(obj.YValueDisplay)
-                    obj.YValueDisplay.Text = '0';
-                    obj.YValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
-                end
-                if ~isempty(obj.ZValueDisplay) && isvalid(obj.ZValueDisplay)
-                    obj.ZValueDisplay.Text = '0';
-                    obj.ZValueDisplay.FontColor = [0.5 0.5 0.5]; % Gray for no data
-                end
-            catch ME
-                obj.Logger.error('Error setting placeholder values: %s', ME.message);
-            end
+            % This method is kept for compatibility but does nothing in the simplified interface
+            % The joystick input is still working - you can see the "SIMULATION: X-axis would move" messages
         end
         
-        function isValid = validateObjects(obj)
-            % Validate that all critical objects are still valid
-            isValid = true;
-            
-            try
-                % Check if the main UI figure is valid
-                if isempty(obj.UIFigure) || ~isvalid(obj.UIFigure)
-                    obj.Logger.warning('UIFigure is invalid or deleted');
-                    isValid = false;
-                    return;
-                end
-                
-                % Check if the controller is valid (if it exists)
-                if ~isempty(obj.HIDController) && ~isvalid(obj.HIDController)
-                    obj.Logger.warning('HIDController is invalid or deleted');
-                    obj.HIDController = []; % Clear invalid reference
-                    obj.IsEnabled = false;
-                    obj.IsConnected = false;
-                    isValid = false;
-                    return;
-                end
-                
-                % Check if critical UI components are valid
-                criticalComponents = {obj.EnableButton, obj.StatusLabel, obj.ConnectionStatus};
-                for i = 1:length(criticalComponents)
-                    if ~isempty(criticalComponents{i}) && ~isvalid(criticalComponents{i})
-                        obj.Logger.warning('Critical UI component %d is invalid', i);
-                        isValid = false;
-                        return;
-                    end
-                end
-                
-            catch ME
-                obj.Logger.error('Error validating objects: %s', ME.message);
-                isValid = false;
-            end
-        end
+
         
         function calibrateAxis(obj, axisName)
             % Calibrate a specific axis using the new calibration system
@@ -1089,20 +711,78 @@ classdef MJC3View < handle
             end
         end
         
+        function resetCalibration(obj)
+            % Reset all axis calibration to defaults
+            try
+                % Show confirmation dialog
+                response = uiconfirm(obj.UIFigure, ...
+                    'This will reset all axis calibration to default values. Continue?', ...
+                    'Reset Calibration', ...
+                    'Options', {'Reset', 'Cancel'}, ...
+                    'DefaultOption', 'Cancel', ...
+                    'Icon', 'warning');
+                
+                if strcmp(response, 'Cancel')
+                    return;
+                end
+                
+                % Reset calibration using the controller
+                if ~isempty(obj.HIDController) && ismethod(obj.HIDController, 'resetCalibration')
+                    obj.HIDController.resetCalibration('all');
+                    
+                    % Show success message
+                    uialert(obj.UIFigure, ...
+                        '✅ All calibration data has been reset to defaults.', ...
+                        'Calibration Reset', 'Icon', 'success');
+                    
+                    obj.Logger.info('All axis calibration reset to defaults');
+                else
+                    error('Controller does not support calibration reset');
+                end
+                
+            catch ME
+                obj.Logger.error('Failed to reset calibration: %s', ME.message);
+                uialert(obj.UIFigure, sprintf('Reset failed: %s', ME.message), ...
+                    'Reset Error', 'Icon', 'error');
+            end
+        end
+        
         % Callback Methods
         function onEnableButtonPushed(obj)
-            % Toggle enable/disable state with detailed status feedback and robust error handling
+            % Toggle enable/disable state with enhanced crash prevention
             try
+                % Check if we're in shutdown mode
+                if obj.IsClosing || obj.IsDeleting || obj.CleanupComplete
+                    obj.Logger.debug('Ignoring enable button - shutdown in progress');
+                    return;
+                end
+                
                 % Validate objects before proceeding
                 if ~obj.validateObjects()
                     obj.Logger.warning('Cannot toggle enable state - objects not valid');
                     return;
                 end
                 
+                % Disable button temporarily to prevent double-clicks
+                if ~isempty(obj.EnableButton) && isvalid(obj.EnableButton)
+                    obj.EnableButton.Enable = 'off';
+                end
+                
                 if ~obj.IsEnabled
                     % Trying to enable - check hardware first
                     if isempty(obj.HIDController)
-                        uialert(obj.UIFigure, 'No controller available. Please check hardware connection.', 'No Controller');
+                        obj.showSafeAlert(['No HID controller available.\n\n' ...
+                            'The joystick controller needs to be initialized by the main application first.\n\n' ...
+                            'This usually means:\n' ...
+                            '• The main Foilview application is not running\n' ...
+                            '• The MJC3 hardware is not detected\n' ...
+                            '• The controller failed to initialize\n\n' ...
+                            'Try:\n' ...
+                            '1. Close this window\n' ...
+                            '2. Restart the main Foilview application\n' ...
+                            '3. Open the joystick window again'], 'No Controller Available');
+                        obj.enableButton();
+                        obj.updateUI(); % Make sure UI is updated even on failure
                         return;
                     end
                     
@@ -1110,14 +790,18 @@ classdef MJC3View < handle
                     if ~isvalid(obj.HIDController)
                         obj.Logger.warning('Controller is no longer valid');
                         obj.HIDController = [];
-                        uialert(obj.UIFigure, 'Controller is no longer valid. Please restart the application.', 'Invalid Controller');
+                        obj.showSafeAlert('Controller is no longer valid. Please restart the application.', 'Invalid Controller');
+                        obj.enableButton();
+                        obj.updateUI(); % Make sure UI is updated even on failure
                         return;
                     end
                     
                     % Check if hardware is detected
                     isDetected = obj.checkHardwareDetection();
                     if ~isDetected
-                        uialert(obj.UIFigure, 'MJC3 hardware not detected. Please check USB connection and try again.', 'Hardware Not Found');
+                        obj.showSafeAlert('MJC3 hardware not detected. Please check USB connection and try again.', 'Hardware Not Found');
+                        obj.enableButton();
+                        obj.updateUI(); % Make sure UI is updated even on failure
                         return;
                     end
                     
@@ -1130,22 +814,17 @@ classdef MJC3View < handle
                     catch ME
                         obj.IsEnabled = false;
                         obj.IsConnected = false;
-                        uialert(obj.UIFigure, sprintf('Failed to start controller: %s\n\nHardware detected but connection failed. Try:\n• Reconnecting USB cable\n• Restarting application\n• Checking device permissions', ME.message), 'Connection Failed');
+                        errorMsg = sprintf('Failed to start controller: %s\n\nHardware detected but connection failed. Try:\n• Reconnecting USB cable\n• Restarting application\n• Checking device permissions', ME.message);
+                        obj.showSafeAlert(errorMsg, 'Connection Failed');
                     end
                 else
-                    % Disabling controller
-                    if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
-                        try
-                            obj.HIDController.stop();
-                            obj.Logger.info('MJC3 controller disabled');
-                        catch ME
-                            obj.Logger.warning('Error stopping controller: %s', ME.message);
-                        end
-                    end
-                    obj.IsEnabled = false;
-                    obj.IsConnected = false;
+                    % Disabling controller - use safe method
+                    obj.safeStopController();
+                    obj.Logger.info('MJC3 controller disabled by user');
                 end
                 
+                % Re-enable button and update UI
+                obj.enableButton();
                 obj.updateUI();
                 
             catch ME
@@ -1153,6 +832,7 @@ classdef MJC3View < handle
                 % Reset to safe state
                 obj.IsEnabled = false;
                 obj.IsConnected = false;
+                obj.enableButton();
                 obj.updateUI();
             end
         end
@@ -1208,60 +888,43 @@ classdef MJC3View < handle
         end
         
         function onWindowClose(obj)
-            % Handle window close event - ensure proper cleanup
-            obj.Logger.info('MJC3View: Window close requested...');
+            % Handle window close event - ensure proper cleanup with crash prevention
             
-            % Stop the controller if it's running
-            if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
+            % Prevent recursive close handling
+            if obj.IsClosing || obj.IsDeleting || obj.CleanupComplete
+                return;
+            end
+            obj.IsClosing = true;
+            
+            try
+                obj.Logger.info('MJC3View: Window close requested...');
+                
+                % Disable the UI immediately to prevent further interactions
+                obj.disableUI();
+                
+                % Stop the controller safely
+                obj.safeStopController();
+                
+                % Delete the object (which will trigger the delete method)
+                obj.Logger.info('MJC3View: Initiating cleanup...');
+                delete(obj);
+                
+            catch ME
+                obj.Logger.error('MJC3View: Error during window close: %s', ME.message);
+                % Force cleanup to prevent hanging
                 try
-                    if obj.IsEnabled
-                        obj.Logger.info('MJC3View: Stopping controller before close...');
-                        obj.HIDController.stop();
-                        obj.IsEnabled = false;
-                        obj.IsConnected = false;
+                    obj.CleanupComplete = true;
+                    if ~isempty(obj.UIFigure) && isvalid(obj.UIFigure)
+                        obj.UIFigure.CloseRequestFcn = '';
+                        delete(obj.UIFigure);
                     end
-                catch ME
-                    obj.Logger.warning('MJC3View: Warning - Error stopping controller: %s', ME.message);
+                catch
+                    % Ignore final cleanup errors
                 end
             end
-            
-            % Delete the object (which will trigger the delete method)
-            obj.Logger.info('MJC3View: Deleting view object...');
-            delete(obj);
         end
         
-        function createNewMapping(obj)
-            % Create new mapping file
-            try
-                obj.Logger.info('Creating new mapping file...');
-                uialert(obj.UIFigure, 'New mapping file created successfully.', 'Mapping', 'Icon', 'success');
-            catch ME
-                obj.Logger.error('Failed to create new mapping: %s', ME.message);
-                uialert(obj.UIFigure, 'Failed to create new mapping file.', 'Error', 'Icon', 'error');
-            end
-        end
-        
-        function saveMapping(obj)
-            % Save current mapping
-            try
-                obj.Logger.info('Saving current mapping...');
-                uialert(obj.UIFigure, 'Mapping saved successfully.', 'Mapping', 'Icon', 'success');
-            catch ME
-                obj.Logger.error('Failed to save mapping: %s', ME.message);
-                uialert(obj.UIFigure, 'Failed to save mapping.', 'Error', 'Icon', 'error');
-            end
-        end
-        
-        function removeMapping(obj)
-            % Remove current mapping
-            try
-                obj.Logger.info('Removing current mapping...');
-                uialert(obj.UIFigure, 'Mapping removed successfully.', 'Mapping', 'Icon', 'success');
-            catch ME
-                obj.Logger.error('Failed to remove mapping: %s', ME.message);
-                uialert(obj.UIFigure, 'Failed to remove mapping.', 'Error', 'Icon', 'error');
-            end
-        end
+
         
         % Removed complex methods - simplified UI now uses analog controls
         
@@ -1280,10 +943,11 @@ classdef MJC3View < handle
                 '• Action: Choose movement type\n' ...
                 '• Calibrate: Improve accuracy\n\n' ...
                 'Calibration:\n' ...
-                '• Click "Calibrate" for any axis\n' ...
-                '• Move joystick through full range\n' ...
-                '• System will collect samples automatically\n' ...
-                '• Calibration data is saved permanently\n\n' ...
+                '• Click "Cal X", "Cal Y", or "Cal Z" to calibrate each axis\n' ...
+                '• Move joystick through full range during calibration\n' ...
+                '• System will collect 100 samples automatically\n' ...
+                '• Calibration data is saved permanently\n' ...
+                '• Click "Reset" to restore default calibration\n\n' ...
                 'Troubleshooting:\n' ...
                 '• If joystick not detected, check USB connection\n' ...
                 '• Adjust step factor for different movement speeds\n' ...
@@ -1291,6 +955,204 @@ classdef MJC3View < handle
                 '• Check ScanImage integration if stage not moving']);
             
             uialert(obj.UIFigure, helpText, 'Help', 'Icon', 'info');
+        end
+    end
+    
+    % === CRASH PREVENTION METHODS ===
+    methods (Access = private)
+        function safeStopMonitoring(obj)
+            % Safely stop monitoring timer with comprehensive error handling
+            try
+                if ~isempty(obj.UpdateTimer)
+                    if isvalid(obj.UpdateTimer)
+                        try
+                            stop(obj.UpdateTimer);
+                            obj.Logger.debug('Timer stopped successfully');
+                        catch ME
+                            obj.Logger.warning('Error stopping timer: %s', ME.message);
+                        end
+                        
+                        try
+                            delete(obj.UpdateTimer);
+                            obj.Logger.debug('Timer deleted successfully');
+                        catch ME
+                            obj.Logger.warning('Error deleting timer: %s', ME.message);
+                        end
+                    end
+                    obj.UpdateTimer = [];
+                end
+            catch ME
+                obj.Logger.error('Critical error in safeStopMonitoring: %s', ME.message);
+                % Force cleanup
+                obj.UpdateTimer = [];
+            end
+        end
+        
+        function safeStopController(obj)
+            % Safely stop HID controller with error handling
+            try
+                if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
+                    if obj.IsEnabled
+                        try
+                            obj.Logger.info('Stopping HID controller...');
+                            obj.HIDController.stop();
+                            obj.Logger.info('HID controller stopped successfully');
+                        catch ME
+                            obj.Logger.warning('Error stopping HID controller: %s', ME.message);
+                        end
+                    end
+                end
+                
+                % Reset state regardless of success/failure
+                obj.IsEnabled = false;
+                obj.IsConnected = false;
+                
+            catch ME
+                obj.Logger.error('Critical error in safeStopController: %s', ME.message);
+                % Force state reset
+                obj.IsEnabled = false;
+                obj.IsConnected = false;
+            end
+        end
+        
+        function safeDeleteUIFigure(obj)
+            % Safely delete UI figure with error handling
+            try
+                if ~isempty(obj.UIFigure) && isvalid(obj.UIFigure)
+                    % Clear the close request function to prevent recursion
+                    obj.UIFigure.CloseRequestFcn = '';
+                    
+                    try
+                        delete(obj.UIFigure);
+                        obj.Logger.debug('UI figure deleted successfully');
+                    catch ME
+                        obj.Logger.warning('Error deleting UI figure: %s', ME.message);
+                    end
+                end
+                obj.UIFigure = [];
+                
+            catch ME
+                obj.Logger.error('Critical error in safeDeleteUIFigure: %s', ME.message);
+                obj.UIFigure = [];
+            end
+        end
+        
+        function safeUpdateDisplay(obj)
+            % Safely update display with comprehensive error handling
+            try
+                % Check if we're in the process of closing/deleting
+                if obj.IsClosing || obj.IsDeleting || obj.CleanupComplete
+                    return;
+                end
+                
+                % Validate all objects before proceeding
+                if ~obj.validateObjects()
+                    obj.Logger.debug('Objects not valid, stopping monitoring');
+                    obj.safeStopMonitoring();
+                    return;
+                end
+                
+                % Only update if enabled and controller is available
+                if ~isempty(obj.HIDController) && obj.IsEnabled
+                    obj.updateAnalogControls();
+                end
+                
+            catch ME
+                obj.Logger.error('Error in safeUpdateDisplay: %s', ME.message);
+                % Stop monitoring to prevent repeated crashes
+                obj.safeStopMonitoring();
+            end
+        end
+        
+        function handleTimerError(obj)
+            % Handle timer errors gracefully
+            try
+                obj.Logger.error('Timer error occurred, stopping monitoring');
+                obj.safeStopMonitoring();
+            catch ME
+                obj.Logger.error('Error in timer error handler: %s', ME.message);
+            end
+        end
+        
+        function disableUI(obj)
+            % Disable UI components to prevent interaction during shutdown (simplified)
+            try
+                if ~isempty(obj.EnableButton) && isvalid(obj.EnableButton)
+                    obj.EnableButton.Enable = 'off';
+                end
+                
+                if ~isempty(obj.StepFactorField) && isvalid(obj.StepFactorField)
+                    obj.StepFactorField.Enable = 'off';
+                end
+                
+            catch ME
+                obj.Logger.warning('Error disabling UI: %s', ME.message);
+            end
+        end
+        
+        function isValid = validateObjects(obj)
+            % Enhanced object validation with crash prevention
+            isValid = true;
+            
+            try
+                % Check if we're in cleanup mode
+                if obj.IsClosing || obj.IsDeleting || obj.CleanupComplete
+                    isValid = false;
+                    return;
+                end
+                
+                % Check if the main UI figure is valid
+                if isempty(obj.UIFigure) || ~isvalid(obj.UIFigure)
+                    obj.Logger.debug('UIFigure is invalid or deleted');
+                    isValid = false;
+                    return;
+                end
+                
+                % Check critical UI components
+                criticalComponents = {obj.EnableButton, obj.StatusLabel, obj.ConnectionStatus};
+                for i = 1:length(criticalComponents)
+                    if isempty(criticalComponents{i}) || ~isvalid(criticalComponents{i})
+                        obj.Logger.debug('Critical UI component %d is invalid', i);
+                        isValid = false;
+                        return;
+                    end
+                end
+                
+            catch ME
+                obj.Logger.error('Error in validateObjects: %s', ME.message);
+                isValid = false;
+            end
+        end
+        
+        function showSafeAlert(obj, message, title)
+            % Safely show alert dialog with error handling
+            try
+                if ~isempty(obj.UIFigure) && isvalid(obj.UIFigure) && ~obj.IsClosing
+                    uialert(obj.UIFigure, message, title);
+                else
+                    % Fallback to command window if UI is not available
+                    fprintf('Alert: %s - %s\n', title, message);
+                end
+            catch ME
+                obj.Logger.warning('Error showing alert: %s', ME.message);
+                fprintf('Alert: %s - %s\n', title, message);
+            end
+        end
+        
+        function enableButton(obj)
+            % Safely re-enable the enable button (but only if we have a controller)
+            try
+                if ~isempty(obj.EnableButton) && isvalid(obj.EnableButton) && ~obj.IsClosing
+                    % Only enable the button if we have a controller
+                    if ~isempty(obj.HIDController)
+                        obj.EnableButton.Enable = 'on';
+                    else
+                        obj.EnableButton.Enable = 'off';  % Keep disabled if no controller
+                    end
+                end
+            catch ME
+                obj.Logger.warning('Error enabling button: %s', ME.message);
+            end
         end
     end
 end

@@ -208,55 +208,8 @@ classdef ScanImageManager < handle
         end
         
         function saveImageMetadata(obj, src, ~)
-            % saveImageMetadata - Logs metadata for each acquired frame
-            % Called by ScanImage for each frame (frameAcquired event)
-            
-            try
-                % Skip frames that are too close together (max 5 frames/sec for metadata logging)
-                if ~isempty(obj.LastFrameTime) && (datetime('now') - obj.LastFrameTime) < seconds(0.2)
-                    return;
-                end
-                obj.LastFrameTime = datetime('now');
-                
-                % Handle simulation mode
-                if obj.SimulationMode
-                    if ~isempty(obj.FoilviewApp)
-                        obj.FoilviewApp.collectSimulatedMetadata();
-                    end
-                    return;
-                end
-                
-                % Get handles with minimal overhead
-                if isempty(obj.HSI) || isempty(obj.MetadataFile)
-                    [obj.HSI, obj.MetadataFile] = obj.getHandles(src);
-                    if isempty(obj.MetadataFile)
-                        return; % Skip if no metadata file is configured
-                    end
-                end
-                
-                % Check validity and mode with minimal overhead
-                if ~obj.isValidFrame(obj.HSI) || ~obj.isGrabMode(obj.HSI)
-                    return;
-                end
-                
-                % Collect metadata efficiently
-                metadata = obj.collectMetadata(obj.HSI);
-                
-                % Write to file with error handling
-                if ~isempty(metadata)
-                    obj.writeMetadataToFile(metadata, obj.MetadataFile, false);
-                end
-                
-            catch ME
-                % Only report serious errors, not routine failures
-                if contains(ME.message, 'Permission denied') || contains(ME.message, 'No such file')
-                    % Reset persistent variables to force rechecking
-                    obj.HSI = [];
-                    obj.MetadataFile = [];
-                else
-                    warning('%s: %s', ME.identifier, ME.message);
-                end
-            end
+            % saveImageMetadata - Delegate to metadata service
+            obj.MetadataService.saveImageMetadata(src, obj.HSI, obj.MetadataFile, obj.SimulationMode, obj.FoilviewApp);
         end
         
         function [hSI, metadataFile] = getHandles(~, src)
@@ -498,164 +451,13 @@ classdef ScanImageManager < handle
     
     methods (Access = public)
         function positions = getPositions(obj)
-            % getPositions - Get current stage positions from ScanImage
-            % Returns struct with x, y, z positions
-            
-            positions = struct('x', 0, 'y', 0, 'z', 0);
-            
-            try
-                if obj.SimulationMode || isempty(obj.HSI)
-                    % Return simulated positions
-                    positions.x = 0;
-                    positions.y = 0;
-                    positions.z = 0;
-                    return;
-                end
-                
-                % Get positions from ScanImage motors
-                if isprop(obj.HSI, 'hMotors') && ~isempty(obj.HSI.hMotors)
-                    if isprop(obj.HSI.hMotors, 'axesPosition') && ~isempty(obj.HSI.hMotors.axesPosition)
-                        pos = obj.HSI.hMotors.axesPosition;
-                        if numel(pos) >= 3 && all(isfinite(pos))
-                            positions.y = pos(1);
-                            positions.x = pos(2);
-                            positions.z = pos(3);
-                        end
-                    elseif isprop(obj.HSI.hMotors, 'motorPosition') && ~isempty(obj.HSI.hMotors.motorPosition)
-                        pos = obj.HSI.hMotors.motorPosition;
-                        if numel(pos) >= 3 && all(isfinite(pos))
-                            positions.y = pos(1);
-                            positions.x = pos(2);
-                            positions.z = pos(3);
-                        end
-                    end
-                end
-                
-            catch ME
-                FoilviewUtils.logException('ScanImageManager', ME, 'getPositions failed');
-                % Return default zeros on error
-            end
+            % getPositions - Delegate to hardware interface
+            positions = obj.HardwareInterface.getPositions(obj.HSI, obj.SimulationMode);
         end
         
         function newPosition = moveStage(obj, axisName, microns)
-            % moveStage - Move stage by specified amount
-            % Returns new position after movement
-            
-            try
-                if obj.SimulationMode
-                    % Simulate movement
-                    currentPos = obj.getCurrentPosition(axisName);
-                    newPosition = currentPos + microns;
-                    if strcmpi(axisName, 'Z')
-                        obj.Logger.info('[Sim] Z: %+0.2f μm → %0.2f μm', microns, newPosition);
-                    else
-                        obj.Logger.info('[Sim] %s: %+0.2f μm → %0.2f μm', axisName, microns, newPosition);
-                    end
-                    return;
-                end
-                
-                if isempty(obj.HSI)
-                    FoilviewUtils.warn('ScanImageManager', 'No ScanImage handle available');
-                    newPosition = 0;
-                    return;
-                end
-                
-                motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
-                if isempty(motorFig)
-                    error('Motor Controls window not found. Please ensure ScanImage Motor Controls window is open.');
-                end
-                
-                if obj.checkMotorErrorState(motorFig, axisName)
-                    obj.Logger.warning('Attempting to clear motor error for %s axis', axisName);
-                    obj.clearMotorError(motorFig, axisName);
-                    pause(0.5); % Wait for error to clear
-                    
-                    if obj.checkMotorErrorState(motorFig, axisName)
-                        error('Motor is still in error state for %s axis. Please manually clear the error in ScanImage Motor Controls.', axisName);
-                    end
-                end
-                
-                axisInfo = obj.getAxisInfo(motorFig, axisName);
-                if isempty(axisInfo.etPos)
-                    error('Position field not found for axis %s. Check if Motor Controls window is properly initialized.', axisName);
-                end
-                
-                currentPos = str2double(axisInfo.etPos.String);
-                if isnan(currentPos)
-                    FoilviewUtils.warn('ScanImageManager', 'Could not read current position for %s axis', axisName);
-                    currentPos = 0;
-                end
-                
-                % Z step size sync logic
-                if strcmpi(axisName, 'Z')
-                    guiZStep = obj.getZStepSizeFromGUI();
-                    requestedStep = abs(microns);
-                    % If the requested step is different from GUI, update GUI and cache
-                    if isnan(guiZStep) || abs(guiZStep - requestedStep) > eps
-                        obj.setZStepSizeInGUI(requestedStep);
-                        obj.Logger.info('Synced Z step size to %.2f μm', requestedStep);
-                    else
-                        obj.ZStepSize = guiZStep; % Keep cache updated
-                    end
-                else
-                    % For X/Y, keep legacy behavior
-                    if ~isempty(axisInfo.step)
-                        axisInfo.step.String = num2str(abs(microns));
-                        if isprop(axisInfo.step, 'Callback') && ~isempty(axisInfo.step.Callback)
-                            try
-                                axisInfo.step.Callback(axisInfo.step, []);
-                            catch ME
-                                FoilviewUtils.logException('ScanImageManager', ME, 'Error setting step size');
-                            end
-                        end
-                    end
-                end
-                
-                buttonToPress = [];
-                if microns > 0 && ~isempty(axisInfo.inc)
-                    buttonToPress = axisInfo.inc;
-                elseif microns < 0 && ~isempty(axisInfo.dec)
-                    buttonToPress = axisInfo.dec;
-                end
-                
-                if isempty(buttonToPress)
-                    error('No movement button found for %s axis. Direction: %s, Microns: %.1f', axisName, ...
-                          ternary(microns > 0, 'positive', 'negative'), microns);
-                end
-                
-                if isprop(buttonToPress, 'Enable') && strcmp(buttonToPress.Enable, 'off')
-                    error('Motor button is disabled. The motor may be in an error state. Please check ScanImage Motor Controls.');
-                end
-                
-                if isprop(buttonToPress, 'Callback') && ~isempty(buttonToPress.Callback)
-                    try
-                        buttonToPress.Callback(buttonToPress, []);
-                        obj.Logger.info('Triggered %s movement of %.1f μm', axisName, microns);
-                    catch ME
-                        if contains(ME.message, 'error state')
-                            error('Motor is in error state. Please clear the error in ScanImage Motor Controls before attempting movement.');
-                        else
-                            rethrow(ME);
-                        end
-                    end
-                else
-                    error('Button callback not available for %s axis', axisName);
-                end
-                
-                pause(0.2); % Wait for movement
-                newPosition = str2double(axisInfo.etPos.String);
-                if isnan(newPosition)
-                    FoilviewUtils.warn('ScanImageManager', 'Could not read new position for %s axis, using current position', axisName);
-                    newPosition = obj.getCurrentPosition(axisName);
-                end
-                
-                obj.Logger.info('%s stage moved %.1f μm from %.1f to %.1f μm', axisName, microns, currentPos, newPosition);
-                
-            catch ME
-                errorMsg = sprintf('Movement error for %s axis: %s', axisName, ME.message);
-                FoilviewUtils.warn('ScanImageManager', '%s', errorMsg);
-                newPosition = obj.getCurrentPosition(axisName);
-            end
+            % moveStage - Delegate to hardware interface
+            newPosition = obj.HardwareInterface.moveStage(obj.HSI, axisName, microns, obj.SimulationMode, obj.Logger);
         end
         
         function goToPosition(obj, axisName, value)

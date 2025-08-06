@@ -109,11 +109,10 @@ classdef FoilviewController < handle
         MetricCalculationService
         AutoTimer
         Logger
-
-        StatusUpdateCallback
-        PositionUpdateCallback
-        MetricUpdateCallback
-        AutoStepCompleteCallback
+        
+        % Component coordinators
+        UIOrchestrator
+        EventCoordinator
     end
 
     events
@@ -133,6 +132,10 @@ classdef FoilviewController < handle
             obj.BookmarkManager = BookmarkManager();
             obj.CurrentMetricType = obj.DEFAULT_METRIC;
             obj.Logger = LoggingService('FoilviewController', 'SuppressInitMessage', true);
+            
+            % Initialize component coordinators
+            obj.UIOrchestrator = UIOrchestrator();
+            obj.EventCoordinator = EventCoordinator();
         end
 
         function setFoilviewApp(obj, foilviewApp)
@@ -151,9 +154,8 @@ classdef FoilviewController < handle
                 obj.StageControlService = StageControlService(obj.ScanImageManager);
                 obj.MetricCalculationService = MetricCalculationService(obj.ScanImageManager);
                 
-                % Set up event listeners
-                addlistener(obj.StageControlService, 'PositionChanged', @obj.onStagePositionChanged);
-                addlistener(obj.MetricCalculationService, 'MetricCalculated', @obj.onMetricCalculated);
+                % Set up event listeners through EventCoordinator
+                obj.EventCoordinator.setupServiceListeners(obj);
                 
                 % Connect to ScanImage
                 obj.connectToScanImage();
@@ -171,13 +173,13 @@ classdef FoilviewController < handle
             [success, message] = obj.ScanImageManager.connect();
             obj.SimulationMode = ~success;
             obj.StatusMessage = message;
-            obj.notifyStatusChanged();
+            obj.EventCoordinator.notifyStatusChanged(obj);
 
             if success
                 % Successfully connected - initialize positions via service
                 obj.StageControlService.initializePositions();
                 obj.syncPositionsFromService();
-                obj.notifyPositionChanged();
+                obj.EventCoordinator.notifyPositionChanged(obj);
             end
         end
 

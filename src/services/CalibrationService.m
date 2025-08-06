@@ -53,12 +53,15 @@ classdef CalibrationService < handle
     end
     
     properties (Constant)
-        % Default calibration parameters
-        DEFAULT_CENTER = 128
-        DEFAULT_MIN = 0
-        DEFAULT_MAX = 255
-        DEFAULT_DEADZONE = 10
+        % Default calibration parameters (matching Thorlabs proprietary settings)
+        DEFAULT_CENTER = 0
+        DEFAULT_MIN = -127
+        DEFAULT_MAX = 127
+        DEFAULT_DEADZONE = 10        % Dead Zone from Thorlabs settings
+        DEFAULT_RESOLUTION = 20      % Resolution from Thorlabs settings
+        DEFAULT_DAMPING = 0          % Damping from Thorlabs settings
         DEFAULT_SENSITIVITY = 1.0
+        DEFAULT_INVERT_SENSE = false % Invert Sense from Thorlabs settings
     end
     
     methods
@@ -313,7 +316,7 @@ classdef CalibrationService < handle
         end
         
         function calibration = createDefaultCalibration(obj)
-            % Create default calibration structure
+            % Create default calibration structure with Thorlabs-compatible parameters
             calibration = struct();
             axes = {'X', 'Y', 'Z'};
             
@@ -326,13 +329,16 @@ classdef CalibrationService < handle
                     'min', obj.DEFAULT_MIN, ...
                     'max', obj.DEFAULT_MAX, ...
                     'deadzone', obj.DEFAULT_DEADZONE, ...
-                    'sensitivity', obj.DEFAULT_SENSITIVITY);
+                    'resolution', obj.DEFAULT_RESOLUTION, ...
+                    'damping', obj.DEFAULT_DAMPING, ...
+                    'sensitivity', obj.DEFAULT_SENSITIVITY, ...
+                    'invertSense', obj.DEFAULT_INVERT_SENSE);
             end
         end
         
         function calibration = calculateCalibration(~, rawValues)
             % Calculate calibration parameters from raw values
-            % rawValues: Array of raw joystick values
+            % rawValues: Array of raw joystick values (signed 8-bit: -127 to 127)
             % Returns: Calibration structure
             
             % Calculate basic statistics
@@ -344,9 +350,9 @@ classdef CalibrationService < handle
             totalRange = maxVal - minVal;
             deadzone = max(1, round(totalRange * 0.05));
             
-            % Calculate sensitivity based on range
+            % Calculate sensitivity based on range (normalized to 127 max range)
             if totalRange > 0
-                sensitivity = 255 / totalRange;
+                sensitivity = 127 / max(abs(minVal), abs(maxVal));
             else
                 sensitivity = 1.0;
             end
@@ -361,11 +367,12 @@ classdef CalibrationService < handle
         
         function calibratedValue = applyDefaultCalibration(obj, rawValue)
             % Apply default calibration to raw value
-            % rawValue: Raw joystick value
+            % rawValue: Raw joystick value (signed 8-bit: -127 to 127)
             % Returns: Calibrated value (-1.0 to 1.0)
             
-            % Simple linear mapping from [0, 255] to [-1, 1]
-            calibratedValue = (rawValue - obj.DEFAULT_CENTER) / obj.DEFAULT_CENTER;
+            % Simple linear mapping from [-127, 127] to [-1, 1]
+            % Note: MEX function returns signed 8-bit values, not unsigned
+            calibratedValue = rawValue / 127;
             calibratedValue = max(-1.0, min(1.0, calibratedValue));
         end
         

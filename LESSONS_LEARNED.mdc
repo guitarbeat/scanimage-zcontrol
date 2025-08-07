@@ -1,0 +1,234 @@
+---
+globs: *.m
+alwaysApply: false
+---
+# Lessons Learned: MATLAB Refactoring Patterns
+
+## Core Technical Insights
+
+### 1. MATLAB JSON Handling
+**Issue**: `config.elements(i)` fails with cell arrays
+**Solution**: Use `config.elements{i}` for cell arrays, `config.elements(i)` for struct arrays
+```matlab
+if iscell(config.elements)
+    element = config.elements{i};  % Cell arrays
+else
+    element = config.elements(i);  % Struct arrays
+end
+```
+
+### 2. MATLAB Method Visibility
+**Issue**: Cannot test private methods directly
+**Solution**: Test through public methods like `UiBuilder.build()`
+
+### 3. Testing Strategy for Complex Integration
+**Pattern**: Step-by-step isolation testing
+```matlab
+components = UiBuilder.build();           % Test each step
+testApp = struct();                       % Isolate operations
+% Copy components manually                % Verify state
+% Check after each operation             % Find failure point
+```
+
+### 4. Architecture Patterns Successfully Implemented
+
+#### Phase 1: Configuration-Driven UI
+- **ComponentFactory**: Creates UI components from JSON config
+- **File Organization**: `src/config/ui_components.json`
+- **Result**: 159+ lines refactored across 4 methods
+
+#### Phase 2: Component Delegation
+- **ScanImageManager Split** (934 → 200 lines):
+  - `hardware/ScanImageInterface.m` (200 lines)
+  - `services/ScanImageMetadata.m` (300 lines)
+  - `managers/ScanImageManager.m` (coordination)
+
+- **FoilviewController Split** (929 → 300 lines):
+  - `UIOrchestrator.m` (UI validation)
+  - `EventCoordinator.m` (event handling)
+  - `FoilviewController.m` (business logic)
+
+### 5. Key Debugging Lessons
+- **Always verify with direct property inspection**: `isfield()` tests can be misleading
+- **Complex bugs require isolation**: Test each step in the process
+- **Assumptions are dangerous**: Verify actual app state, not test conditions
+
+### 6. UI Design Fundamentals
+**Lesson**: Basic visual design principles matter more than complex UX theory
+- Proper spacing and alignment first
+- Visual hierarchy before features
+- Group related functions logically
+
+### 7. MATLAB Array Syntax and Line Continuation
+**Issue**: Newline following comma acts as a row separator
+**Solution**: Use semicolon for clearer row separation or ellipsis for line continuation
+```matlab
+% Bad - comma with newline creates row separation
+data = [1, 2, 3,
+        4, 5, 6];
+
+% Good - semicolon for clear row separation
+data = [1, 2, 3;
+        4, 5, 6];
+
+% Good - ellipsis for line continuation
+data = [1, 2, 3, ...
+        4, 5, 6];
+```
+
+### 8. MATLAB Date/Time Best Practices
+**Issue**: `'now'` is not recommended for datetime operations
+**Solution**: Use `datetime("now")` for better type safety and performance
+```matlab
+% Bad - deprecated 'now' function
+timestamp = now;
+
+% Good - modern datetime approach
+timestamp = datetime("now");
+```
+
+### 9. MATLAB Loop Performance Optimization
+**Issue**: Variable appears to change size on every loop iteration
+**Solution**: Preallocate arrays for better performance
+```matlab
+% Bad - array grows in each iteration
+for i = 1:1000
+    data(i) = i^2;  % Array resized each time
+end
+
+% Good - preallocated array
+data = zeros(1, 1000);  % Preallocate
+for i = 1:1000
+    data(i) = i^2;  % No resizing
+end
+```
+
+## Architecture Patterns Summary
+
+1. **Configuration-Driven**: JSON config + ComponentFactory
+2. **Component Delegation**: Extract services, coordinate in managers
+3. **Separation of Concerns**: UI, Events, Business Logic
+4. **Testing Strategy**: Isolation testing for complex integration
+
+### 10. MATLAB Object Instantiation Syntax
+**Issue**: Using undefined properties as constructors causes "Unable to use a value of type X as an index" error
+**Solution**: Call class constructors directly, not through undefined properties
+```matlab
+% Bad - trying to use undefined property as constructor
+app.PlotManager = app.PlotManager(app);      % app.PlotManager is undefined!
+app.UIController = app.UIController(app);    % app.UIController is undefined!
+
+% Good - call class constructor directly
+app.PlotManager = PlotManager(app);          % Direct constructor call
+app.UIController = UIController(app);        % Direct constructor call
+```
+**Root Cause**: MATLAB interprets `app.PropertyName(args)` as attempting to use the app object as an index when `PropertyName` is undefined, rather than as a constructor call. This is a fundamental syntax requirement in MATLAB object-oriented programming.
+
+## Architecture Patterns Summary
+
+1. **Configuration-Driven**: JSON config + ComponentFactory
+2. **Component Delegation**: Extract services, coordinate in managers
+3. **Separation of Concerns**: UI, Events, Business Logic
+4. **Testing Strategy**: Isolation testing for complex integration
+
+## Success Metrics
+- **Phase 1**: 159+ lines refactored with ComponentFactory
+- **Phase 2**: 934-line file split into 3 focused components
+- **Integration**: All components work in production application
+- **Patterns**: 2 major architecture patterns established and proven
+
+## Hardware Integration Lessons
+
+### 11. MEX Controller Integration and Debugging
+**Issue**: MJC3 joystick detection working but application integration failing
+**Root Cause Analysis**: 
+- ✅ **Hardware Detection**: MEX function working perfectly (`mjc3_joystick_mex('test')` returns 1)
+- ✅ **Device Connection**: Device info shows `{"connected":true,"vendor_id":4883,"product_id":36864}`
+- ❌ **Application Integration**: Controller creation failing due to method mismatches
+
+**Key Insights**:
+1. **Method Signature Mismatch**: `obj.HIDController.stop()` called but method is `obj.HIDController.disable()`
+2. **Property Type Conflicts**: `UIController UIController` declaration caused "Unable to use a value of type X as an index" error
+3. **Path Management**: Missing `hardware/` directory in MATLAB path caused `ScanImageInterface` not found
+
+**Solutions Applied**:
+```matlab
+% Fixed method call mismatch
+obj.HIDController.disable();  % Instead of obj.HIDController.stop()
+
+% Fixed property declaration
+properties (Access = public)
+    UIController               % Remove duplicate type declaration
+    PlotManager
+end
+
+% Fixed path management
+addpath(fullfile(srcDir, 'hardware'));  % Add missing directory
+```
+
+### 12. Application Cleanup and Resource Management
+**Issue**: Application freezing on close, disable button not working
+**Root Cause**: Incomplete cleanup chain causing resource leaks
+
+**Comprehensive Cleanup Strategy**:
+1. **Timer Management**: All timers properly stopped and deleted
+2. **MEX Connection Cleanup**: MEX functions properly closed
+3. **UI Figure Cleanup**: Safe deletion with recursion prevention
+4. **Controller State Reset**: Proper disable/enable state management
+
+**Cleanup Hierarchy**:
+```
+MJC3View.delete() → safeStopMonitoring() → safeStopController() → safeDeleteUIFigure()
+FoilviewApp.delete() → cleanup() → [MJC3View, Controller, ScanImageManager cleanup]
+BaseMJC3Controller.delete() → stop() → timer cleanup → MEX connection close
+```
+
+**Key Success Metrics**:
+- ✅ **Zero Timer Leaks**: All timers properly stopped and deleted
+- ✅ **Clean MEX Cleanup**: MEX connections properly closed
+- ✅ **UI Responsiveness**: Windows close without freezing
+- ✅ **State Consistency**: Enable/disable states properly managed
+
+### 13. MATLAB Version Compatibility
+**Issue**: Multiple MATLAB versions installed, MEX functions compiled for specific version
+**Solution**: Explicit version specification for MEX testing
+```matlab
+% Test with specific MATLAB version
+"C:\Program Files\MATLAB\R2021a\bin\matlab.exe" -batch "mjc3_joystick_mex('test')"
+```
+
+### 14. Debugging Complex Integration Issues
+**Strategy**: Systematic isolation testing
+1. **Hardware Level**: Test MEX function directly
+2. **Controller Level**: Test controller creation and methods
+3. **Application Level**: Test UI integration and cleanup
+4. **Integration Level**: Test complete application lifecycle
+
+**Debugging Tools**:
+- Direct MEX function testing: `mjc3_joystick_mex('test')`
+- Timer monitoring: `timerfindall()` to check for leaks
+- Path verification: `exist('classname', 'class')` to verify class availability
+- State inspection: Property validation before method calls
+
+### 15. Error Prevention Patterns
+**Pattern**: Comprehensive error handling with state reset
+```matlab
+function safeStopController(obj)
+    try
+        if ~isempty(obj.HIDController) && isvalid(obj.HIDController)
+            obj.HIDController.disable();  % Use correct method
+        end
+    catch ME
+        obj.Logger.warning('Error stopping HID controller: %s', ME.message);
+    end
+    % Always reset state regardless of success/failure
+    obj.IsEnabled = false;
+    obj.IsConnected = false;
+end
+```
+
+**Benefits**:
+- **Graceful Degradation**: Application continues even if cleanup fails
+- **State Consistency**: Always reset to known good state
+- **Resource Safety**: Prevent memory leaks and hanging processes
+- **Debugging Clarity**: Clear error messages for troubleshooting

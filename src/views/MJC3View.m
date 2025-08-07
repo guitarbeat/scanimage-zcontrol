@@ -71,6 +71,9 @@ classdef MJC3View < handle
         
         % Hardware detection cache
         HardwareDetectionCache = struct('isDetected', false, 'lastCheck', 0, 'cacheTimeout', 5.0)
+        
+        % Preview timers for axis calibration
+        PreviewTimers
     end
     
     methods
@@ -79,6 +82,9 @@ classdef MJC3View < handle
             
             % Initialize logger
             obj.Logger = LoggingService('MJC3View', 'SuppressInitMessage', true);
+            
+            % Initialize PreviewTimers to avoid sharing between instances
+            obj.PreviewTimers = containers.Map();
             
             obj.createUI();
             obj.setupCallbacks();
@@ -612,7 +618,7 @@ classdef MJC3View < handle
             obj.safeUpdateDisplay();
         end
         
-        function updateAnalogControls(obj)
+        function updateAnalogControls(~)
             % Simplified version - no analog displays in the basic interface
             % The joystick data is still being processed by the controller,
             % but we don't need to update any display components since they were removed
@@ -652,6 +658,7 @@ classdef MJC3View < handle
                     
                     obj.Logger.info('All axis calibration reset to defaults');
                 else
+                    obj.Logger.error('Controller does not support calibration reset');
                     error('Controller does not support calibration reset');
                 end
                 
@@ -792,9 +799,6 @@ classdef MJC3View < handle
             isDetected = obj.checkHardwareDetection();
             
             % Create detailed status message
-            statusMsg = '';
-            iconType = 'info';
-            
             if isDetected
                 statusMsg = sprintf(['✅ MJC3 Hardware Detected!\n\n' ...
                     'Device: Thorlabs MJC3 Joystick\n' ...
@@ -819,6 +823,12 @@ classdef MJC3View < handle
             % Update status and show dialog
             obj.updateConnectionStatus();
             uialert(obj.UIFigure, statusMsg, 'Hardware Detection', 'Icon', iconType);
+            
+            % Restore original status text if detection failed
+            if ~isDetected
+                obj.ConnectionStatus.Text = originalText;
+                obj.ConnectionStatus.FontColor = [0.8 0.2 0.2]; % Red for failure
+            end
         end
         
         function onWindowClose(obj)
@@ -929,7 +939,7 @@ classdef MJC3View < handle
                     if obj.IsEnabled
                         try
                             obj.Logger.info('Stopping HID controller...');
-                            obj.HIDController.stop();
+                            obj.HIDController.disable();
                             obj.Logger.info('HID controller stopped successfully');
                         catch ME
                             obj.Logger.warning('Error stopping HID controller: %s', ME.message);
@@ -1436,6 +1446,7 @@ classdef MJC3View < handle
                 
                 % Validate that all fields were found
                 if isempty(negField) || isempty(centerField) || isempty(posField)
+                    obj.Logger.error('Could not find all required position fields');
                     error('Could not find all required position fields');
                 end
                 
@@ -1452,7 +1463,7 @@ classdef MJC3View < handle
                 % Apply calibration
                 if ~isempty(obj.HIDController) && ismethod(obj.HIDController, 'setManualCalibration')
                     obj.HIDController.setManualCalibration(axisName, negativePos, centerPos, positivePos, ...
-                        deadzone, resolution, damping, invertSense);
+                        deadzone, resolution, damping, invertSense, sensitivity);
                     
                     % Show success message
                     uialert(parent.Parent.Parent, ...
@@ -1461,6 +1472,7 @@ classdef MJC3View < handle
                     
                     obj.Logger.info('Manual calibration applied for %s axis', axisName);
                 else
+                    obj.Logger.error('Controller does not support manual calibration');
                     error('Controller does not support manual calibration');
                 end
                 
@@ -1541,10 +1553,6 @@ classdef MJC3View < handle
                     'Name', timerName);
                 
                 % Store timer reference
-                if ~isprop(obj, 'PreviewTimers')
-                    addprop(obj, 'PreviewTimers');
-                    obj.PreviewTimers = containers.Map();
-                end
                 obj.PreviewTimers(axisName) = previewTimer;
                 
                 start(previewTimer);
@@ -1558,7 +1566,7 @@ classdef MJC3View < handle
         function stopAxisPreview(obj, axisName)
             % Stop live preview for an axis
             try
-                if isprop(obj, 'PreviewTimers') && isKey(obj.PreviewTimers, axisName)
+                if isKey(obj.PreviewTimers, axisName)
                     previewTimer = obj.PreviewTimers(axisName);
                     if isvalid(previewTimer)
                         stop(previewTimer);

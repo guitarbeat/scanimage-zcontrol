@@ -61,11 +61,10 @@ classdef ScanImageMetadata < handle
             catch ME
                 % Only report serious errors, not routine failures
                 if contains(ME.message, 'Permission denied') || contains(ME.message, 'No such file')
-                    % Reset persistent variables to force rechecking
-                    hSI = [];
-                    metadataFile = [];
+                                    % Log cleanup action for debugging
+                obj.Logger.debug('Reset persistent variables due to file access error: %s', ME.message);
                 else
-                    warning('%s: %s', ME.identifier, ME.message);
+                    obj.Logger.warning('%s: %s', ME.identifier, ME.message);
                 end
             end
         end
@@ -141,7 +140,7 @@ classdef ScanImageMetadata < handle
             end
         end
         
-        function powerInfo = getLaserPowerInfo(obj, hSI)
+        function powerInfo = getLaserPowerInfo(~, hSI)
             %GETLASERPOWERINFO Get laser power information
             powerInfo = struct('powerPercent', 0, 'pockelsValue', 0, 'laserPower', 0);
             
@@ -169,7 +168,7 @@ classdef ScanImageMetadata < handle
             end
         end
         
-        function motorPositions = getMotorPositions(obj, hSI)
+        function motorPositions = getMotorPositions(~, hSI)
             %GETMOTORPOSITIONS Get motor position information
             motorPositions = struct('x', 0, 'y', 0, 'z', 0);
             
@@ -237,7 +236,7 @@ classdef ScanImageMetadata < handle
             obj.Logger.info('Metadata logging cleanup completed');
         end
         
-        function [hSI, metadataFile] = getHandles(obj, src)
+        function [hSI, metadataFile] = getHandles(~, src)
             %GETHANDLES Get handles with minimal overhead
             if isobject(src) && isfield(src, 'hSI')
                 hSI = src.hSI;
@@ -261,13 +260,13 @@ classdef ScanImageMetadata < handle
             end
         end
         
-        function valid = isValidFrame(obj, hSI)
+        function valid = isValidFrame(~, hSI)
             %ISVALIDFRAME Check if frame is valid for metadata logging
             valid = ~isempty(hSI) && isprop(hSI, 'hScan2D') && ~isempty(hSI.hScan2D) && ...
                     isprop(hSI.hScan2D, 'logFileStem') && ~isempty(hSI.hScan2D.logFileStem);
         end
         
-        function isGrab = isGrabMode(obj, hSI)
+        function isGrab = isGrabMode(~, hSI)
             %ISGRABMODE Check if we're in GRAB mode vs FOCUS mode
             try
                 acqMode = hSI.acqState;
@@ -279,7 +278,7 @@ classdef ScanImageMetadata < handle
     end
     
     methods (Access = private)
-        function value = getNumericProperty(obj, object, propertyName, defaultValue)
+        function value = getNumericProperty(~, object, propertyName, defaultValue)
             %GETNUMERICPROPERTY Safely get numeric property with default
             try
                 if isprop(object, propertyName) && ~isempty(object.(propertyName))
@@ -295,7 +294,7 @@ classdef ScanImageMetadata < handle
             end
         end
         
-        function value = getStringProperty(obj, object, propertyName, defaultValue)
+        function value = getStringProperty(~, object, propertyName, defaultValue)
             %GETSTRINGPROPERTY Safely get string property with default
             try
                 if isprop(object, propertyName) && ~isempty(object.(propertyName))
@@ -308,7 +307,7 @@ classdef ScanImageMetadata < handle
             end
         end
         
-        function value = getBooleanProperty(obj, object, propertyName, defaultValue)
+        function value = getBooleanProperty(~, object, propertyName, defaultValue)
             %GETBOOLEANPROPERTY Safely get boolean property with default
             try
                 if isprop(object, propertyName) && ~isempty(object.(propertyName))

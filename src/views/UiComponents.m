@@ -30,6 +30,11 @@
 
 classdef UiComponents
 
+    properties (Constant, Access = private)
+        % Static logger for the class
+        Logger = LoggingService('UiComponents', 'SuppressInitMessage', true)
+    end
+
     properties (Constant, Access = public)
         % ===== WINDOW DIMENSIONS =====
         MIN_WINDOW_WIDTH = 500
@@ -497,7 +502,7 @@ classdef UiComponents
                 button.FontColor = style.FontColor;
                 button.FontWeight = style.FontWeight;
             else
-                warning('UiComponents:InvalidStyle', 'Unknown button style: %s (tried: %s)', styleName, styleNameTitle);
+                UiComponents.Logger.warning('Unknown button style: %s (tried: %s)', styleName, styleNameTitle);
             end
         end
 
@@ -514,7 +519,7 @@ classdef UiComponents
                 label.FontWeight = style.FontWeight;
                 label.FontColor = style.FontColor;
             else
-                warning('UiComponents:InvalidStyle', 'Unknown text style: %s', styleName);
+                UiComponents.Logger.warning('Unknown text style: %s', styleName);
             end
         end
 
@@ -530,7 +535,7 @@ classdef UiComponents
             if isfield(UiComponents.COLORS, colorName)
                 color = UiComponents.COLORS.(colorName);
             else
-                warning('UiComponents:InvalidColor', 'Unknown color: %s', colorName);
+                UiComponents.Logger.warning('Unknown color: %s', colorName);
                 color = [0 0 0]; % Default to black
             end
         end

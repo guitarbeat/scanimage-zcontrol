@@ -68,8 +68,8 @@ classdef foilview < matlab.apps.AppBase
     
     properties (Access = public)
         Controller                  FoilviewController
-        UIController                UIController
-        PlotManager                 PlotManager
+        UIController
+        PlotManager
         StageViewApp
         BookmarksViewApp
         MJC3ViewApp
@@ -93,11 +93,11 @@ classdef foilview < matlab.apps.AppBase
     
     methods (Access = public)
         function app = foilview()
-            % Initialize logger
-            app.Logger = LoggingService('FoilviewApp');
-            
-            % Add MJC3 MEX controller paths (lightweight operation)
+            % Add MJC3 MEX controller paths first (lightweight operation)
             app.addMJC3Paths();
+            
+            % Initialize logger after paths are added
+            app.Logger = LoggingService('FoilviewApp');
             
             % Build UI components (this is relatively fast)
             components = UiBuilder.build();
@@ -492,6 +492,13 @@ classdef foilview < matlab.apps.AppBase
             field = app.AutoControls.StepsField.Field;
             minVal = app.AutoControls.StepsField.MinValue;
             maxVal = app.AutoControls.StepsField.MaxValue;
+            
+            % Validate current value is within bounds
+            if field.Value < minVal || field.Value > maxVal
+                app.Logger.warning('Auto steps value %.1f is outside valid range [%.1f, %.1f]', field.Value, minVal, maxVal);
+                field.Value = max(minVal, min(maxVal, field.Value));
+            end
+            
             newVal = max(minVal, field.Value - 1);
             field.Value = newVal;
             app.onAutoStepsChanged();
@@ -501,6 +508,13 @@ classdef foilview < matlab.apps.AppBase
             field = app.AutoControls.StepsField.Field;
             minVal = app.AutoControls.StepsField.MinValue;
             maxVal = app.AutoControls.StepsField.MaxValue;
+            
+            % Validate current value is within bounds
+            if field.Value < minVal || field.Value > maxVal
+                app.Logger.warning('Auto steps value %.1f is outside valid range [%.1f, %.1f]', field.Value, minVal, maxVal);
+                field.Value = max(minVal, min(maxVal, field.Value));
+            end
+            
             newVal = min(maxVal, field.Value + 1);
             field.Value = newVal;
             app.onAutoStepsChanged();
@@ -511,6 +525,13 @@ classdef foilview < matlab.apps.AppBase
             minVal = app.AutoControls.DelayField.MinValue;
             maxVal = app.AutoControls.DelayField.MaxValue;
             step = 0.1;
+            
+            % Validate current value is within bounds
+            if field.Value < minVal || field.Value > maxVal
+                app.Logger.warning('Auto delay value %.1f is outside valid range [%.1f, %.1f]', field.Value, minVal, maxVal);
+                field.Value = max(minVal, min(maxVal, field.Value));
+            end
+            
             newVal = max(minVal, round((field.Value - step)*10)/10);
             field.Value = newVal;
             app.onAutoDelayChanged();
@@ -521,6 +542,13 @@ classdef foilview < matlab.apps.AppBase
             minVal = app.AutoControls.DelayField.MinValue;
             maxVal = app.AutoControls.DelayField.MaxValue;
             step = 0.1;
+            
+            % Validate current value is within bounds
+            if field.Value < minVal || field.Value > maxVal
+                app.Logger.warning('Auto delay value %.1f is outside valid range [%.1f, %.1f]', field.Value, minVal, maxVal);
+                field.Value = max(minVal, min(maxVal, field.Value));
+            end
+            
             newVal = min(maxVal, round((field.Value + step)*10)/10);
             field.Value = newVal;
             app.onAutoDelayChanged();
@@ -764,24 +792,31 @@ classdef foilview < matlab.apps.AppBase
                 addpath(fullfile(srcDir, 'services'));
                 addpath(fullfile(srcDir, 'utils'));
                 addpath(fullfile(srcDir, 'managers'));
+                addpath(fullfile(srcDir, 'hardware'));
                 
-                % Verify MEX controller is available
+                % Verify MEX controller is available (only if Logger is initialized)
                 if exist('mjc3_joystick_mex', 'file') == 3
                     % Test MEX function
                     try
                         result = mjc3_joystick_mex('test');
-                        if result
+                        if result && ~isempty(app.Logger)
                             app.Logger.info('✅ MJC3 MEX controller is functional');
                         end
                     catch
-                        app.Logger.warning('⚠️  MJC3 MEX controller paths added but function not responding');
+                        if ~isempty(app.Logger)
+                            app.Logger.warning('⚠️  MJC3 MEX controller paths added but function not responding');
+                        end
                     end
                 else
-                    app.Logger.warning('⚠️  MJC3 MEX controller not found. Run install_mjc3() to build.');
+                    if ~isempty(app.Logger)
+                        app.Logger.warning('⚠️  MJC3 MEX controller not found. Run install_mjc3() to build.');
+                    end
                 end
                 
             catch ME
-                app.Logger.error('⚠️  Error adding application paths: %s', ME.message);
+                if ~isempty(app.Logger)
+                    app.Logger.error('⚠️  Error adding application paths: %s', ME.message);
+                end
             end
         end
         %% Copy UI components from struct
@@ -856,67 +891,7 @@ classdef foilview < matlab.apps.AppBase
             end
         end
         
-        %% Launch the MJC3 joystick control window
-        function launchMJC3View(app)
-            try
-                % Check if MJC3View already exists and is valid
-                if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp.UIFigure)
-                    app.MJC3ViewApp.bringToFront();
-                    return;
-                end
-                
-                % Clear any invalid reference
-                if ~isempty(app.MJC3ViewApp) && ~isvalid(app.MJC3ViewApp)
-                    app.Logger.warning('Clearing invalid MJC3ViewApp reference');
-                    app.MJC3ViewApp = [];
-                end
-                
-                % Create new MJC3View with robust error handling
-                try
-                    app.MJC3ViewApp = MJC3View();
-                    app.Logger.info('MJC3View created successfully');
-                catch ME
-                    app.Logger.error('Failed to create MJC3View: %s', ME.message);
-                    app.MJC3ViewApp = [];
-                    uialert(app.UIFigure, sprintf('Failed to open joystick window: %s', ME.message), 'Error', 'Icon', 'error');
-                    return;
-                end
-                
-                % Create and set up the HID controller using the controller's method
-                if ~isempty(app.Controller) && isvalid(app.Controller)
-                    try
-                        hidController = app.Controller.createMJC3Controller(5);
-                        
-                        if ~isempty(hidController) && isvalid(hidController)
-                            app.MJC3ViewApp.setController(hidController);
-                            app.Logger.info('MJC3 Controller integrated successfully');
-                        else
-                            app.Logger.warning('Invalid HID controller created - using manual mode');
-                            app.MJC3ViewApp.setController([]);
-                        end
-                    catch ME
-                        app.Logger.error('Failed to create HID controller: %s', ME.message);
-                        app.MJC3ViewApp.setController([]);
-                    end
-                else
-                    app.Logger.warning('Main controller not available, MJC3 View opened in manual mode');
-                    app.MJC3ViewApp.setController([]);
-                end
-                
-            catch ME
-                app.Logger.error('Failed to launch MJC3 View: %s', ME.message);
-                % Clean up any partially created objects
-                if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp)
-                    try
-                        delete(app.MJC3ViewApp);
-                    catch
-                        % Ignore cleanup errors
-                    end
-                    app.MJC3ViewApp = [];
-                end
-                uialert(app.UIFigure, sprintf('Failed to open joystick window: %s', ME.message), 'Error', 'Icon', 'error');
-            end
-        end
+
         %% Set up all UI callback functions
         function setupCallbacks(app)
             app.UIFigure.CloseRequestFcn = createCallbackFcn(app, @app.onWindowClose, true);
@@ -1400,6 +1375,7 @@ classdef foilview < matlab.apps.AppBase
                         FoilviewUtils.warn('FoilviewApp', 'Failed to create metadata file: %s', metadataFile);
                         return;
                     end
+                    app.Logger.info('Writing headers to metadata file: %s', metadataFile);
                     fprintf(fid, headers);
                     fclose(fid);
                 catch ME
@@ -1469,6 +1445,68 @@ classdef foilview < matlab.apps.AppBase
         function setIgnoreNextResize(app, value)
             % Set the IgnoreNextResize flag for plot expansion/collapse
             app.IgnoreNextResize = value;
+        end
+        
+        %% Launch the MJC3 joystick control window
+        function launchMJC3View(app)
+            try
+                % Check if MJC3View already exists and is valid
+                if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp.UIFigure)
+                    app.MJC3ViewApp.bringToFront();
+                    return;
+                end
+                
+                % Clear any invalid reference
+                if ~isempty(app.MJC3ViewApp) && ~isvalid(app.MJC3ViewApp)
+                    app.Logger.warning('Clearing invalid MJC3ViewApp reference');
+                    app.MJC3ViewApp = [];
+                end
+                
+                % Create new MJC3View with robust error handling
+                try
+                    app.MJC3ViewApp = MJC3View();
+                    app.Logger.info('MJC3View created successfully');
+                catch ME
+                    app.Logger.error('Failed to create MJC3View: %s', ME.message);
+                    app.MJC3ViewApp = [];
+                    uialert(app.UIFigure, sprintf('Failed to open joystick window: %s', ME.message), 'Error', 'Icon', 'error');
+                    return;
+                end
+                
+                % Create and set up the HID controller using the controller's method
+                if ~isempty(app.Controller) && isvalid(app.Controller)
+                    try
+                        hidController = app.Controller.createMJC3Controller(5);
+                        
+                        if ~isempty(hidController) && isvalid(hidController)
+                            app.MJC3ViewApp.setController(hidController);
+                            app.Logger.info('MJC3 Controller integrated successfully');
+                        else
+                            app.Logger.warning('Invalid HID controller created - using manual mode');
+                            app.MJC3ViewApp.setController([]);
+                        end
+                    catch ME
+                        app.Logger.error('Failed to create HID controller: %s', ME.message);
+                        app.MJC3ViewApp.setController([]);
+                    end
+                else
+                    app.Logger.warning('Main controller not available, MJC3 View opened in manual mode');
+                    app.MJC3ViewApp.setController([]);
+                end
+                
+            catch ME
+                app.Logger.error('Failed to launch MJC3 View: %s', ME.message);
+                % Clean up any partially created objects
+                if ~isempty(app.MJC3ViewApp) && isvalid(app.MJC3ViewApp)
+                    try
+                        delete(app.MJC3ViewApp);
+                    catch
+                        % Ignore cleanup errors
+                    end
+                    app.MJC3ViewApp = [];
+                end
+                uialert(app.UIFigure, sprintf('Failed to open joystick window: %s', ME.message), 'Error', 'Icon', 'error');
+            end
         end
     end
 

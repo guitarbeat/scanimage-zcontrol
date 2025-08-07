@@ -322,7 +322,7 @@ classdef UserNotificationService < handle
             obj.showCriticalError(title, message, steps);
         end
         
-        function steps = getDefaultTroubleshootingSteps(obj)
+        function steps = getDefaultTroubleshootingSteps(~)
             % Get default troubleshooting steps
             
             steps = {
@@ -335,7 +335,7 @@ classdef UserNotificationService < handle
             };
         end
         
-        function steps = getDependencyTroubleshootingSteps(obj)
+        function steps = getDependencyTroubleshootingSteps(~)
             % Get dependency-specific troubleshooting steps
             
             steps = {
@@ -348,7 +348,7 @@ classdef UserNotificationService < handle
             };
         end
         
-        function steps = getServiceTroubleshootingSteps(obj)
+        function steps = getServiceTroubleshootingSteps(~)
             % Get service-specific troubleshooting steps
             
             steps = {
@@ -361,7 +361,7 @@ classdef UserNotificationService < handle
             };
         end
         
-        function steps = getUITroubleshootingSteps(obj)
+        function steps = getUITroubleshootingSteps(~)
             % Get UI-specific troubleshooting steps
             
             steps = {
@@ -374,7 +374,7 @@ classdef UserNotificationService < handle
             };
         end
         
-        function steps = getConnectionTroubleshootingSteps(obj)
+        function steps = getConnectionTroubleshootingSteps(~)
             % Get connection-specific troubleshooting steps
             
             steps = {

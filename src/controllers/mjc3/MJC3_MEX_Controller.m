@@ -55,6 +55,7 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
         lastZValue     % Last Z-axis value to detect changes
         lastXValue     % Last X-axis value to detect changes
         lastYValue     % Last Y-axis value to detect changes
+        lastButtonState % Last button state to detect changes
         mexFunction    % Name of the MEX function
         isConnected    % Connection status
         CalibrationService  % Calibration service for X, Y, Z axes
@@ -78,6 +79,7 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             obj.lastZValue = 0;
             obj.lastXValue = 0;
             obj.lastYValue = 0;
+            obj.lastButtonState = 0;
             obj.isConnected = false;
             obj.running = false;
             
@@ -304,6 +306,17 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             button = data(4);
             speedKnob = data(5);
             
+            % Handle button state changes
+            if button ~= obj.lastButtonState
+                obj.Logger.debug('Button state changed: %d -> %d', obj.lastButtonState, button);
+                obj.lastButtonState = button;
+                
+                % Button pressed (assuming button value > 0 indicates pressed)
+                if button > 0
+                    obj.handleButtonPress();
+                end
+            end
+            
             % Speed knob provides 0-255 range, normalize to 0.1-1.0
             speedFactor = max(0.1, speedKnob / 255);
             
@@ -375,6 +388,21 @@ classdef MJC3_MEX_Controller < BaseMJC3Controller
             obj.Logger.error('Timer error occurred, stopping controller');
             obj.running = false;
             obj.isConnected = false;
+        end
+        
+        function handleButtonPress(obj)
+            % Handle joystick button press events
+            % This method can be extended to implement button-specific functionality
+            % such as enabling/disabling movement, changing modes, etc.
+            
+            obj.Logger.info('Joystick button pressed (value: %d)', obj.lastButtonState);
+            
+            % TODO: Implement button-specific functionality
+            % Examples:
+            % - Toggle movement enable/disable
+            % - Change movement speed modes
+            % - Trigger calibration
+            % - Emergency stop
         end
         
         % Calibration Methods

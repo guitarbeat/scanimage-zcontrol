@@ -142,7 +142,7 @@ classdef BookmarkManager < handle
             valid = isnumeric(index) && isscalar(index) && index >= 1 && index <= length(obj.MarkedPositions.Labels);
         end
         
-        function metadataFile = getMetadataFile(obj)
+        function metadataFile = getMetadataFile(~)
             % Get the metadata file path from workspace
             try
                 metadataFile = evalin('base', 'metadataFilePath');

@@ -1,7 +1,7 @@
 ---
-alwaysApply: true
+description: vague prompts
+alwaysApply: false
 ---
-
 # Prompt Optimization Rules
 
 ## Core Issues to Check

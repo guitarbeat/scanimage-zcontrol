@@ -393,14 +393,14 @@ classdef ApplicationInitializer < handle
             % Validate MATLAB version compatibility
             
             try
-                version = version('-release');
-                year = str2double(version(1:4));
+                matlabVersion = version('-release');
+                year = str2double(matlabVersion(1:4));
                 
                 if year < 2019
-                    obj.logMessage('ERROR', sprintf('MATLAB %s not supported. Requires R2019b or later.', version));
+                    obj.logMessage('ERROR', sprintf('MATLAB %s not supported. Requires R2019b or later.', matlabVersion));
                     success = false;
                 else
-                    obj.logMessage('INFO', sprintf('MATLAB %s detected - compatible', version));
+                    obj.logMessage('INFO', sprintf('MATLAB %s detected - compatible', matlabVersion));
                     success = true;
                 end
             catch

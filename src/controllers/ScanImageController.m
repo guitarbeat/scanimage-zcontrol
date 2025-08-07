@@ -76,6 +76,7 @@ classdef ScanImageController < handle
             else
                 % Verify the motors handle is valid
                 if ~isprop(hMotors, 'axesPosition')
+                    obj.Logger.error('Invalid hMotors handle - missing axesPosition property');
                     error('Invalid hMotors handle - missing axesPosition property');
                 end
                 obj.Logger.info('ScanImageController initialized for X, Y, Z-axis control');
@@ -214,7 +215,7 @@ classdef ScanImageController < handle
                 % Get current position
                 currentPos = obj.getCurrentAxisPosition(axisName, axisIndex);
                 if isempty(currentPos)
-                    warning('ScanImageController:NoPosition', 'Could not get current %s position', axisName);
+                    obj.Logger.warning('Could not get current %s position', axisName);
                     return;
                 end
                 
@@ -231,7 +232,7 @@ classdef ScanImageController < handle
                 end
                 
             catch ME
-                warning('ScanImageController:RelativeMoveError', 'relativeMove%s error: %s', axisName, ME.message);
+                obj.Logger.warning('relativeMove%s error: %s', axisName, ME.message);
             end
         end
         
@@ -260,7 +261,7 @@ classdef ScanImageController < handle
                 % Get current axes positions
                 currentAxes = obj.hMotors.axesPosition;
                 if length(currentAxes) < axisIndex
-                    warning('ScanImageController:InvalidAxis', '%s-axis index %d not available in axes position array', axisName, axisIndex);
+                    obj.Logger.warning('%s-axis index %d not available in axes position array', axisName, axisIndex);
                     return;
                 end
                 
@@ -273,7 +274,7 @@ classdef ScanImageController < handle
                 success = true;
                 
             catch ME
-                warning('ScanImageController:MoveToAbsoluteError', 'move%sToAbsolute error: %s', axisName, ME.message);
+                obj.Logger.warning('move%sToAbsolute error: %s', axisName, ME.message);
             end
         end
         
@@ -302,7 +303,7 @@ classdef ScanImageController < handle
                 end
                 
             catch ME
-                warning('ScanImageController:GetPositionError', 'getCurrent%sPosition error: %s', axisName, ME.message);
+                obj.Logger.warning('getCurrent%sPosition error: %s', axisName, ME.message);
             end
         end
     end

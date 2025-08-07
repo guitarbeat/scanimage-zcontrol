@@ -257,7 +257,7 @@ classdef UIOrchestrator < handle
     end
     
     methods (Access = private)
-        function [valid, errorMsg] = validateAutoStepParameters(obj, autoControls)
+        function [valid, errorMsg] = validateAutoStepParameters(~, autoControls)
             %VALIDATEAUTOSTEPPARAMETERS Validate auto-stepping parameters from UI
             valid = true;
             errorMsg = '';

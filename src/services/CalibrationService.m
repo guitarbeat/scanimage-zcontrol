@@ -510,7 +510,7 @@ classdef CalibrationService < handle
                 'sensitivity', sensitivity);
         end
         
-        function calibratedValue = applyDefaultCalibration(obj, rawValue)
+        function calibratedValue = applyDefaultCalibration(~, rawValue)
             % Apply default calibration to raw value
             % rawValue: Raw joystick value (signed 8-bit: -127 to 127)
             % Returns: Calibrated value (-1.0 to 1.0)

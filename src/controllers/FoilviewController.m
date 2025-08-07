@@ -1,4 +1,4 @@
-﻿%==============================================================================
+%==============================================================================
 % FOILVIEWCONTROLLER.M
 %==============================================================================
 % Main controller class for the Foilview application that manages Z-axis stage
@@ -151,8 +151,8 @@ classdef FoilviewController < handle
             
             % Initialize services that depend on ScanImageManager
             if ~isempty(obj.ScanImageManager)
-                obj.StageControlService = StageControlService(obj.ScanImageManager);
-                obj.MetricCalculationService = MetricCalculationService(obj.ScanImageManager);
+                obj.StageControlService = obj.StageControlService(obj.ScanImageManager);
+                obj.MetricCalculationService = obj.MetricCalculationService(obj.ScanImageManager);
                 
                 % Set up event listeners through EventCoordinator
                 obj.EventCoordinator.setupServiceListeners(obj);
@@ -281,6 +281,7 @@ classdef FoilviewController < handle
             % Create and validate parameters using service
             params = ScanControlService.createAutoStepParams(stepSize, numSteps, delay, direction, recordMetrics);
             if ~params.isValid
+                obj.Logger.error('Invalid auto-step parameters: %s', params.errorMessage);
                 error('Invalid auto-step parameters: %s', params.errorMessage);
             end
 
@@ -360,6 +361,7 @@ classdef FoilviewController < handle
 
         function markCurrentPosition(obj, label)
             if isempty(strtrim(label))
+                obj.Logger.error('Label cannot be empty');
                 error('Label cannot be empty');
             end
 
@@ -735,9 +737,26 @@ classdef FoilviewController < handle
                 end
             end
             
+            % Create a mock UI components structure for HIDController
+            % This provides the UI interface that HIDController expects
+            mockUIComponents = struct();
+            mockUIComponents.EnableButton = struct('Text', '▶ Enable', 'BackgroundColor', [0.4 0.7 0.4]);
+            mockUIComponents.StatusLabel = struct('Text', '⚪ Disconnected', 'FontColor', [0.5 0.5 0.5]);
+            mockUIComponents.StepFactorField = struct('Value', stepFactor);
+            mockUIComponents.SettingsButton = struct();
+            
             % Use the factory to create the best available controller
             try
-                controller = MJC3ControllerFactory.createController(zController, stepFactor);
+                % Create the underlying MJC3 controller first
+                mjc3Controller = MJC3ControllerFactory.createController(zController, stepFactor);
+                
+                % Wrap it in an HIDController for UI integration
+                controller = HIDController(mockUIComponents, zController);
+                
+                % Replace the internal controller with the real one
+                controller.hidController = mjc3Controller;
+                
+                obj.Logger.info('Created HIDController wrapper for MJC3 controller');
                 
             catch ME
                 obj.Logger.error('Failed to create MJC3 controller: %s', ME.message);

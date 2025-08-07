@@ -56,6 +56,7 @@ classdef ScanImageManager < handle
         FoilviewApp
         ZStepSize = NaN % * Caches the last known Z step size for bidirectional sync
         Logger
+        MetadataFile = [] % * Metadata file path for logging
         
         % Warning cache to prevent duplicate messages
         WarningCache = struct('simulationModeWarned', false)
@@ -467,6 +468,7 @@ classdef ScanImageManager < handle
             try
                 motorFig = findall(0, 'Type', 'figure', 'Tag', 'MotorControls');
                 if isempty(motorFig)
+                    obj.Logger.error('Motor Controls window not found. Please ensure ScanImage Motor Controls window is open.');
                     error('Motor Controls window not found. Please ensure ScanImage Motor Controls window is open.');
                 end
                 % Map axis to field tags
@@ -481,10 +483,12 @@ classdef ScanImageManager < handle
                         posFieldTag = 'etZPos';
                         goButtonTag = 'Zinc';
                     otherwise
+                        obj.Logger.error('Invalid axis name: %s', axisName);
                         error('Invalid axis name: %s', axisName);
                 end
                 posField = findall(motorFig, 'Tag', posFieldTag);
                 if isempty(posField)
+                    obj.Logger.error('Position field not found for axis %s.', axisName);
                     error('Position field not found for axis %s.', axisName);
                 end
                 % Set the value as string

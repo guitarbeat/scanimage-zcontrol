@@ -199,7 +199,7 @@ classdef EventCoordinator < handle
             end
         end
         
-        function success = refreshConnection(obj, controller)
+        function success = refreshConnection(~, controller)
             %REFRESHCONNECTION Enhanced connection refresh with return value
             success = FoilviewUtils.safeExecuteWithReturn(@() doRefresh(), ...
                 'refreshConnection', false);

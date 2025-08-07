@@ -193,6 +193,46 @@ classdef LoggingService < handle
             obj.UseColoredOutput = false;
             obj.info('Colored output disabled');
         end
+        
+        function progress(obj, message, varargin)
+            % Log progress message with cross-platform overwrite support
+            % Uses carriage return for reliable progress updates
+            if ~obj.shouldLog(obj.INFO)
+                return;
+            end
+            
+            if ~isempty(varargin)
+                try
+                    formattedMessage = sprintf(message, varargin{:});
+                catch ME
+                    formattedMessage = sprintf('Message formatting error: %s', ME.message);
+                end
+            else
+                formattedMessage = message;
+            end
+            
+            % Create progress entry without newline
+            if obj.IncludeTimestamp
+                timestamp = datestr(now, 'HH:MM:SS');
+                progressEntry = sprintf('\r[%s] [PROGRESS] [%s] %s', timestamp, obj.ComponentName, formattedMessage);
+            else
+                progressEntry = sprintf('\r[PROGRESS] [%s] %s', obj.ComponentName, formattedMessage);
+            end
+            
+            % Output to console only (file logging would be messy for progress)
+            if obj.OutputToConsole
+                fprintf('%s', progressEntry);
+            end
+        end
+        
+        function progressComplete(obj, finalMessage)
+            % Complete progress logging with final message and newline
+            if nargin < 2
+                finalMessage = 'Complete';
+            end
+            obj.progress(finalMessage);
+            fprintf('\n'); % Add newline to finish progress display
+        end
     end
     
     methods (Access = private)
@@ -286,7 +326,7 @@ classdef LoggingService < handle
                 {'Comments', 'Text', 'SystemCommands', 'Errors', '*Errors'});
         end
         
-        function available = checkCprintfAvailability(obj)
+        function available = checkCprintfAvailability(~)
             % Check if cprintf function is available
             try
                 % Try to call cprintf with minimal arguments to test availability

@@ -8,6 +8,7 @@ classdef ComponentFactory < handle
     
     properties (Access = private)
         Config
+        Logger  % LoggingService instance
     end
     
     methods (Static)
@@ -56,10 +57,13 @@ classdef ComponentFactory < handle
     methods
         function obj = ComponentFactory()
             %COMPONENTFACTORY Constructor
+            % Initialize logger
+            obj.Logger = LoggingService('ComponentFactory', 'SuppressInitMessage', true);
+            
             try
                 obj.loadConfig();
             catch ME
-                fprintf('ComponentFactory initialization failed: %s\n', ME.message);
+                obj.Logger.error('ComponentFactory initialization failed: %s', ME.message);
                 obj.Config = [];
             end
         end
@@ -68,11 +72,13 @@ classdef ComponentFactory < handle
             %BUILDCOMPONENT Build a component from config
             try
                 if isempty(obj.Config) || ~isfield(obj.Config, 'components')
+                    obj.Logger.error('Component %s not found in config', componentName);
                     error('Component %s not found in config', componentName);
                 end
                 
                 components = obj.Config.components;
                 if ~isfield(components, componentName)
+                    obj.Logger.error('Component %s not found in config', componentName);
                     error('Component %s not found in config', componentName);
                 end
                 
@@ -89,6 +95,7 @@ classdef ComponentFactory < handle
             %BUILDLAYOUT Build a complete layout from config
             try
                 if isempty(obj.Config) || ~isfield(obj.Config.layouts, layoutName)
+                    obj.Logger.error('Layout %s not found in config', layoutName);
                     error('Layout %s not found in config', layoutName);
                 end
                 
@@ -109,9 +116,11 @@ classdef ComponentFactory < handle
                 if exist(obj.CONFIG_FILE, 'file')
                     obj.Config = jsondecode(fileread(obj.CONFIG_FILE));
                 else
+                    obj.Logger.error('Config file not found: %s', obj.CONFIG_FILE);
                     error('Config file not found: %s', obj.CONFIG_FILE);
                 end
             catch ME
+                obj.Logger.error('Failed to load config: %s', ME.message);
                 error('Failed to load config: %s', ME.message);
             end
         end
@@ -127,6 +136,7 @@ classdef ComponentFactory < handle
                 case 'vertical_panel'
                     component = obj.createVerticalPanel(config, parent);
                 otherwise
+                    obj.Logger.error('Unknown component type: %s', config.type);
                     error('Unknown component type: %s', config.type);
             end
         end
@@ -215,7 +225,7 @@ classdef ComponentFactory < handle
             end
         end
         
-        function uiElement = createElement(obj, elementConfig, parent)
+        function uiElement = createElement(~, elementConfig, parent)
             %CREATEELEMENT Create individual UI element
             
             switch elementConfig.type

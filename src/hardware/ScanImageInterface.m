@@ -54,7 +54,7 @@ classdef ScanImageInterface < handle
             end
         end
         
-        function positions = getPositions(obj, hSI, simulationMode)
+        function positions = getPositions(~, hSI, simulationMode)
             %GETPOSITIONS Get current stage positions from ScanImage
             positions = struct('x', 0, 'y', 0, 'z', 0);
             
@@ -293,7 +293,7 @@ classdef ScanImageInterface < handle
     end
     
     methods (Access = private)
-        function motorFig = findMotorControlsFigure(obj)
+        function motorFig = findMotorControlsFigure(~)
             %FINDMOTORCONTROLSFIGURE Find ScanImage Motor Controls figure
             motorFig = [];
             
@@ -310,24 +310,18 @@ classdef ScanImageInterface < handle
             end
         end
         
-        function axisInfo = getAxisInfo(obj, motorFig, axisName)
+        function axisInfo = getAxisInfo(~, ~, ~)
             %GETAXISINFO Get UI controls for a specific axis
             axisInfo = [];
             
-            try
-                % Find axis-specific controls in the motor figure
-                % This is a simplified version - actual implementation would
-                % need to match the specific ScanImage GUI structure
-                
-                % For now, return empty to avoid errors
-                % Real implementation would parse the motor controls GUI
-                
-            catch ME
-                FoilviewUtils.logException('ScanImageInterface', ME, sprintf('Error getting axis info for %s', axisName));
-            end
+            % This is a simplified version - actual implementation would
+            % need to match the specific ScanImage GUI structure
+            
+            % For now, return empty to avoid errors
+            % Real implementation would parse the motor controls GUI
         end
         
-        function axisInfo = getAxisInfoFromFig(obj, motorFig, axisName)
+        function axisInfo = getAxisInfoFromFig(~, motorFig, axisName)
             %GETAXISINFOFROMFIG Get UI controls for a specific axis from figure
             axisInfo = struct('etPos', [], 'step', [], 'inc', [], 'dec', []);
             
@@ -364,7 +358,7 @@ classdef ScanImageInterface < handle
             end
         end
         
-        function isError = checkMotorErrorStateFromFig(obj, motorFig, axisName)
+        function isError = checkMotorErrorStateFromFig(~, motorFig, axisName)
             %CHECKMOTORERRORSTATEFROMFIG Check if motor is in error state from figure
             isError = false;
             
@@ -393,7 +387,7 @@ classdef ScanImageInterface < handle
             end
         end
         
-        function clearMotorError(obj, motorFig, axisName)
+        function clearMotorError(~, motorFig, axisName)
             %CLEARMOTORERROR Clear motor error for specified axis
             try
                 % Map axis names to clear error button tags

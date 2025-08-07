@@ -41,12 +41,15 @@ classdef HIDController < handle
     % providing UI integration and status management for joystick-based Z-control.
     
     properties (Access = private)
-        hidController    % Instance of MJC3_MEX_Controller
         zController     % Z-axis controller (must implement relativeMove method)
         uiComponents    % UI components for HID controls
         isEnabled       % Current enable/disable state
         stepFactor      % Current step factor setting
         Logger          % Logging service for structured output
+    end
+    
+    properties (Access = public)
+        hidController    % Instance of MJC3_MEX_Controller (public for external access)
     end
     
     properties (Constant)

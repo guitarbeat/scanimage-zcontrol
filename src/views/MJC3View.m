@@ -207,7 +207,8 @@ classdef MJC3View < handle
             % Uses caching to prevent repeated detection checks and logging
             
             % Check cache first
-            currentTime = now;
+            % Use datenum-equivalent for elapsed-day calculations
+            currentTime = datenum(datetime('now'));
             if currentTime - obj.HardwareDetectionCache.lastCheck < obj.HardwareDetectionCache.cacheTimeout / 86400
                 isDetected = obj.HardwareDetectionCache.isDetected;
                 return;

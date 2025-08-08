@@ -115,6 +115,8 @@ classdef ComponentFactory < handle
             try
                 if exist(obj.CONFIG_FILE, 'file')
                     obj.Config = jsondecode(fileread(obj.CONFIG_FILE));
+                    % * Validate configuration schema to catch errors early
+                    obj.validateConfigSchema(obj.Config);
                 else
                     obj.Logger.error('Config file not found: %s', obj.CONFIG_FILE);
                     error('Config file not found: %s', obj.CONFIG_FILE);
@@ -123,6 +125,72 @@ classdef ComponentFactory < handle
                 obj.Logger.error('Failed to load config: %s', ME.message);
                 error('Failed to load config: %s', ME.message);
             end
+        end
+
+        function validateConfigSchema(obj, config)
+            %VALIDATECONFIGSCHEMA Basic schema validation for UI config
+            % * Ensures required top-level sections and minimal field checks
+            if ~isstruct(config)
+                error('UI config must be a struct');
+            end
+            requiredTop = { 'components', 'layouts' };
+            for i = 1:numel(requiredTop)
+                if ~isfield(config, requiredTop{i})
+                    error('UI config missing required section: %s', requiredTop{i});
+                end
+            end
+
+            % Validate components
+            components = config.components;
+            if ~isstruct(components)
+                error('UI config "components" must be a struct');
+            end
+            compNames = fieldnames(components);
+            for i = 1:numel(compNames)
+                c = components.(compNames{i});
+                if ~isfield(c, 'type')
+                    error('Component "%s" missing required field: type', compNames{i});
+                end
+                switch c.type
+                    case 'grid_panel'
+                        if ~isfield(c, 'rows') || ~isfield(c, 'columns')
+                            error('grid_panel "%s" must specify rows and columns', compNames{i});
+                        end
+                        if (~isscalar(c.rows) || c.rows < 1) || (~isscalar(c.columns) || c.columns < 1)
+                            error('grid_panel "%s" rows/columns must be positive scalars', compNames{i});
+                        end
+                    case {'horizontal_panel','vertical_panel'}
+                        % No extra required fields
+                    otherwise
+                        error('Unknown component type in "%s": %s', compNames{i}, c.type);
+                end
+                if isfield(c, 'elements')
+                    elems = c.elements;
+                    if ~(iscell(elems) || isstruct(elems))
+                        error('Component "%s" elements must be a cell array or struct array', compNames{i});
+                    end
+                end
+            end
+
+            % Validate layouts
+            layouts = config.layouts;
+            if ~isstruct(layouts)
+                error('UI config "layouts" must be a struct');
+            end
+            layoutNames = fieldnames(layouts);
+            for i = 1:numel(layoutNames)
+                l = layouts.(layoutNames{i});
+                if ~isfield(l, 'rows') || ~isfield(l, 'columns')
+                    error('Layout "%s" must specify rows and columns', layoutNames{i});
+                end
+                if (~isscalar(l.rows) || l.rows < 1) || (~isscalar(l.columns) || l.columns < 1)
+                    error('Layout "%s" rows/columns must be positive scalars', layoutNames{i});
+                end
+                if isfield(l, 'components') && ~(isstruct(l.components) || isvector(l.components))
+                    error('Layout "%s" components should be an array-like struct', layoutNames{i});
+                end
+            end
+            obj.Logger.debug('UI configuration schema validated: %d components, %d layouts', numel(compNames), numel(layoutNames));
         end
         
         function component = createFromConfig(obj, config, parent)

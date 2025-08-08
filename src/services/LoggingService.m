@@ -213,7 +213,7 @@ classdef LoggingService < handle
             
             % Create progress entry without newline
             if obj.IncludeTimestamp
-                timestamp = datestr(now, 'HH:MM:SS');
+                timestamp = char(datetime('now', 'Format', 'HH:mm:ss'));
                 progressEntry = sprintf('\r[%s] [PROGRESS] [%s] %s', timestamp, obj.ComponentName, formattedMessage);
             else
                 progressEntry = sprintf('\r[PROGRESS] [%s] %s', obj.ComponentName, formattedMessage);
@@ -279,10 +279,10 @@ classdef LoggingService < handle
             shouldLog = level >= currentLevel;
         end
         
-                               function logEntry = createLogEntry(obj, levelName, message)
+                                function logEntry = createLogEntry(obj, levelName, message)
             % Create formatted log entry
             if obj.IncludeTimestamp
-                timestamp = datestr(now, 'HH:MM:SS');
+                timestamp = char(datetime('now', 'Format', 'HH:mm:ss'));
                 logEntry = sprintf('[%s] [%s] [%s] %s', timestamp, levelName, obj.ComponentName, message);
             else
                 logEntry = sprintf('[%s] [%s] %s', levelName, obj.ComponentName, message);
@@ -311,7 +311,7 @@ classdef LoggingService < handle
                 mkdir(logDir);
             end
             
-            timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+            timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
             obj.LogFile = fullfile(logDir, sprintf('foilview_%s.log', timestamp));
         end
         

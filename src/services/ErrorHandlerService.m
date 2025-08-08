@@ -185,7 +185,7 @@ classdef ErrorHandlerService < handle
             %   level - Severity level (CRITICAL, ERROR, WARNING, INFO, DEBUG)
             %   message - Message to log
             
-            timestamp = datestr(now, 'HH:MM:SS');
+            timestamp = char(datetime('now', 'Format', 'HH:mm:ss'));
             logEntry = sprintf('[%s] %s: %s', timestamp, level, message);
             
             % Always output to console for immediate feedback
@@ -227,7 +227,7 @@ classdef ErrorHandlerService < handle
             end
             
             % Create timestamped log file
-            timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+            timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
             obj.LogFile = fullfile(logDir, sprintf('foilview_%s.log', timestamp));
             
             % Write initial log entry

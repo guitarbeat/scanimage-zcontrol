@@ -428,10 +428,10 @@ classdef UserNotificationService < handle
                 if ~isempty(obj.ParentFigure) && isvalid(obj.ParentFigure)
                     uialert(obj.ParentFigure, message, title, 'Icon', icon);
                 else
-                    fprintf('[%s] %s: %s\n', datestr(now, 'HH:MM:SS'), title, message);
+                    fprintf('[%s] %s: %s\n', char(datetime('now','Format','HH:mm:ss')), title, message);
                 end
             catch ME
-                fprintf('[%s] %s: %s\n', datestr(now, 'HH:MM:SS'), title, message);
+                fprintf('[%s] %s: %s\n', char(datetime('now','Format','HH:mm:ss')), title, message);
                 obj.logMessage('WARNING', sprintf('Alert fallback used: %s', ME.message));
             end
         end
@@ -459,7 +459,7 @@ classdef UserNotificationService < handle
             if ~isempty(obj.ErrorHandler)
                 obj.ErrorHandler.logMessage(level, sprintf('UserNotificationService: %s', message));
             else
-                timestamp = datestr(now, 'HH:MM:SS');
+                timestamp = char(datetime('now','Format','HH:mm:ss'));
                 fprintf('[%s] %s: UserNotificationService: %s\n', timestamp, level, message);
             end
         end

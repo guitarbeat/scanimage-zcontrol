@@ -93,6 +93,8 @@ classdef ApplicationInitializer < handle
             
             try
                 obj.logMessage('INFO', 'Starting application initialization');
+                % * Ensure MATLAB path contains all required source directories
+                obj.setupApplicationPaths();
                 
                 % Phase 1: Validate dependencies
                 if ~obj.validateDependencies()
@@ -154,6 +156,23 @@ classdef ApplicationInitializer < handle
     end
     
     methods (Access = private)
+        function setupApplicationPaths(~)
+            % * Adds required application directories to MATLAB path
+            try
+                currentDir = fileparts(mfilename('fullpath'));
+                srcDir = currentDir;
+                addpath(fullfile(srcDir, 'controllers', 'mjc3'));
+                addpath(fullfile(srcDir, 'controllers'));
+                addpath(fullfile(srcDir, 'views'));
+                addpath(fullfile(srcDir, 'services'));
+                addpath(fullfile(srcDir, 'utils'));
+                addpath(fullfile(srcDir, 'managers'));
+                addpath(fullfile(srcDir, 'hardware'));
+            catch pathME
+                % Fallback to console message; ErrorHandler may not be ready yet
+                fprintf('[WARN] Failed to add application paths: %s\n', pathME.message);
+            end
+        end
         function success = validateDependencies(obj)
             % Validate critical dependencies before initialization
             % 
@@ -582,7 +601,7 @@ classdef ApplicationInitializer < handle
             if ~isempty(obj.ErrorHandler)
                 obj.ErrorHandler.logMessage(level, sprintf('ApplicationInitializer: %s', message));
             else
-                timestamp = datestr(now, 'HH:MM:SS');
+                timestamp = char(datetime('now', 'Format', 'HH:mm:ss'));
                 fprintf('[%s] %s: ApplicationInitializer: %s\n', timestamp, level, message);
             end
         end

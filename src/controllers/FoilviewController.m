@@ -299,7 +299,7 @@ classdef FoilviewController < handle
 
             % Initialize metrics collection using service
             if obj.RecordMetrics
-                obj.AutoStepMetrics = ScanControlService.initializeMetricsCollection();
+                obj.AutoStepMetrics = ScanControlService.initializeMetricsCollection(params.numSteps);
             end
 
             try
@@ -339,6 +339,11 @@ classdef FoilviewController < handle
 
                 obj.AutoTimer = [];
                 obj.IsAutoRunning = false;
+                
+                % Finalize metrics collection if it was being recorded
+                if obj.RecordMetrics && ~isempty(obj.AutoStepMetrics)
+                    obj.AutoStepMetrics = ScanControlService.finalizeMetricsCollection(obj.AutoStepMetrics);
+                end
 
                 obj.notifyStatusChanged();
 

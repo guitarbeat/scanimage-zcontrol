@@ -167,25 +167,45 @@ classdef BookmarkManager < handle
                 end
                 % Use FilePathUtils to ensure full path
                 metadataFile = FilePathUtils.ensureFullPath(metadataFile);
-                % Read file as text
-                fid = fopen(metadataFile, 'r');
-                if fid == -1
-                    FoilviewUtils.warn('BookmarkManager', 'Could not open metadata file: %s', metadataFile);
-                    return;
+                % Read file content efficiently
+                try
+                    if exist('readlines', 'builtin')
+                        % Use readlines for MATLAB R2020b+
+                        lines = readlines(metadataFile);
+                        lines = cellstr(lines);  % Convert to cell array for compatibility
+                    else
+                        % Fallback for older MATLAB versions
+                        fid = fopen(metadataFile, 'r');
+                        if fid == -1
+                            FoilviewUtils.warn('BookmarkManager', 'Could not open metadata file: %s', metadataFile);
+                            return;
+                        end
+                        fileContent = fread(fid, '*char')';
+                        fclose(fid);
+                        lines = strsplit(fileContent, '\n');
+                        lines = lines(~cellfun('isempty', lines));  % Remove empty lines
+                    end
+                catch
+                    % Final fallback to original method if both approaches fail
+                    fid = fopen(metadataFile, 'r');
+                    if fid == -1
+                        FoilviewUtils.warn('BookmarkManager', 'Could not open metadata file: %s', metadataFile);
+                        return;
+                    end
+                    fileContent = fread(fid, '*char')';
+                    fclose(fid);
+                    lines = strsplit(fileContent, '\n');
+                    lines = lines(~cellfun('isempty', lines));  % Remove empty lines
                 end
-                lines = {};
-                tline = fgetl(fid);
-                while ischar(tline)
-                    lines{end+1} = tline; %#ok<AGROW>
-                    tline = fgetl(fid);
-                end
-                fclose(fid);
-                % Parse lines for bookmarks
-                labels = {};
-                xPos = [];
-                yPos = [];
-                zPos = [];
-                metrics = {};
+                
+                % Preallocate arrays based on number of lines
+                numLines = length(lines);
+                labels = cell(numLines, 1);
+                xPos = NaN(numLines, 1);
+                yPos = NaN(numLines, 1);
+                zPos = NaN(numLines, 1);
+                metrics = cell(numLines, 1);
+                validCount = 0;
                 for i = 1:length(lines)
                     line = lines{i};
                     tokens = strsplit(line, ',');
@@ -209,13 +229,25 @@ classdef BookmarkManager < handle
                                 metricVal = bookmarkMetricValue;
                             end
                             metricStruct = struct('Type', bookmarkMetricType, 'Value', metricVal);
-                            labels{end+1} = bookmarkLabel;
-                            xPos(end+1) = x;
-                            yPos(end+1) = y;
-                            zPos(end+1) = z;
-                            metrics{end+1} = metricStruct;
+                            
+                            % Use preallocated arrays
+                            validCount = validCount + 1;
+                            labels{validCount} = bookmarkLabel;
+                            xPos(validCount) = x;
+                            yPos(validCount) = y;
+                            zPos(validCount) = z;
+                            metrics{validCount} = metricStruct;
                         end
                     end
+                end
+                
+                % Trim arrays to actual size
+                if validCount < numLines
+                    labels = labels(1:validCount);
+                    xPos = xPos(1:validCount);
+                    yPos = yPos(1:validCount);
+                    zPos = zPos(1:validCount);
+                    metrics = metrics(1:validCount);
                 end
                 % Update MarkedPositions
                 obj.MarkedPositions.Labels = labels;

@@ -39,7 +39,10 @@ Source: `LESSONS_LEARNED.mdc` → JSON handling, Method visibility, Testing stra
 ## Code Quality Audits (Safe Refactors)
 - [x] Replace usage of `now` with `datetime("now")` across codebase
   - Updated: `src/services/UserNotificationService.m`, `src/services/LoggingService.m`, `src/services/ApplicationInitializer.m`, `src/services/ErrorHandlerService.m`, `src/views/MJC3View.m`
-- [ ] Preallocate arrays in loops; remove dynamic growth patterns
+- [x] Preallocate arrays in loops; remove dynamic growth patterns
+  - Fixed: `src/managers/BookmarkManager.m` - improved file reading with preallocation
+  - Fixed: `src/services/ScanControlService.m` - preallocated arrays for auto-step metrics collection
+  - Updated: `src/controllers/FoilviewController.m` - integrated improved metrics initialization and finalization
 - [ ] Ensure constructors are called directly (avoid `app.Property(args)` for undefined properties)
 - [ ] Normalize controller lifecycle API: prefer `enable()`/`disable()`; remove mismatched `stop()` calls
 - [x] Add startup path hygiene: ensure `src/hardware/` (and others) added to MATLAB path centrally

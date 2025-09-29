@@ -1,0 +1,84 @@
+# MATLAB specific
+*.asv
+*.m~
+*.mex*
+*.mlapp
+*.p
+codegen/
+*.autosave
+
+# MATLAB App Designer temporary files
+*.autosave
+temp_*.mlapp
+
+# MATLAB Compiler generated files
+for_redistribution/
+for_redistribution_files_only/
+for_testing/
+*.mltbx
+*.prj
+
+# Simulink specific
+*.slxc
+slprj/
+sccprj/
+
+# Build artifacts
+build/
+dist/
+*.exe
+*.dmg
+*.pkg
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Logs
+*.log
+logs/
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Cache files
+*.cache
+cache/
+
+# Test outputs
+test_results/
+coverage/
+
+# Hardware specific temporary files
+*.cal
+*.tmp_cal
+hardware_state.mat
+
+# User-specific configuration
+config/user_config.json
+user_settings.mat
+
+# Performance profiling
+profile_results/
+*.profiler

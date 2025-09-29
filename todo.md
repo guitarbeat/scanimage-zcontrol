@@ -73,12 +73,14 @@ Source: `LESSONS_LEARNED.mdc` → UI Design Fundamentals
 - [ ] Track completion status and link PRs/issues for each checklist item
 
 ## Repository Management & GitHub Best Practices
-- [ ] Create comprehensive README.md with project description, installation, and usage instructions
-- [ ] Add project badges (build status, license, MATLAB version compatibility)
-- [ ] Set up GitHub issue templates for bug reports and feature requests
-- [ ] Create pull request template with checklist for contributors
-- [ ] Add CONTRIBUTING.md with development guidelines and coding standards
-- [ ] Create CHANGELOG.md to track version history and notable changes
+- [x] Create comprehensive README.md with project description, installation, and usage instructions
+- [x] Add project badges (build status, license, MATLAB version compatibility)
+- [x] Set up GitHub issue templates for bug reports and feature requests
+- [x] Create pull request template with checklist for contributors
+- [x] Add CONTRIBUTING.md with development guidelines and coding standards
+- [x] Create CHANGELOG.md to track version history and notable changes
+- [x] Add security policy (SECURITY.md) for vulnerability reporting
+- [x] Create .gitignore file for proper repository hygiene
 - [ ] Set up GitHub Discussions for community Q&A and announcements
 - [ ] Add repository topics/tags for better discoverability (matlab, microscopy, scanimage, hardware-control)
 
@@ -98,65 +100,10 @@ Source: Repository exploration - no CI/CD workflows found
 ## Project Maintenance & Community
 - [ ] Create GitHub project boards for task tracking and milestone management
 - [ ] Set up automated issue labeling and triage
-- [ ] Add security policy (SECURITY.md) for vulnerability reporting
+- [x] Add security policy (SECURITY.md) for vulnerability reporting
 - [ ] Create user documentation wiki or GitHub Pages site
 - [ ] Set up automated dependency updates (dependabot equivalent for MATLAB)
-- [ ] Add code of conduct for community interactions
-- [ ] Create issue/PR auto-close policies for stale items
-
-Source: Repository exploration - minimal issue/PR activity, community features missing
-
-## Development Environment & Tooling
-- [ ] Enhance dev-tools with additional MATLAB static analysis
-- [ ] Add pre-commit hooks for code formatting and basic checks
-- [ ] Create Docker/container setup for consistent development environment
-- [ ] Add MATLAB package (.mltbx) build automation
-- [ ] Implement automated MEX compilation testing across platforms
-- [ ] Create development setup script for new contributors
-- [ ] Add performance benchmarking and regression testing tools
-
-Source: `dev-tools/` directory analysis and MATLAB development best practices
-
-## Hardware Integration & Testing
-- [ ] Address foilview application initialization issues from .kiro/specs requirements
-- [ ] Implement robust ScanImage connection handling with fallback modes
-- [ ] Add comprehensive hardware abstraction layer testing
-- [ ] Create hardware simulation framework for development without physical devices
-- [ ] Implement hardware compatibility matrix and testing
-- [ ] Add automatic hardware detection and configuration
-- [ ] Create hardware troubleshooting and diagnostic tools
-
-Source: `.kiro/specs/foilview-fixes/requirements.md` and hardware integration challenges
-
-## Performance & Reliability
-- [ ] Implement comprehensive application lifecycle management
-- [ ] Add memory leak detection and prevention
-- [ ] Create performance monitoring and metrics collection
-- [ ] Implement automatic crash recovery and state persistence
-- [ ] Add comprehensive error tracking and reporting
-- [ ] Create system resource monitoring (timers, handles, connections)
-- [ ] Implement graceful degradation for hardware failures
-
-Source: `LESSONS_LEARNED.mdc` - resource management and cleanup issues
-
-## Continuous Integration & Deployment
-- [ ] Set up GitHub Actions for automated MATLAB testing
-- [ ] Create workflow for MEX compilation and testing across MATLAB versions
-- [ ] Add automated code quality checks (MATLAB Code Analyzer)
-- [ ] Implement automated documentation generation
-- [ ] Set up dependency vulnerability scanning
-- [ ] Create release automation workflow with semantic versioning
-- [ ] Add automated backup of development tools and configurations
-
-Source: Repository exploration - no CI/CD workflows found
-
-## Project Maintenance & Community
-- [ ] Create GitHub project boards for task tracking and milestone management
-- [ ] Set up automated issue labeling and triage
-- [ ] Add security policy (SECURITY.md) for vulnerability reporting
-- [ ] Create user documentation wiki or GitHub Pages site
-- [ ] Set up automated dependency updates (dependabot equivalent for MATLAB)
-- [ ] Add code of conduct for community interactions
+- [x] Add code of conduct for community interactions
 - [ ] Create issue/PR auto-close policies for stale items
 
 Source: Repository exploration - minimal issue/PR activity, community features missing

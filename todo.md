@@ -43,8 +43,12 @@ Source: `LESSONS_LEARNED.mdc` → JSON handling, Method visibility, Testing stra
   - Fixed: `src/managers/BookmarkManager.m` - improved file reading with preallocation
   - Fixed: `src/services/ScanControlService.m` - preallocated arrays for auto-step metrics collection
   - Updated: `src/controllers/FoilviewController.m` - integrated improved metrics initialization and finalization
-- [ ] Ensure constructors are called directly (avoid `app.Property(args)` for undefined properties)
-- [ ] Normalize controller lifecycle API: prefer `enable()`/`disable()`; remove mismatched `stop()` calls
+- [x] Ensure constructors are called directly (avoid `app.Property(args)` for undefined properties)
+  - Audited codebase: all constructors use proper `ClassName()` syntax
+  - No instances of `app.Property(args)` for undefined properties found
+- [x] Normalize controller lifecycle API: prefer `enable()`/`disable()`; remove mismatched `stop()` calls
+  - Fixed `HIDController.disable()` to call `obj.hidController.disable()` instead of `obj.hidController.stop()`
+  - Verified all other lifecycle API calls are consistent
 - [x] Add startup path hygiene: ensure `src/hardware/` (and others) added to MATLAB path centrally
   - Added `setupApplicationPaths` in `src/services/ApplicationInitializer.m`
 

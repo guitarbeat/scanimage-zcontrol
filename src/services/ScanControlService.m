@@ -161,13 +161,21 @@ classdef ScanControlService < handle
             executionPlan.isValid = true;
         end
 
-        function metrics = initializeMetricsCollection()
+        function metrics = initializeMetricsCollection(expectedSteps)
             % Initialize structure for collecting auto-step metrics
+            % expectedSteps: Optional parameter to preallocate arrays for performance
+            
+            if nargin < 1 || isempty(expectedSteps)
+                expectedSteps = ScanControlService.MAX_AUTO_STEPS; % Default to maximum
+            end
+            
             metrics = struct();
-            metrics.Positions = [];
+            % Preallocate arrays for better performance
+            metrics.Positions = NaN(expectedSteps, 1);
             metrics.Values = struct();
             metrics.StartTime = datetime('now');
             metrics.StepCount = 0;
+            metrics.MaxSteps = expectedSteps;
         end
 
         function metrics = recordMetricStep(metrics, position, metricValues)
@@ -176,18 +184,53 @@ classdef ScanControlService < handle
                 metricValues = struct();
             end
 
-            % Record position
-            metrics.Positions(end+1) = position;
+            % Increment step count
             metrics.StepCount = metrics.StepCount + 1;
+            stepIndex = metrics.StepCount;
+            
+            % Check if we need to expand arrays (shouldn't happen with proper preallocation)
+            if stepIndex > length(metrics.Positions)
+                % Emergency fallback: expand arrays
+                currentSize = length(metrics.Positions);
+                newSize = max(currentSize * 2, stepIndex);
+                metrics.Positions(newSize) = NaN; % Expand array
+                metrics.MaxSteps = newSize;
+            end
 
-            % Record metric values
+            % Record position using index instead of end+1
+            metrics.Positions(stepIndex) = position;
+
+            % Record metric values with preallocation
             metricFields = fieldnames(metricValues);
             for i = 1:length(metricFields)
                 fieldName = metricFields{i};
                 if ~isfield(metrics.Values, fieldName)
-                    metrics.Values.(fieldName) = [];
+                    % Preallocate array for new metric type
+                    metrics.Values.(fieldName) = NaN(metrics.MaxSteps, 1);
+                elseif length(metrics.Values.(fieldName)) < stepIndex
+                    % Emergency expansion (shouldn't happen with proper preallocation)
+                    metrics.Values.(fieldName)(metrics.MaxSteps) = NaN;
                 end
-                metrics.Values.(fieldName)(end+1) = metricValues.(fieldName);
+                metrics.Values.(fieldName)(stepIndex) = metricValues.(fieldName);
+            end
+        end
+
+        function metrics = finalizeMetricsCollection(metrics)
+            % Finalize metrics collection by trimming preallocated arrays to actual size
+            actualSteps = metrics.StepCount;
+            
+            if actualSteps > 0 && actualSteps < length(metrics.Positions)
+                % Trim position array
+                metrics.Positions = metrics.Positions(1:actualSteps);
+                
+                % Trim metric value arrays
+                metricFields = fieldnames(metrics.Values);
+                for i = 1:length(metricFields)
+                    fieldName = metricFields{i};
+                    if length(metrics.Values.(fieldName)) > actualSteps
+                        metrics.Values.(fieldName) = metrics.Values.(fieldName)(1:actualSteps);
+                    end
+                end
             end
         end
 

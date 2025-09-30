@@ -21,6 +21,12 @@
 %   - stop(): Stop the controller polling
 %   - connectToMJC3(): Connect to MJC3 device
 %
+% Lifecycle API:
+%   - enable(): Preferred method to start controller (calls start())
+%   - disable(): Preferred method to stop controller (calls stop())
+%   - start(): Legacy method to start controller
+%   - stop(): Legacy method to stop controller
+%
 % Dependencies:
 %   - Z-controller: Stage movement interface (must implement relativeMove)
 %   - LoggingService: Unified logging system
@@ -111,6 +117,21 @@ classdef BaseMJC3Controller < handle
             else
                 obj.Logger.warning('Failed to move Z down by %.1f μm', abs(dz));
             end
+        end
+        
+        %% Normalized Lifecycle API
+        % Provides consistent enable/disable interface across all controllers
+        
+        function enable(obj)
+            % Enable the controller (normalized API)
+            % This method provides a consistent interface with other controllers
+            obj.start();
+        end
+        
+        function disable(obj)
+            % Disable the controller (normalized API)
+            % This method provides a consistent interface with other controllers
+            obj.stop();
         end
         
         function delete(obj)

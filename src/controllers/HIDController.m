@@ -132,7 +132,7 @@ classdef HIDController < handle
             try
                 if ~isempty(obj.hidController)
                     obj.Logger.info('Stopping joystick controller...');
-                    obj.hidController.stop();
+                    obj.hidController.disable();
                     delete(obj.hidController);
                     obj.hidController = [];
                 end
